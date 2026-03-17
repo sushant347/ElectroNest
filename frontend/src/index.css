@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #1e293b;
+  background-color: #FFFFFF;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --primary: #F97316;
+  --secondary: #232F3E;
+  --background: #FFFFFF;
+  --surface: #F3F4F6;
+  --success: #16A34A;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+}
+
+a {
+  color: #F97316;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #ea580c;
+}
+
+/* ── Print Styles (StockMovements warehouse modal) ── */
+@media print {
+  @page { size: A4 portrait; margin: 8mm 10mm; }
+
+  /* sm-modal = StockMovements detail modal */
+  body * { visibility: hidden !important; }
+  .sm-modal-overlay, .sm-modal-overlay * { visibility: visible !important; }
+  .sm-modal-overlay {
+    position: fixed !important; inset: 0 !important;
+    background: white !important; backdrop-filter: none !important;
+    padding: 0 !important; display: block !important;
+  }
+  .sm-modal {
+    position: static !important; max-height: none !important;
+    max-width: 100% !important; width: 100% !important;
+    box-shadow: none !important; border: none !important;
+    border-radius: 0 !important; overflow: visible !important;
+  }
+  .sm-modal-close, .sm-btn-deliver, .sm-btn-close-modal, .sm-btn-print { display: none !important; }
+
+  /* Invoice stamp (both sm and odm contexts) */
+  .invoice-stamp {
+    visibility: visible !important;
+    display: block !important;
+    text-align: center;
+    margin-top: 16px;
+    padding: 8px 12px;
+    border: 2.5px solid #7C3AED;
+    border-radius: 10px;
+    color: #7C3AED;
+    font-weight: 800;
+    font-size: 0.8rem;
+    transform: rotate(-3deg);
+    opacity: 0.75;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
