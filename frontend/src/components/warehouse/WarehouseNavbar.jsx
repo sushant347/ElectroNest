@@ -82,7 +82,7 @@ export default function WarehouseNavbar() {
             <img src={electronestLogo} alt="ElectroNest" className="wh-nav-logo-img" />
             <div className="wh-nav-logo-text">
               <span className="wh-nav-logo-name">Electro<span className="wh-nav-accent">Nest</span></span>
-              <span className="wh-nav-logo-tag">Warehouse</span>
+              <span className="wh-nav-logo-tag">Warehouse Panel</span>
             </div>
           </Link>
 
@@ -342,7 +342,7 @@ export default function WarehouseNavbar() {
           .wh-topbar-inner { padding: 0.3rem 1rem; }
           .wh-nav-logo-img { height: 26px !important; }
           .wh-nav-logo-name { font-size: 0.92rem !important; }
-          .wh-nav-logo-tag { display: none; }
+          .wh-nav-logo-tag { display: block; font-size: 0.52rem; }
           .wh-topbar-left span { display: none; }
           /* Keep notification dropdown in-viewport on tablets */
           .wh-notif-dropdown { right: 0; width: 340px; }

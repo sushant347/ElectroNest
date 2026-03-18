@@ -208,6 +208,7 @@ const s = {
   label: { fontSize: 13, fontWeight: 600, color: "#334155", display: "flex", alignItems: "center", gap: 6 },
   input: {
     width: "100%",
+    boxSizing: "border-box",
     padding: "10px 14px",
     border: "1.5px solid #e2e8f0",
     borderRadius: 10,
@@ -220,6 +221,7 @@ const s = {
   },
   textarea: {
     width: "100%",
+    boxSizing: "border-box",
     padding: "10px 14px",
     border: "1.5px solid #e2e8f0",
     borderRadius: 10,
@@ -272,7 +274,7 @@ const s = {
   },
   savedAddrInfo: { flex: 1, minWidth: 0 },
   savedAddrName: { fontSize: 14, fontWeight: 600, color: "#1e293b" },
-  savedAddrDetail: { fontSize: 12, color: "#64748b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  savedAddrDetail: { fontSize: 12, color: "#64748b", marginTop: 2, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal" },
   savedAddrDeleteBtn: {
     background: "none",
     border: "none",
@@ -797,7 +799,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
   /* -- order placed success screen -- */
   if (orderPlaced) {
     return (
-      <section style={s.page}>
+      <section style={s.page} className="checkout-page">
         <div style={{ ...s.container, maxWidth: 600, textAlign: "center", padding: "80px 24px" }}>
           <div style={{
             width: 80, height: 80, borderRadius: "50%",
@@ -837,7 +839,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
   }
 
   return (
-    <section style={s.page}>
+    <section style={s.page} className="checkout-page">
       <div style={s.container}>
         {/* Toast Notifications */}
         <div style={s.toastOverlay}>
@@ -932,7 +934,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                             {selectedSavedId === addr.id && <div style={s.savedAddrDot} />}
                           </div>
                           <div style={s.savedAddrInfo}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="checkout-saved-row">
                               <div style={s.savedAddrName}>
                                 {addr.street}, {addr.city}
                               </div>
@@ -1058,7 +1060,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                       {/* Country selector */}
                       <div style={s.formGroup}>
                         <label style={s.label}><MapPin size={13} /> Country *</label>
-                        <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 8 }} className="checkout-country-row">
                           {['Nepal', 'India'].map((c) => (
                             <button
                               key={c}
@@ -1489,17 +1491,48 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
           }
         }
         @media (max-width: 600px) {
+          .checkout-page {
+            padding: 16px 10px 36px !important;
+          }
+          .checkout-grid {
+            gap: 12px !important;
+          }
+          .checkout-grid > * {
+            min-width: 0;
+          }
           .checkout-form-grid {
             grid-template-columns: 1fr !important;
+            gap: 12px !important;
           }
           .checkout-form-grid > * {
             grid-column: auto !important;
+          }
+          .checkout-saved-row {
+            flex-wrap: wrap;
+            row-gap: 4px;
+          }
+          .checkout-country-row {
+            flex-wrap: wrap;
+          }
+          .checkout-country-row > button {
+            flex: 1 1 calc(50% - 8px) !important;
+            min-width: 0;
           }
           .checkout-payment-grid {
             grid-template-columns: repeat(2, 1fr) !important;
           }
         }
         @media (max-width: 480px) {
+          .checkout-payment-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .checkout-mobile-summary {
+            overflow: hidden;
+          }
+          .checkout-mobile-summary * {
+            max-width: 100%;
+            box-sizing: border-box;
+          }
           .checkout-mobile-summary .summary-card-inner {
             padding: 16px !important;
           }

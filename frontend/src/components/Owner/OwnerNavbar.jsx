@@ -93,7 +93,7 @@ export default function OwnerNavbar() {
             <img src={electronestLogo} alt="ElectroNest" className="owner-nav-logo-img" />
             <div className="owner-nav-logo-text">
               <span className="owner-nav-logo-name">Electro<span className="owner-nav-accent">Nest</span></span>
-              <span className="owner-nav-logo-tag">Management</span>
+              <span className="owner-nav-logo-tag">Owner Panel</span>
             </div>
           </Link>
 
@@ -366,7 +366,7 @@ export default function OwnerNavbar() {
           .owner-topbar-inner { padding: 0.3rem 1rem; }
           .owner-nav-logo-img { height: 26px !important; }
           .owner-nav-logo-name { font-size: 0.92rem !important; }
-          .owner-nav-logo-tag { display: none; }
+          .owner-nav-logo-tag { display: block; font-size: 0.52rem; }
           .owner-topbar-left span { display: none; }
           /* Keep notification dropdown in-viewport on tablets */
           .owner-notif-dropdown { right: 0; width: 340px; }
