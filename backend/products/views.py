@@ -1,5 +1,7 @@
 import csv
 import io
+import random
+import string
 
 from rest_framework import viewsets, filters, status as drf_status
 from rest_framework.views import APIView
@@ -63,6 +65,20 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
 
     def get_audit_table_name(self):
         return 'Products'
+
+    def _generate_sku(self):
+        """Generate a unique SKU like PRD-AB3X9K2M."""
+        while True:
+            sku = 'PRD-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            if not Product.objects.filter(sku=sku).exists():
+                return sku
+
+    def perform_create(self, serializer):
+        save_kwargs = {'sku': self._generate_sku()}
+        # Use owner_name from payload if explicitly set; otherwise derive from the logged-in user
+        if not serializer.validated_data.get('owner_name', '').strip():
+            save_kwargs['owner_name'] = f"{self.request.user.first_name} {self.request.user.last_name}".strip()
+        serializer.save(**save_kwargs)
 
     def get_queryset(self):
         qs       = super().get_queryset()

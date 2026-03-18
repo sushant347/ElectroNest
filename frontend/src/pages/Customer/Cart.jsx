@@ -29,10 +29,12 @@ const styles = {
     minHeight: "100vh",
     background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 35%)",
     padding: "48px 24px 64px",
+    overflowX: "hidden",
   },
   container: {
     maxWidth: 1200,
     margin: "0 auto",
+    width: "100%",
   },
 
   
@@ -203,6 +205,9 @@ const styles = {
     boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
     position: "sticky",
     top: 100,
+    width: "100%",
+    boxSizing: "border-box",
+    minWidth: 0,
   },
   summaryTitle: {
     fontSize: 18,
@@ -240,13 +245,18 @@ const styles = {
   summaryRow: {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 8,
     marginBottom: 12,
     fontSize: 14,
     color: "#64748b",
+    minWidth: 0,
   },
   summaryVal: {
     fontWeight: 600,
     color: "#1e293b",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   divider: {
     height: 1,
@@ -256,18 +266,24 @@ const styles = {
   totalRow: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "flex-end",
+    alignItems: "center",
+    gap: 8,
     marginBottom: 24,
+    minWidth: 0,
   },
   totalLabel: {
     fontSize: 16,
     fontWeight: 600,
     color: "#1e293b",
+    flexShrink: 1,
+    minWidth: 0,
   },
   totalVal: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 800,
     color: "#F97316",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   checkoutBtn: {
     width: "100%",

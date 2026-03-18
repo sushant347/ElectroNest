@@ -49,10 +49,12 @@ const styles = {
     minHeight: "100vh",
     background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 35%)",
     padding: "48px 24px 64px",
+    overflowX: "hidden",
   },
   container: {
     maxWidth: 1200,
     margin: "0 auto",
+    width: "100%",
   },
   /* header */
   headerWrap: {

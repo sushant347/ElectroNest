@@ -1,9 +1,40 @@
 import { useState, useEffect } from 'react';
-import { X, Upload } from 'lucide-react';
+import { X } from 'lucide-react';
 
-export default function ProductModal({ isOpen, onClose, onSave, product, categories = [], suppliers = [] }) {
+/* ── Field lives OUTSIDE ProductModal so its identity is stable across re-renders.
+   Defining a component inside another component causes React to treat it as a new
+   component type on every render, unmounting/remounting it and losing input focus. ── */
+function Field({ label, name, type = 'text', required, rows, form, errors, onChange }) {
+  return (
+    <div className="pm-field">
+      <label className="pm-label">{label}{required && <span className="pm-req">*</span>}</label>
+      {rows ? (
+        <textarea
+          className={`pm-input ${errors[name] ? 'pm-err' : ''}`}
+          rows={rows}
+          value={form[name] ?? ''}
+          onChange={(e) => onChange(name, e.target.value)}
+        />
+      ) : (
+        <input
+          className={`pm-input ${errors[name] ? 'pm-err' : ''}`}
+          type={type}
+          value={form[name] ?? ''}
+          onChange={(e) => onChange(name, e.target.value)}
+        />
+      )}
+      {errors[name] && <span className="pm-error">{errors[name]}</span>}
+    </div>
+  );
+}
+
+export default function ProductModal({ isOpen, onClose, onSave, product, categories = [], owners = [] }) {
   const isEdit = !!product;
-  const blank = { name: '', category: '', brand: '', description: '', specifications: '', cost_price: '', selling_price: '', stock: '64', reorder_level: '', supplier: '', image_url: '' };
+  const blank = {
+    name: '', category: '', brand: '', description: '', specifications: '',
+    cost_price: '', selling_price: '', stock: '', reorder_level: '',
+    owner_name: '', image_url: '',
+  };
   const [form, setForm] = useState(blank);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -14,29 +45,34 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
         setForm({
           ...blank,
           ...product,
-          category: product.category ?? '',
-          supplier: product.supplier ?? '',
+          category:   product.category   ?? '',
+          owner_name: product.owner_name ?? '',
           cost_price: product.cost_price ?? '',
           selling_price: product.selling_price ?? '',
-          stock: product.stock ?? '',
+          stock:      product.stock      ?? '',
+          reorder_level: product.reorder_level ?? '',
         });
       } else {
         setForm(blank);
       }
+      setErrors({});
     }
-    setErrors({});
   }, [isOpen, product]);
 
-  const set = (k, v) => { setForm((p) => ({ ...p, [k]: v })); setErrors((p) => ({ ...p, [k]: undefined })); };
+  const set = (k, v) => {
+    setForm((p) => ({ ...p, [k]: v }));
+    setErrors((p) => ({ ...p, [k]: undefined }));
+  };
 
   const validate = () => {
     const e = {};
-    if (!form.name.trim()) e.name = 'Required';
+    if (!form.name?.trim()) e.name = 'Required';
     if (!form.category) e.category = 'Required';
-    if (!form.brand.trim()) e.brand = 'Required';
+    if (!form.brand?.trim()) e.brand = 'Required';
     if (form.cost_price === '' || Number(form.cost_price) < 0) e.cost_price = 'Enter valid cost';
     if (form.selling_price === '' || Number(form.selling_price) < 0) e.selling_price = 'Enter valid price';
-    if (Number(form.selling_price) <= Number(form.cost_price)) e.selling_price = 'Must be > cost price';
+    if (form.cost_price !== '' && form.selling_price !== '' && Number(form.selling_price) <= Number(form.cost_price))
+      e.selling_price = 'Must be > cost price';
     if (form.stock === '' || Number(form.stock) < 0) e.stock = 'Enter valid quantity';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -47,18 +83,21 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
     setSaving(true);
     try {
       const payload = {
-        name: form.name,
-        category: Number(form.category),
-        supplier: form.supplier ? Number(form.supplier) : null,
-        brand: form.brand,
-        description: form.description,
-        specifications: form.specifications,
-        cost_price: Number(form.cost_price),
+        name:         form.name.trim(),
+        category:     Number(form.category),
+        brand:        form.brand.trim(),
+        description:  form.description ?? '',
+        specifications: form.specifications ?? '',
+        cost_price:   Number(form.cost_price),
         selling_price: Number(form.selling_price),
-        stock: Number(form.stock),
-        reorder_level: form.reorder_level ? Number(form.reorder_level) : 10,
-        image_url: form.image_url,
+        stock:        Number(form.stock),
+        reorder_level: form.reorder_level !== '' ? Number(form.reorder_level) : 10,
+        image_url:    form.image_url ?? '',
       };
+      // Include owner_name only when explicitly selected
+      if (form.owner_name?.trim()) {
+        payload.owner_name = form.owner_name.trim();
+      }
       await onSave(payload);
     } catch (err) {
       console.error('Save failed:', err);
@@ -69,23 +108,6 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
 
   if (!isOpen) return null;
 
-  const Field = ({ label, name, type = 'text', required, options, rows }) => (
-    <div className="pm-field">
-      <label className="pm-label">{label}{required && <span className="pm-req">*</span>}</label>
-      {options ? (
-        <select className={`pm-input ${errors[name] ? 'pm-err' : ''}`} value={form[name]} onChange={(e) => set(name, e.target.value)}>
-          <option value="">Select...</option>
-          {options.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-      ) : rows ? (
-        <textarea className={`pm-input ${errors[name] ? 'pm-err' : ''}`} rows={rows} value={form[name]} onChange={(e) => set(name, e.target.value)} />
-      ) : (
-        <input className={`pm-input ${errors[name] ? 'pm-err' : ''}`} type={type} value={form[name]} onChange={(e) => set(name, e.target.value)} />
-      )}
-      {errors[name] && <span className="pm-error">{errors[name]}</span>}
-    </div>
-  );
-
   return (
     <div className="pm-overlay" onClick={onClose}>
       <div className="pm-modal" onClick={(e) => e.stopPropagation()}>
@@ -93,40 +115,66 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
           <h2 className="pm-title">{isEdit ? 'Edit Product' : 'Add New Product'}</h2>
           <button className="pm-close" onClick={onClose}><X size={20} /></button>
         </div>
+
         <div className="pm-body">
           <div className="pm-grid">
-            <Field label="Product Name" name="name" required />
+            <Field label="Product Name"        name="name"           required form={form} errors={errors} onChange={set} />
+
+            {/* Category */}
             <div className="pm-field">
               <label className="pm-label">Category<span className="pm-req">*</span></label>
-              <select className={`pm-input ${errors.category ? 'pm-err' : ''}`} value={form.category} onChange={(e) => set('category', e.target.value)}>
+              <select
+                className={`pm-input ${errors.category ? 'pm-err' : ''}`}
+                value={form.category}
+                onChange={(e) => set('category', e.target.value)}
+              >
                 <option value="">Select...</option>
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               {errors.category && <span className="pm-error">{errors.category}</span>}
             </div>
-            <Field label="Brand" name="brand" required />
-            <Field label="Cost Price (NPR)" name="cost_price" type="number" required />
-            <Field label="Selling Price (NPR)" name="selling_price" type="number" required />
-            <Field label="Stock Quantity" name="stock" type="number" required />
-            <Field label="Reorder Level" name="reorder_level" type="number" />
+
+            <Field label="Brand"               name="brand"          required form={form} errors={errors} onChange={set} />
+            <Field label="Cost Price (NPR)"    name="cost_price"     required type="number" form={form} errors={errors} onChange={set} />
+            <Field label="Selling Price (NPR)" name="selling_price"  required type="number" form={form} errors={errors} onChange={set} />
+            <Field label="Stock Quantity"      name="stock"          required type="number" form={form} errors={errors} onChange={set} />
+            <Field label="Reorder Level"       name="reorder_level"           type="number" form={form} errors={errors} onChange={set} />
+
+            {/* Supplier Name — lists store owners, value stored as owner_name */}
             <div className="pm-field">
-              <label className="pm-label">Supplier</label>
-              <select className="pm-input" value={form.supplier} onChange={(e) => set('supplier', e.target.value)}>
-                <option value="">Select...</option>
-                {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <label className="pm-label">Supplier Name</label>
+              <select
+                className="pm-input"
+                value={form.owner_name}
+                onChange={(e) => set('owner_name', e.target.value)}
+              >
+                <option value="">Select owner...</option>
+                {owners.map((o) => (
+                  <option key={o.id} value={o.name}>{o.name}</option>
+                ))}
               </select>
             </div>
+
+            {/* Image URL */}
             <div className="pm-field">
               <label className="pm-label">Image URL</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input className="pm-input" style={{ flex: 1 }} value={form.image_url} onChange={(e) => set('image_url', e.target.value)} placeholder="https://..." />
+                <input
+                  className="pm-input"
+                  style={{ flex: 1 }}
+                  value={form.image_url ?? ''}
+                  onChange={(e) => set('image_url', e.target.value)}
+                  placeholder="https://..."
+                />
                 {form.image_url && <img src={form.image_url} alt="" className="pm-preview" />}
               </div>
             </div>
           </div>
-          <Field label="Description" name="description" rows={3} />
-          <Field label="Specifications" name="specifications" rows={3} />
+
+          <Field label="Description"    name="description"    rows={3} form={form} errors={errors} onChange={set} />
+          <Field label="Specifications" name="specifications" rows={3} form={form} errors={errors} onChange={set} />
         </div>
+
         <div className="pm-footer">
           <button className="pm-btn pm-btn-cancel" onClick={onClose}>Cancel</button>
           <button className="pm-btn pm-btn-save" onClick={handleSave} disabled={saving}>
@@ -134,6 +182,7 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
           </button>
         </div>
       </div>
+
       <style>{`
         .pm-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(2px); }
         .pm-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 680px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
@@ -141,8 +190,8 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
         .pm-title { font-size: 1.15rem; font-weight: 700; color: #1e293b; }
         .pm-close { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.15s; }
         .pm-close:hover { color: #ef4444; background: #fef2f2; }
-        .pm-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
-        .pm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem 1.25rem; margin-bottom: 1rem; }
+        .pm-body { padding: 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 0.85rem; }
+        .pm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem 1.25rem; }
         @media (max-width: 540px) { .pm-grid { grid-template-columns: 1fr; } }
         .pm-field { display: flex; flex-direction: column; gap: 0.25rem; }
         .pm-label { font-size: 0.78rem; font-weight: 600; color: #374151; }

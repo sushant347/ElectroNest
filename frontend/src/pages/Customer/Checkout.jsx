@@ -122,8 +122,9 @@ const s = {
     minHeight: "100vh",
     background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 35%)",
     padding: "32px 24px 64px",
+    overflowX: "hidden",
   },
-  container: { maxWidth: 1200, margin: "0 auto" },
+  container: { maxWidth: 1200, margin: "0 auto", width: "100%" },
   /* breadcrumb */
   breadcrumb: {
     marginBottom: 24,
@@ -177,6 +178,9 @@ const s = {
     borderRadius: 16,
     padding: 24,
     boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+    width: "100%",
+    boxSizing: "border-box",
+    minWidth: 0,
   },
   cardTitle: {
     fontSize: 17,
@@ -328,6 +332,8 @@ const s = {
     gap: 14,
     padding: "10px 0",
     borderBottom: "1px solid #f1f5f9",
+    minWidth: 0,
+    overflow: "hidden",
   },
   summaryItemImg: {
     width: 52,
@@ -347,13 +353,13 @@ const s = {
     whiteSpace: "nowrap",
   },
   summaryItemQty: { fontSize: 11, color: "#94a3b8", marginTop: 2 },
-  summaryItemPrice: { fontSize: 14, fontWeight: 700, color: "#F97316", flexShrink: 0 },
-  summaryRow: { display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 14, color: "#64748b" },
-  summaryVal: { fontWeight: 600, color: "#1e293b" },
+  summaryItemPrice: { fontSize: 14, fontWeight: 700, color: "#F97316", flexShrink: 0, whiteSpace: "nowrap", marginLeft: "auto", paddingLeft: 8 },
+  summaryRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 10, fontSize: 14, color: "#64748b", minWidth: 0 },
+  summaryVal: { fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap", flexShrink: 0 },
   divider: { height: 1, background: "#e2e8f0", margin: "16px 0" },
-  totalRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20 },
-  totalLabel: { fontSize: 16, fontWeight: 600, color: "#1e293b" },
-  totalVal: { fontSize: 24, fontWeight: 800, color: "#F97316" },
+  totalRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 20, minWidth: 0 },
+  totalLabel: { fontSize: 16, fontWeight: 600, color: "#1e293b", flexShrink: 1, minWidth: 0 },
+  totalVal: { fontSize: 20, fontWeight: 800, color: "#F97316", whiteSpace: "nowrap" },
   /* buttons */
   placeOrderBtn: {
     width: "100%",
@@ -1244,7 +1250,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                     </div>
                     <div style={s.divider} />
                     <div style={s.summaryRow}>
-                      <span>Subtotal</span>
+                      <span>Subtotal ({totalItems} items)</span>
                       <span style={s.summaryVal}>{formatPrice(subtotal)}</span>
                     </div>
                     <div style={s.summaryRow}>
@@ -1253,9 +1259,15 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                         {shipping === 0 ? 'Free 🎉' : formatPrice(shipping)}
                       </span>
                     </div>
+                    {couponDiscount > 0 && (
+                      <div style={{ ...s.summaryRow, color: '#16a34a' }}>
+                        <span>Coupon ({appliedCoupon?.discount_percent}%)</span>
+                        <span style={{ fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap', flexShrink: 0 }}>−{formatPrice(couponDiscount)}</span>
+                      </div>
+                    )}
                     <div style={s.divider} />
                     <div style={s.totalRow}>
-                      <span style={s.totalLabel}>Total</span>
+                      <span style={s.totalLabel}>Order Total</span>
                       <span style={s.totalVal}>{formatPrice(total)}</span>
                     </div>
                     <button
@@ -1467,6 +1479,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
         @media (max-width: 900px) {
           .checkout-grid {
             grid-template-columns: 1fr !important;
+            gap: 16px !important;
           }
           .checkout-sidebar {
             display: none !important;
@@ -1484,6 +1497,11 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
           }
           .checkout-payment-grid {
             grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .checkout-mobile-summary .summary-card-inner {
+            padding: 16px !important;
           }
         }
       `}</style>

@@ -297,8 +297,8 @@ function Field({ label, children }) {
 }
 
 const s = {
-  page:      { minHeight: '100vh', background: 'linear-gradient(180deg,#fff7ed 0%,#fff 35%)', padding: '40px 24px 64px' },
-  container: { maxWidth: 820, margin: '0 auto' },
+  page:      { minHeight: '100vh', background: 'linear-gradient(180deg,#fff7ed 0%,#fff 35%)', padding: '40px 24px 64px', overflowX: 'hidden' },
+  container: { maxWidth: 820, margin: '0 auto', width: '100%' },
   header:    { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
   title:     { fontSize: '1.8rem', fontWeight: 800, color: '#1e293b', margin: 0 },
   logoutBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 20px', background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' },

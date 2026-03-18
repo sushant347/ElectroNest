@@ -23,6 +23,16 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Product
         fields = '__all__'
+        extra_kwargs = {
+            # sku is auto-generated in perform_create — never required from the client
+            'sku':        {'required': False},
+            # owner_name is set from the authenticated user in perform_create
+            'owner_name': {'required': False},
+            # these are always auto-managed
+            'units_sold': {'required': False},
+            'created_at': {'read_only': True},
+            'updated_at': {'read_only': True},
+        }
 
     def get_average_rating(self, obj):
         value = getattr(obj, 'average_rating', None)

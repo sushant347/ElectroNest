@@ -321,7 +321,7 @@ function useProductFilters(products = []) {
 export default function ProductManagement() {
   const [products, setProducts] = useState([]);
   const [categoriesList, setCategoriesList] = useState([]);
-  const [suppliersList, setSuppliersList] = useState([]);
+  const [ownersList, setOwnersList] = useState([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState(null);
   const {
@@ -335,14 +335,14 @@ export default function ProductManagement() {
     try {
       setPageLoading(true);
       setPageError(null);
-      const [prodRes, catRes, supRes] = await Promise.all([
-        ownerAPI.getAllProducts({ page_size: 1000 }),
+      const [prodRes, catRes, ownersRes] = await Promise.all([
+        ownerAPI.getAllProducts({ page_size: 1000, my_products: true }),
         ownerAPI.getCategories(),
-        ownerAPI.getSuppliers(),
+        ownerAPI.getOwners(),
       ]);
       setProducts(prodRes.data.results || prodRes.data);
       setCategoriesList(catRes.data.results || catRes.data || []);
-      setSuppliersList(supRes.data.results || supRes.data || []);
+      setOwnersList(ownersRes.data || []);
     } catch (err) {
       setPageError(err.response?.data?.message || 'Failed to load products. Please try again.');
     } finally {
@@ -542,7 +542,7 @@ export default function ProductManagement() {
       )}
 
       {/* Modals */}
-      <ProductModal isOpen={showModal} onClose={() => setShowModal(false)} onSave={handleSave} product={editingProduct} categories={categoriesList} suppliers={suppliersList} />
+      <ProductModal isOpen={showModal} onClose={() => setShowModal(false)} onSave={handleSave} product={editingProduct} categories={categoriesList} owners={ownersList} />
 
       {showStockModal && (
         <StockIncreaseModal products={products} onClose={() => setShowStockModal(false)} onStockUpdate={handleStockUpdate} />

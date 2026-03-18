@@ -240,6 +240,28 @@ def get_customer_from_token(request):
     return None
 
 
+class OwnersListView(APIView):
+    """Return all active owner accounts — accessible to any authenticated staff user."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        owners = (
+            CustomUser.objects
+            .filter(role='owner', is_active=True)
+            .values('id', 'first_name', 'last_name', 'email')
+            .order_by('first_name', 'last_name')
+        )
+        data = [
+            {
+                'id':    o['id'],
+                'name':  f"{o['first_name']} {o['last_name']}".strip(),
+                'email': o['email'],
+            }
+            for o in owners
+        ]
+        return Response(data)
+
+
 class CustomerAddressViewSet(viewsets.ModelViewSet):
     serializer_class   = CustomerAddressSerializer
     permission_classes = [AllowAny]  # We handle auth manually

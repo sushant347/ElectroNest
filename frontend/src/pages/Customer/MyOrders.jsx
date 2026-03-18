@@ -515,8 +515,8 @@ export default function MyOrders() {
 }
 
 const s = {
-  page:      { minHeight: '100vh', background: 'linear-gradient(180deg,#fff7ed 0%,#fff 35%)', padding: '40px 24px 64px' },
-  container: { maxWidth: 900, margin: '0 auto' },
+  page:      { minHeight: '100vh', background: 'linear-gradient(180deg,#fff7ed 0%,#fff 35%)', padding: '40px 24px 64px', overflowX: 'hidden' },
+  container: { maxWidth: 900, margin: '0 auto', width: '100%' },
   title:     { fontSize: '2rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 },
   filterBar: { display: 'flex', gap: 6, marginBottom: 24, flexWrap: 'wrap' },
   filterBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', fontSize: 13, fontWeight: 600, color: '#64748b', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' },

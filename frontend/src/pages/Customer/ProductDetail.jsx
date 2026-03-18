@@ -809,8 +809,8 @@ const couponCSS = `
 
 /* ── Product styles ── */
 const s = {
-  page: { minHeight: '100vh', background: 'linear-gradient(180deg, #fff7ed 0%, #ffffff 35%)', padding: '32px 24px 64px' },
-  container: { maxWidth: 1100, margin: '0 auto' },
+  page: { minHeight: '100vh', background: 'linear-gradient(180deg, #fff7ed 0%, #ffffff 35%)', padding: '32px 24px 64px', overflowX: 'hidden' },
+  container: { maxWidth: 1100, margin: '0 auto', width: '100%' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'start' },
   imageCard: { position: 'relative', background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' },
   img: { width: '100%', height: 420, objectFit: 'cover', display: 'block' },

@@ -120,7 +120,7 @@ export const ownerAPI = {
   getAllProducts: (params) => api.get('/products/', { params }),
   getProduct: (id) => api.get(`/products/${id}/`),
   createProduct: (data) => api.post('/products/', data),
-  updateProduct: (id, data) => api.put(`/products/${id}/`, data),
+  updateProduct: (id, data) => api.patch(`/products/${id}/`, data),
   deleteProduct: (id) => api.delete(`/products/${id}/`),
 
   // Order Management
@@ -129,10 +129,11 @@ export const ownerAPI = {
   updateOrderStatus: (id, statusData) => api.patch(`/orders/${id}/update-status/`, statusData),
   getOrderStatuses: () => api.get('/order-statuses/'),
 
-  // Categories, Brands & Suppliers (for dropdowns)
+  // Categories, Brands & Owners (for dropdowns)
   getCategories: () => api.get('/categories/'),
   getBrands: () => api.get('/brands/'),
   getSuppliers: () => api.get('/suppliers/'),
+  getOwners: () => api.get('/auth/owners/'),
 
   // Notifications
   getNotifications: () => api.get('/notifications/'),
