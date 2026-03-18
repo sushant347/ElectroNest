@@ -22,10 +22,11 @@ class Migration(migrations.Migration):
                 ('date_of_birth', models.DateField(blank=True, db_column='DateOfBirth', null=True)),
                 ('registration_date', models.DateTimeField(blank=True, db_column='RegistrationDate', null=True)),
                 ('is_active', models.BooleanField(db_column='isActive', default=True)),
+                ('password', models.CharField(blank=True, db_column='Password', max_length=128, null=True)),
             ],
             options={
                 'db_table': 'Customers',
-                'managed': False,
+                'managed': True,
             },
         ),
         migrations.AlterModelOptions(

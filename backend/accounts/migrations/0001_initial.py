@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('auth', '0012_alter_user_first_name_max_length'),
+        ('products', '0002_customer_alter_category_options_and_more'),
     ]
 
     operations = [
@@ -50,14 +51,14 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='CustomerAddress',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('street', models.CharField(blank=True, default='', max_length=255)),
-                ('city', models.CharField(max_length=255)),
-                ('province', models.CharField(blank=True, default='', max_length=255)),
-                ('postal_code', models.CharField(max_length=20)),
-                ('country', models.CharField(default='Nepal', max_length=255)),
-                ('address_type', models.CharField(choices=[('Billing', 'Billing'), ('Shipping', 'Shipping')], max_length=50)),
-                ('customer', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='addresses', to=settings.AUTH_USER_MODEL)),
+                ('id', models.AutoField(db_column='AddressID', primary_key=True, serialize=False)),
+                ('street', models.CharField(blank=True, db_column='Street', default='', max_length=255)),
+                ('city', models.CharField(db_column='City', max_length=255)),
+                ('province', models.CharField(blank=True, db_column='Province', default='', max_length=255)),
+                ('postal_code', models.CharField(blank=True, db_column='PostalCode', default='', max_length=20)),
+                ('country', models.CharField(db_column='Country', default='Nepal', max_length=255)),
+                ('address_type', models.CharField(choices=[('Billing', 'Billing'), ('Shipping', 'Shipping')], db_column='AddressType', max_length=50)),
+                ('customer', models.ForeignKey(db_column='CustomerID', on_delete=django.db.models.deletion.CASCADE, related_name='addresses', to='products.customer')),
             ],
             options={
                 'db_table': 'Customer_Address',
