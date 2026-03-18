@@ -564,6 +564,16 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
             grid-template-columns: 1fr !important;
           }
         }
+        @media (max-width: 640px) {
+          .cart-grid > div > div > div {
+            flex-direction: column !important;
+            gap: 12px !important;
+          }
+          .cart-grid img {
+            width: 80px !important;
+            height: 80px !important;
+          }
+        }
       `}</style>
     </section>
   );

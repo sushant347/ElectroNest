@@ -469,9 +469,9 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
     <div style={s.page}>
       <div style={s.container}>
 
-        <div style={s.grid}>
+        <div style={s.grid} className="pd-grid">
           {/* Image */}
-          <div style={s.imageCard}>
+          <div style={s.imageCard} className="pd-image-card">
             {product.image ? (
               <img src={product.image} alt={product.name} style={s.img} onError={(e) => { e.target.style.display = 'none' }} />
             ) : (
@@ -870,4 +870,20 @@ const spinnerCSS = `
   .reviews-scroll::-webkit-scrollbar-thumb { background: #fed7aa; border-radius: 4px; }
   .reviews-scroll::-webkit-scrollbar-thumb:hover { background: #F97316; }
   .reviews-scroll { scrollbar-width: thin; scrollbar-color: #fed7aa #f1f5f9; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .pd-grid {
+      grid-template-columns: 1fr !important;
+      gap: 20px !important;
+    }
+    .pd-image-card img {
+      height: 280px !important;
+    }
+  }
+  @media (max-width: 480px) {
+    .pd-image-card img {
+      height: 220px !important;
+    }
+  }
 `;

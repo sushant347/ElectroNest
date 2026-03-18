@@ -261,6 +261,101 @@ table {
   }
 }
 
+/* ── Owner panel pages: responsive ── */
+@media (max-width: 768px) {
+  .owner-om { padding: 1rem !important; }
+  .owner-om-header { flex-direction: column; gap: 0.5rem; }
+  .owner-om-status-pills { flex-wrap: wrap; }
+  .owner-om-search { max-width: 100% !important; }
+  .owner-om-table-wrap { border-radius: 10px !important; }
+
+  /* Owner Dashboard */
+  .owner-dash { padding: 1rem !important; }
+  .owner-dash-header { flex-direction: column !important; gap: 0.5rem !important; }
+  .owner-filter-btns { flex-wrap: wrap !important; gap: 0.4rem !important; }
+  .owner-filter-btn { padding: 0.35rem 0.65rem !important; font-size: 0.72rem !important; }
+
+  /* Owner product management */
+  .owner-pm { padding: 1rem !important; }
+  .owner-pm-header { flex-direction: column !important; gap: 0.5rem !important; }
+  .pm-search { max-width: 100% !important; }
+  .pm-table-wrap { border-radius: 10px !important; }
+}
+
+/* ── Admin panel pages: responsive ── */
+@media (max-width: 768px) {
+  .adm-dash-cards,
+  .adm-dash-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+  .adm-card { min-width: 0 !important; }
+  .adm-page { padding: 1rem !important; }
+  .adm-page-header { flex-direction: column !important; gap: 0.5rem !important; }
+}
+
+/* ── Warehouse panel pages: responsive ── */
+@media (max-width: 768px) {
+  .wh-page { padding: 1rem !important; }
+  .wh-header { flex-direction: column !important; gap: 0.5rem !important; }
+  .wh-dashboard-grid { grid-template-columns: 1fr !important; }
+  .wh-summary-cards { grid-template-columns: 1fr 1fr !important; }
+}
+@media (max-width: 480px) {
+  .wh-summary-cards { grid-template-columns: 1fr !important; }
+}
+
+/* ── Customer pages: extra responsive ── */
+@media (max-width: 640px) {
+  /* Profile page: grid stacking */
+  .profile-grid { grid-template-columns: 1fr !important; }
+  .profile-card { min-width: 0 !important; }
+
+  /* Orders page: full-width cards */
+  .my-orders-list > div { padding: 0.75rem !important; }
+
+  /* Checkout page: stack the grid */
+  .checkout-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+}
+
+/* ── Global: any 2-column inline grid stacks on mobile ── */
+@media (max-width: 768px) {
+  div[style*="grid-template-columns: 1fr 1fr"],
+  div[style*="grid-template-columns: 1fr 380px"],
+  div[style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Global: reduce padding on all pages on mobile ── */
+@media (max-width: 640px) {
+  section[style*="padding: 48px"],
+  section[style*="padding: 32px"],
+  div[style*="padding: 48px"],
+  div[style*="padding: 32px"] {
+    padding: 16px 12px !important;
+  }
+}
+
+/* ── Global: images never overflow ── */
+img {
+  max-width: 100%;
+  height: auto;
+}
+img[style*="height"] {
+  max-width: 100%;
+}
+
+/* ── Global: touch targets min 44px on mobile ── */
+@media (max-width: 640px) {
+  button, a, [role="button"] {
+    min-height: 36px;
+  }
+}
+
 /* ── Prevent horizontal page overflow everywhere ── */
 html, body, #root {
   overflow-x: hidden;
