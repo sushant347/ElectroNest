@@ -41,6 +41,15 @@ import SystemLogs from './pages/Admin/SystemLogs'
 import AnalyticsSummary from './pages/Admin/AnalyticsSummary'
 import AdminLayout from './components/admin/AdminLayout'
 
+// Support Pages
+import ContactUs from './pages/Support/ContactUs'
+import FAQ from './pages/Support/FAQ'
+import ShippingInfo from './pages/Support/ShippingInfo'
+import ReturnsExchanges from './pages/Support/ReturnsExchanges'
+import Warranty from './pages/Support/Warranty'
+import PrivacyPolicy from './pages/Support/PrivacyPolicy'
+import TermsOfService from './pages/Support/TermsOfService'
+
 /** Redirect already-logged-in users away from /login to their role dashboard */
 function LoginRoute() {
   const { user, initialized } = useAuth()
@@ -143,6 +152,7 @@ export default function App() {
       stock: p.stock || 0,
       specifications: p.specifications || '',
       rating: parseFloat(p.average_rating || 0) || 4.5,
+      reviewCount: Number(p.review_count ?? 0),
       inStock: (p.stock || 0) > 0,
     }
   }
@@ -445,6 +455,15 @@ export default function App() {
           <Route path="/profile" element={<ProtectedRoute allowedRoles={['customer', 'owner', 'warehouse', 'admin']}><Profile /></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute allowedRoles={['customer']}><MyOrders /></ProtectedRoute>} />
           <Route path="/reviews" element={<ProtectedRoute allowedRoles={['customer']}><MyReviews /></ProtectedRoute>} />
+
+          {/* Support Routes */}
+          <Route path="/support/contact" element={<ContactUs />} />
+          <Route path="/support/faq" element={<FAQ />} />
+          <Route path="/support/shipping" element={<ShippingInfo />} />
+          <Route path="/support/returns" element={<ReturnsExchanges />} />
+          <Route path="/support/warranty" element={<Warranty />} />
+          <Route path="/support/privacy" element={<PrivacyPolicy />} />
+          <Route path="/support/terms" element={<TermsOfService />} />
 
           {/* Owner Routes */}
           <Route path="/owner" element={<ProtectedRoute allowedRoles={['owner']}><OwnerLayout /></ProtectedRoute>}>

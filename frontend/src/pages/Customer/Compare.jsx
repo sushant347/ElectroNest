@@ -220,6 +220,8 @@ const styles = {
 
 const Compare = ({ items = [], removeFromCompare, addToCart }) => {
   const [showSpecs, setShowSpecs] = useState(false);
+  const [showMore, setShowMore] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
   const specsRef = useRef(null);
 
   const toggleSpecs = () => {
@@ -283,30 +285,118 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
   return (
     <section className="cmp-page" style={styles.page}>
       <style>{`
+        /* ── Desktop / Tablet ── */
         @media (max-width: 900px) {
           .cmp-page { padding: 28px 16px 48px !important; }
-          .cmp-table { min-width: 600px !important; }
-          .cmp-table th { width: 120px !important; padding: 14px 10px !important; font-size: 13px !important; }
+          .cmp-table { min-width: unset !important; }
+          .cmp-table th { width: 100px !important; padding: 14px 10px !important; font-size: 13px !important; }
           .cmp-table td { padding: 14px 10px !important; }
           .cmp-table img { width: 90px !important; height: 90px !important; margin-bottom: 10px !important; }
         }
+
+        /* ── Sidebar toggle button (mobile only) ── */
+        .cmp-sidebar-btn-wrap { display: none; }
         @media (max-width: 640px) {
-          .cmp-page { padding: 20px 12px 36px !important; }
-          .cmp-table { min-width: 480px !important; }
-          .cmp-table th { width: 100px !important; padding: 10px 8px !important; font-size: 12px !important; }
-          .cmp-table td { padding: 10px 8px !important; }
-          .cmp-table img { width: 72px !important; height: 72px !important; margin-bottom: 8px !important; }
-          .cmp-table h3 { font-size: 13px !important; margin-bottom: 4px !important; }
-          .cmp-table-container { border-radius: 12px !important; }
-          .cmp-header { margin-bottom: 24px !important; }
+          .cmp-sidebar-btn-wrap {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 8px;
+          }
+          .cmp-sidebar-toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: #fff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            font-family: inherit;
+            transition: border-color 0.15s, color 0.15s;
+          }
+          .cmp-sidebar-toggle-btn:hover { border-color: #F97316; color: #F97316; }
         }
-        @media (max-width: 420px) {
-          .cmp-page { padding: 14px 10px 28px !important; }
-          .cmp-table { min-width: 380px !important; }
-          .cmp-table th { width: 82px !important; padding: 8px 6px !important; font-size: 11px !important; }
-          .cmp-table td { padding: 8px 5px !important; }
+
+        /* ── Mobile table layout ── */
+        @media (max-width: 640px) {
+          /* hide empty "Add Product" placeholder columns */
+          .cmp-empty-col { display: none !important; }
+
+          .cmp-page { padding: 16px 10px 32px !important; }
+          .cmp-table-container { overflow-x: auto !important; border-radius: 12px !important; -webkit-overflow-scrolling: touch; }
+          .cmp-table {
+            min-width: unset !important;
+            width: 100% !important;
+            table-layout: auto !important;
+            /* Override global white-space:nowrap from index.css */
+            white-space: normal !important;
+          }
+
+          /* Override global white-space:nowrap on all cells */
+          .cmp-table th,
+          .cmp-table td {
+            white-space: normal !important;
+          }
+
+          /* ── Sidebar label column — narrow, text wraps to 2 lines ── */
+          .cmp-table th {
+            width: 68px !important;
+            min-width: 68px !important;
+            max-width: 68px !important;
+            padding: 10px 5px !important;
+            font-size: 10px !important;
+            word-break: break-word !important;
+            text-align: center !important;
+            line-height: 1.3 !important;
+            vertical-align: middle !important;
+          }
+
+          /* ── Product columns: 2 products fit without scroll ──
+               68 (label) + 2 × 136 (products) = 340px — fits 360px phones   ── */
+          .cmp-table td {
+            min-width: 136px !important;
+            padding: 10px 6px !important;
+            word-break: break-word !important;
+            overflow-wrap: anywhere !important;
+          }
+
+          /* ── Product name: clamp to 2 lines, never overflow ── */
+          .cmp-table h3 {
+            font-size: 11px !important;
+            line-height: 1.3 !important;
+            margin-bottom: 4px !important;
+            white-space: normal !important;
+            overflow: hidden !important;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2 !important;
+            -webkit-box-orient: vertical !important;
+            word-break: break-word !important;
+            max-width: 100% !important;
+          }
+
+          /* ── When sidebar is hidden: products fill the full width ── */
+          .cmp-table-container[data-sidebar='hide'] .cmp-table th {
+            display: none !important;
+          }
+          .cmp-table-container[data-sidebar='hide'] .cmp-table td {
+            min-width: 46vw !important;
+          }
+
+          .cmp-table img { width: 72px !important; height: 72px !important; margin-bottom: 8px !important; border-radius: 8px !important; }
+          .cmp-table button { font-size: 10px !important; padding: 5px 8px !important; }
+          .cmp-table span { font-size: 11px !important; white-space: normal !important; }
+          .cmp-header { margin-bottom: 20px !important; }
+        }
+
+        @media (max-width: 380px) {
+          .cmp-table th { width: 58px !important; min-width: 58px !important; max-width: 58px !important; padding: 8px 4px !important; font-size: 9px !important; }
+          .cmp-table td { min-width: 120px !important; padding: 8px 4px !important; }
           .cmp-table img { width: 56px !important; height: 56px !important; }
-          .cmp-table h3 { font-size: 12px !important; }
+          .cmp-table h3 { font-size: 10px !important; }
+          .cmp-table span { font-size: 10px !important; }
         }
       `}</style>
       <div style={styles.container}>
@@ -336,9 +426,20 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
             </Link>
           </div>
         ) : (
-          <div className="cmp-table-container" style={styles.tableContainer}>
+          <>
+          {/* Mobile sidebar toggle — only visible on phones */}
+          <div className="cmp-sidebar-btn-wrap">
+            <button
+              className="cmp-sidebar-toggle-btn"
+              onClick={() => setSidebarVisible(v => !v)}
+            >
+              {sidebarVisible ? '✕ Hide Labels' : '☰ Show Labels'}
+            </button>
+          </div>
+          <div className="cmp-table-container" style={styles.tableContainer} data-sidebar={sidebarVisible ? 'show' : 'hide'}>
             <table className="cmp-table" style={styles.table}>
               <tbody>
+                {/* ── Product (always visible) ── */}
                 <tr>
                   <th style={styles.th}>Product</th>
                   {items.map((item) => (
@@ -357,18 +458,19 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
                       </div>
                     </td>
                   ))}
-                  {/* Fill empty columns if less than 3 */}
                   {[...Array(3 - items.length)].map((_, i) => (
-                    <td key={`empty-${i}`} style={{ ...styles.td, background: "#e07b3c" }}>
-                      <Link to="/" style={{ textDecoration: 'none', height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1", flexDirection: "column", gap: 10, minHeight: 200 }}>
-                        <div style={{ width: 60, height: 60, borderRadius: "50%", border: "2px dashed #cbd5e1", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <Scale size={24} />
+                    <td key={`empty-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}>
+                      <Link to="/" style={{ textDecoration: 'none', display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1", flexDirection: "column", gap: 10, minHeight: 140 }}>
+                        <div style={{ width: 48, height: 48, borderRadius: "50%", border: "2px dashed #cbd5e1", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <Scale size={18} />
                         </div>
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>Add Product</span>
+                        <span style={{ fontSize: 12, fontWeight: 500 }}>Add Product</span>
                       </Link>
                     </td>
                   ))}
                 </tr>
+
+                {/* ── Price (always visible) ── */}
                 <tr>
                   <th style={styles.th}>Price</th>
                   {items.map((item) => (
@@ -376,8 +478,10 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
                       <span style={styles.price}>{formatPrice(item.price)}</span>
                     </td>
                   ))}
-                  {[...Array(3 - items.length)].map((_, i) => <td key={`empty-price-${i}`} style={{ ...styles.td, background: "#f8fafc" }}></td>)}
+                  {[...Array(3 - items.length)].map((_, i) => <td key={`ep-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
                 </tr>
+
+                {/* ── Category (always visible) ── */}
                 <tr>
                   <th style={styles.th}>Category</th>
                   {items.map((item) => (
@@ -385,61 +489,82 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
                       <span style={styles.value}>{item.category}</span>
                     </td>
                   ))}
-                  {[...Array(3 - items.length)].map((_, i) => <td key={`empty-cat-${i}`} style={{ ...styles.td, background: "#f8fafc" }}></td>)}
+                  {[...Array(3 - items.length)].map((_, i) => <td key={`ec-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
                 </tr>
-                <tr ref={specsRef} onClick={toggleSpecs} style={{ cursor: "pointer", background: showSpecs ? "#f8fafc" : "transparent" }}>
-                  <th style={styles.th}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#F97316" }}>
-                      Specification {showSpecs ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+
+                {/* ── More Details Toggle ── */}
+                <tr onClick={() => setShowMore(p => !p)} style={{ cursor: "pointer", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                  <th style={{ ...styles.th, background: "#f8fafc" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#F97316", fontWeight: 700 }}>
+                      {showMore ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                      More
                     </div>
                   </th>
-                  <td colSpan={3} style={{ ...styles.td, textAlign: "left", color: "#64748b", fontStyle: "italic" }}>
-                    {showSpecs ? "Hide details" : "Click to view detailed specifications"}
+                  <td colSpan={items.length} style={{ ...styles.td, textAlign: "left", color: "#94a3b8", fontSize: 12, fontStyle: "italic", background: "#f8fafc" }}>
+                    {showMore ? "Hide rating, availability & specs" : "Rating, availability & specs"}
                   </td>
                 </tr>
-                {showSpecs && allSpecKeys.map((specKey) => (
-                  <tr key={specKey}>
-                    <th style={{ ...styles.th, paddingLeft: 32, fontSize: 13 }}>{specKey}</th>
-                    {items.map((item) => (
-                      <td key={item.id} style={styles.td}><span style={styles.value}>{parseSpecs(item)[specKey] || "-"}</span></td>
+
+                {/* ── Collapsible: Rating, Availability, Warranty, Specs ── */}
+                {showMore && (
+                  <>
+                    <tr>
+                      <th style={styles.th}>Rating</th>
+                      {items.map((item) => (
+                        <td key={item.id} style={styles.td}>
+                          <StarRating rating={item.averageRating ?? item.rating ?? 0} />
+                          <div style={{ marginTop: 4, fontSize: 11, color: '#94a3b8' }}>
+                            ({Number(item.reviewCount ?? item.review_count ?? 0)} reviews)
+                          </div>
+                        </td>
+                      ))}
+                      {[...Array(3 - items.length)].map((_, i) => <td key={`er-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
+                    </tr>
+                    <tr>
+                      <th style={styles.th}>Availability</th>
+                      {items.map((item) => (
+                        <td key={item.id} style={styles.td}>
+                          <span style={styles.stockBadge(item.inStock !== false)}>
+                            {item.inStock !== false ? <Check size={12} /> : <AlertCircle size={12} />}
+                            {item.inStock !== false ? "In Stock" : "Out of Stock"}
+                          </span>
+                        </td>
+                      ))}
+                      {[...Array(3 - items.length)].map((_, i) => <td key={`es-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
+                    </tr>
+                    <tr>
+                      <th style={styles.th}>Warranty</th>
+                      {items.map((item) => (
+                        <td key={item.id} style={styles.td}>
+                          <span style={styles.value}>{item.warranty || "1 Year"}</span>
+                        </td>
+                      ))}
+                      {[...Array(3 - items.length)].map((_, i) => <td key={`ew-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
+                    </tr>
+                    <tr ref={specsRef} onClick={toggleSpecs} style={{ cursor: "pointer", background: showSpecs ? "#f8fafc" : "transparent" }}>
+                      <th style={styles.th}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#F97316" }}>
+                          Specs {showSpecs ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </div>
+                      </th>
+                      <td colSpan={items.length} style={{ ...styles.td, textAlign: "left", color: "#64748b", fontStyle: "italic" }}>
+                        {showSpecs ? "Hide specifications" : "Tap to view detailed specs"}
+                      </td>
+                    </tr>
+                    {showSpecs && allSpecKeys.map((specKey) => (
+                      <tr key={specKey}>
+                        <th style={{ ...styles.th, paddingLeft: 28, fontSize: 12 }}>{specKey}</th>
+                        {items.map((item) => (
+                          <td key={item.id} style={styles.td}><span style={styles.value}>{parseSpecs(item)[specKey] || "-"}</span></td>
+                        ))}
+                        {[...Array(3 - items.length)].map((_, i) => <td key={`espec-${specKey}-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
+                      </tr>
                     ))}
-                    {[...Array(3 - items.length)].map((_, i) => <td key={`empty-spec-${specKey}-${i}`} style={{ ...styles.td, background: "#f8fafc" }}></td>)}
-                  </tr>
-                ))}
-                <tr>
-                  <th style={styles.th}>Rating</th>
-                  {items.map((item) => (
-                    <td key={item.id} style={styles.td}>
-                      <StarRating rating={item.averageRating ?? item.rating ?? 0} />
-                      <div style={{ marginTop: 6, fontSize: 12, color: '#94a3b8' }}>
-                        ({Number(item.reviewCount ?? item.review_count ?? 0)} reviews)
-                      </div>
-                    </td>
-                  ))}
-                  {[...Array(3 - items.length)].map((_, i) => <td key={`empty-rating-${i}`} style={{ ...styles.td, background: "#f8fafc" }}></td>)}
-                </tr>
-                <tr>
-                  <th style={styles.th}>Availability</th>
-                  {items.map((item) => (
-                    <td key={item.id} style={styles.td}>
-                      <span style={styles.stockBadge(item.inStock !== false)}>
-                        {item.inStock !== false ? <Check size={12} /> : <AlertCircle size={12} />}
-                        {item.inStock !== false ? "In Stock" : "Out of Stock"}
-                      </span>
-                    </td>
-                  ))}
-                  {[...Array(3 - items.length)].map((_, i) => <td key={`empty-stock-${i}`} style={{ ...styles.td, background: "#f8fafc" }}></td>)}
-                </tr>
-                <tr>
-                  <th style={styles.th}>Warranty</th>
-                  {items.map((item) => (
-                    <td key={item.id} style={styles.td}>
-                      <span style={styles.value}>{item.warranty || "1 Year"}</span>
-                    </td>
-                  ))}
-                  {[...Array(3 - items.length)].map((_, i) => <td key={`empty-war-${i}`} style={{ ...styles.td, background: "#f8fafc" }}></td>)}
-                </tr>
-                <tr>
+                  </>
+                )}
+
+                {/* ── Action (always visible) ── */}
+                <tr style={{ borderTop: "2px solid #f1f5f9" }}>
                   <th style={styles.th}>Action</th>
                   {items.map((item) => (
                     <td key={item.id} style={styles.td}>
@@ -453,11 +578,12 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
                       </button>
                     </td>
                   ))}
-                  {[...Array(3 - items.length)].map((_, i) => <td key={`empty-action-${i}`} style={{ ...styles.td, background: "#f8fafc" }}></td>)}
+                  {[...Array(3 - items.length)].map((_, i) => <td key={`ea-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
                 </tr>
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </section>

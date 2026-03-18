@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Package, ArrowLeftRight, AlertTriangle, LogOut, Bell, Warehouse, ChevronDown, CheckCheck, ShoppingBag, Info, Send, Trash2, Menu, X } from 'lucide-react';
+import electronestLogo from '../images/Electronest.png';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { warehouseAPI } from '../../services/api';
@@ -78,7 +79,7 @@ export default function WarehouseNavbar() {
       <nav className="wh-navbar">
         <div className="wh-navbar-inner">
           <Link to="/warehouse/dashboard" className="wh-nav-logo">
-            <div className="wh-nav-logo-icon"><span>EN</span></div>
+            <img src={electronestLogo} alt="ElectroNest" className="wh-nav-logo-img" />
             <div className="wh-nav-logo-text">
               <span className="wh-nav-logo-name">Electro<span className="wh-nav-accent">Nest</span></span>
               <span className="wh-nav-logo-tag">Warehouse</span>
@@ -217,10 +218,11 @@ export default function WarehouseNavbar() {
         .wh-navbar-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; padding: 0 2rem; height: 58px; gap: 1.5rem; width: 100%; box-sizing: border-box; }
 
         .wh-nav-logo { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; flex-shrink: 0; }
-        .wh-nav-logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #F97316, #ea580c); border-radius: 9px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(249,115,22,0.3); }
-        .wh-nav-logo-icon span { color: #fff; font-weight: 800; font-size: 0.82rem; }
+        .wh-nav-logo-img { height: 32px; width: auto; object-fit: contain; display: block; flex-shrink: 0; }
         .wh-nav-logo-text { display: flex; flex-direction: column; line-height: 1.15; }
-        .wh-nav-logo-name { font-size: 1.1rem; font-weight: 700; color: #fff; }
+        .wh-nav-logo-name { font-size: 1.05rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+        .wh-nav-accent { color: #F97316; }
+        .wh-nav-logo-tag { font-size: 0.6rem; font-weight: 400; color: rgba(255,255,255,0.45); letter-spacing: 0.06em; text-transform: uppercase; }
         .wh-nav-accent { color: #F97316; }
         .wh-nav-logo-tag { font-size: 0.58rem; font-weight: 700; color: rgba(249,115,22,0.8); letter-spacing: 0.1em; text-transform: uppercase; }
 
@@ -338,7 +340,9 @@ export default function WarehouseNavbar() {
 
         @media (max-width: 768px) {
           .wh-topbar-inner { padding: 0.3rem 1rem; }
-          .wh-nav-logo-text { display: none; }
+          .wh-nav-logo-img { height: 26px !important; }
+          .wh-nav-logo-name { font-size: 0.92rem !important; }
+          .wh-nav-logo-tag { display: none; }
           .wh-topbar-left span { display: none; }
           /* Keep notification dropdown in-viewport on tablets */
           .wh-notif-dropdown { right: 0; width: 340px; }
@@ -361,19 +365,11 @@ export default function WarehouseNavbar() {
         @media (max-width: 640px) {
           .wh-nav-user-wrap { display: none; }
           .wh-nav-divider { display: none; }
+          .wh-topbar-right { display: none; }
           .wh-navbar-inner { padding: 0 0.75rem; gap: 0.5rem; }
-          .wh-nav-logo-icon {
-            width: 36px !important;
-            height: 36px !important;
-            flex-shrink: 0;
-          }
-          .wh-notif-dropdown {
-            position: fixed;
-            top: 100px;
-            left: 8px;
-            right: 8px;
-            width: auto;
-          }
+          .wh-nav-logo { flex: 0 0 auto !important; min-width: 0; max-width: fit-content; }
+          .wh-nav-logo-img { height: 28px !important; flex-shrink: 0; }
+          .wh-notif-dropdown { position: fixed; top: 100px; left: 8px; right: 8px; width: auto; }
         }
       `}</style>
     </>

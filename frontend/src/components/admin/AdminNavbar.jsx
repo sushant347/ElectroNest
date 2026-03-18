@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Users, Truck, ScrollText, BarChart3, LogOut, Shield, ChevronDown } from 'lucide-react';
+import electronestLogo from '../images/Electronest.png';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
 
@@ -54,7 +55,7 @@ export default function AdminNavbar() {
       <nav className="adm-navbar">
         <div className="adm-navbar-inner">
           <Link to="/admin/dashboard" className="adm-nav-logo">
-            <div className="adm-nav-logo-icon"><span>EN</span></div>
+            <img src={electronestLogo} alt="ElectroNest" className="adm-nav-logo-img" />
             <div className="adm-nav-logo-text">
               <span className="adm-nav-logo-name">Electro<span className="adm-nav-accent">Nest</span></span>
               <span className="adm-nav-logo-sub">Admin Console</span>
@@ -169,19 +170,12 @@ export default function AdminNavbar() {
           text-decoration: none;
           flex-shrink: 0;
         }
-        .adm-nav-logo-icon {
-          width: 36px;
-          height: 36px;
-          border-radius: 10px;
-          background: linear-gradient(135deg, #DC2626, #991B1B);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .adm-nav-logo-icon span {
-          color: #fff;
-          font-weight: 800;
-          font-size: 14px;
+        .adm-nav-logo-img {
+          height: 32px;
+          width: auto;
+          object-fit: contain;
+          display: block;
+          flex-shrink: 0;
         }
         .adm-nav-logo-text {
           display: flex;
@@ -190,7 +184,7 @@ export default function AdminNavbar() {
         .adm-nav-logo-name {
           color: #fff;
           font-weight: 700;
-          font-size: 16px;
+          font-size: 15px;
           line-height: 1.1;
         }
         .adm-nav-accent { color: #EF4444; }

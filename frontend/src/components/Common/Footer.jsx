@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { FiFacebook, FiTwitter, FiInstagram, FiYoutube, FiMail, FiPhone, FiMapPin, FiTruck, FiShield, FiCreditCard, FiHeadphones } from 'react-icons/fi'
+import electronestLogo from '../images/Electronest.png'
 
 const features = [
   { icon: FiTruck, title: 'Free Shipping', desc: 'On orders over ₹5000' },
@@ -9,7 +10,13 @@ const features = [
 ]
 
 const quickLinks = ['Laptops', 'Smartphones', 'Audio', 'Cameras', 'Tablets', 'Wearables', 'Gaming', 'Accessories']
-const supportLinks = ['Contact Us', 'FAQ', 'Shipping Info', 'Returns & Exchanges', 'Warranty']
+const supportLinks = [
+  { label: 'Contact Us', path: '/support/contact' },
+  { label: 'FAQ', path: '/support/faq' },
+  { label: 'Shipping Info', path: '/support/shipping' },
+  { label: 'Returns & Exchanges', path: '/support/returns' },
+  { label: 'Warranty', path: '/support/warranty' },
+]
 const socials = [FiFacebook, FiTwitter, FiInstagram, FiYoutube]
 
 export default function Footer() {
@@ -33,8 +40,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="footer-brand">
             <Link to="/" className="footer-logo">
-              <div className="footer-logo-icon">EN</div>
-              <span className="footer-logo-text">Electro<span className="accent">Nest</span></span>
+              <img src={electronestLogo} alt="ElectroNest" className="footer-logo-img" />
             </Link>
             <p className="footer-desc">Your premium destination for cutting-edge technology and electronics at competitive prices.</p>
             <div className="social-links">
@@ -59,7 +65,7 @@ export default function Footer() {
             <h3 className="footer-heading">Support</h3>
             <ul className="footer-list">
               {supportLinks.map((link) => (
-                <li key={link}><a href="#">{link}</a></li>
+                <li key={link.label}><Link to={link.path}>{link.label}</Link></li>
               ))}
             </ul>
           </div>
@@ -78,8 +84,8 @@ export default function Footer() {
         <div className="footer-bottom">
           <p>© {new Date().getFullYear()} ElectroNest. All rights reserved.</p>
           <div className="footer-bottom-links">
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
+            <Link to="/support/privacy">Privacy Policy</Link>
+            <Link to="/support/terms">Terms of Service</Link>
           </div>
         </div>
       </div>
@@ -148,27 +154,12 @@ export default function Footer() {
           margin-bottom: 1rem;
         }
 
-        .footer-logo-icon {
-          width: 36px;
+        .footer-logo-img {
           height: 36px;
-          background: #F97316;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-weight: 700;
-          font-size: 0.85rem;
-        }
-
-        .footer-logo-text {
-          font-size: 1.25rem;
-          font-weight: 700;
-          color: #fff;
-        }
-
-        .footer-logo-text .accent {
-          color: #F97316;
+          width: auto;
+          max-width: 160px;
+          object-fit: contain;
+          display: block;
         }
 
         .footer-desc {
@@ -219,7 +210,7 @@ export default function Footer() {
           margin-bottom: 0.6rem;
         }
 
-        .footer-list a {
+        .footer-list a, .footer-list a[href] {
           color: rgba(255,255,255,0.55);
           text-decoration: none;
           font-size: 0.88rem;
@@ -228,6 +219,16 @@ export default function Footer() {
 
         .footer-list a:hover {
           color: #F97316;
+        }
+
+        .footer-bottom-links a {
+          color: rgba(255,255,255,0.35);
+          text-decoration: none;
+          transition: color 0.15s;
+        }
+
+        .footer-bottom-links a:hover {
+          color: rgba(255,255,255,0.7);
         }
 
         .contact-list li {

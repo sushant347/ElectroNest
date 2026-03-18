@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { FiSearch, FiHeart, FiShoppingCart, FiUser, FiChevronDown, FiBarChart2, FiGrid, FiPackage, FiStar, FiLogOut } from 'react-icons/fi'
+import electronestLogo from '../images/Electronest.png'
 import { useAuth } from '../../context/AuthContext'
 import { customerAPI } from '../../services/api'
 
@@ -136,9 +137,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
 
           {/* Logo */}
           <Link to="/" className="logo">
-            <div className="logo-icon">
-              <span>EN</span>
-            </div>
+            <img src={electronestLogo} alt="ElectroNest" className="logo-img" />
             <div className="logo-text">
               <span className="logo-name">Electro<span className="logo-accent">Nest</span></span>
               <span className="logo-tagline">Premium Electronics</span>
@@ -337,21 +336,12 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           flex-shrink: 0;
         }
 
-        .logo-icon {
-          width: 38px;
-          height: 38px;
-          background: #F97316;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        .logo-img {
+          height: 36px;
+          width: auto;
+          object-fit: contain;
+          display: block;
           flex-shrink: 0;
-        }
-
-        .logo-icon span {
-          color: #fff;
-          font-weight: 700;
-          font-size: 0.9rem;
         }
 
         .logo-text {
@@ -799,12 +789,12 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
             padding: 0.6rem 1rem;
             gap: 0.75rem;
           }
-          .logo-tagline { display: none; }
           .action-label { display: none; }
           .action-btn { padding: 0.4rem; }
         }
 
         @media (max-width: 640px) {
+          .logo-img { height: 28px !important; }
           .logo-text { display: none; }
           .search-wrap { flex: 1; min-width: 0; }
           .search-container { min-width: 0; }
@@ -817,8 +807,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           .nav-actions { gap: 0; }
           .action-btn { padding: 0.3rem; }
           .signin-btn { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
-          .logo-icon { width: 32px; height: 32px; border-radius: 6px; }
-          .logo-icon span { font-size: 0.78rem; }
+          .logo-img { height: 26px !important; }
           .search-suggestions { left: 0; right: 0; width: auto; }
         }
         /* Only hide compare on very small phones where it truly won't fit */
