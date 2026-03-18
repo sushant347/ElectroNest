@@ -138,6 +138,7 @@ class Command(BaseCommand):
                 skipped_count += 1
                 continue
 
+            is_admin = u['role'] == 'admin'
             CustomUser.objects.create_user(
                 username=u['email'],
                 email=u['email'],
@@ -146,6 +147,8 @@ class Command(BaseCommand):
                 last_name=u['last_name'],
                 role=u['role'],
                 phone=u.get('phone', ''),
+                is_staff=is_admin,
+                is_superuser=is_admin,
             )
             self.stdout.write(self.style.SUCCESS(f"  CREATE  {u['role']:10s}  {u['email']}"))
             created_count += 1
