@@ -79,4 +79,13 @@ class Command(BaseCommand):
             )
             prod_created += 1
         self.stdout.write(self.style.SUCCESS(f'Products: {prod_created} created, {prod_skipped} skipped'))
+
+        # Reset PostgreSQL sequences so future auto-increment IDs don't conflict
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT setval(pg_get_serial_sequence('\"Categories\"', 'CategoryID'), MAX(\"CategoryID\")) FROM \"Categories\";")
+            cursor.execute("SELECT setval(pg_get_serial_sequence('\"Suppliers\"', 'SupplierID'), MAX(\"SupplierID\")) FROM \"Suppliers\";")
+            cursor.execute("SELECT setval(pg_get_serial_sequence('\"Products\"', 'ProductID'), MAX(\"ProductID\")) FROM \"Products\";")
+            cursor.execute("SELECT setval(pg_get_serial_sequence('\"Customers\"', 'CustomerID'), COALESCE(MAX(\"CustomerID\"), 1)) FROM \"Customers\";")
+        self.stdout.write(self.style.SUCCESS('Sequences reset.'))
         self.stdout.write(self.style.SUCCESS('Done — database seeded successfully.'))
