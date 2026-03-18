@@ -20,7 +20,7 @@ class IsOwnerOrAdmin(BasePermission):
         return bool(
             request.user and
             request.user.is_authenticated and
-            request.user.role in ('owner', 'admin')
+            getattr(request.user, 'role', None) in ('owner', 'admin')
         )
 
 
@@ -111,6 +111,21 @@ class ReviewViewSet(viewsets.ModelViewSet):
         if Review.objects.filter(product__id=product_id, customer=self.request.user).exists():
             raise ValidationError('You have already reviewed this product.')
         serializer.save(customer=self.request.user)
+
+
+class BrandsListView(APIView):
+    """Return distinct non-empty brand names from the Products table."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        brands = (
+            Product.objects
+            .exclude(brand='')
+            .values_list('brand', flat=True)
+            .distinct()
+            .order_by('brand')
+        )
+        return Response(list(brands))
 
 
 class BulkImportProductsView(APIView):

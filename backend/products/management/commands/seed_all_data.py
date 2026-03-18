@@ -228,24 +228,25 @@ class Command(BaseCommand):
 
     # ── Reset sequences ───────────────────────────────────────────────────────
     def _reset_sequences(self):
+        # Each tuple: (quoted_table_for_FROM, unquoted_table_for_pg_get_serial, column)
         tables = [
-            ('"Customers"',             'CustomerID'),
-            ('"Customer_Address"',      'AddressID'),
-            ('"Orders"',                'OrderID'),
-            ('"OrderDetails"',          'OrderDetailID'),
-            ('"Payments"',              'PaymentID'),
-            ('"Reviews"',               'ReviewID'),
-            ('"PurchaseOrders"',        'PurchaseOrderID'),
-            ('"PurchaseOrderDetails"',  'PurchaseOrderDetailID'),
+            ('"Customers"',            'Customers',            'CustomerID'),
+            ('"Customer_Address"',     'Customer_Address',     'AddressID'),
+            ('"Orders"',               'Orders',               'OrderID'),
+            ('"OrderDetails"',         'OrderDetails',         'OrderDetailID'),
+            ('"Payments"',             'Payments',             'PaymentID'),
+            ('"Reviews"',              'Reviews',              'ReviewID'),
+            ('"PurchaseOrders"',       'PurchaseOrders',       'PurchaseOrderID'),
+            ('"PurchaseOrderDetails"', 'PurchaseOrderDetails', 'PurchaseOrderDetailID'),
         ]
         with connection.cursor() as cur:
-            for table, col in tables:
+            for quoted_table, plain_table, col in tables:
                 try:
                     cur.execute(
                         f'SELECT setval(pg_get_serial_sequence(%s, %s), '
-                        f'COALESCE(MAX("{col}"), 1)) FROM {table}',
-                        [table.strip('"'), col]
+                        f'COALESCE(MAX("{col}"), 1)) FROM {quoted_table}',
+                        [plain_table, col]
                     )
                 except Exception as e:
-                    self.stdout.write(self.style.WARNING(f'  Sequence reset skipped for {table}: {e}'))
+                    self.stdout.write(self.style.WARNING(f'  Sequence reset skipped for {quoted_table}: {e}'))
         self.stdout.write(self.style.SUCCESS('  Sequences reset.'))

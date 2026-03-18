@@ -15,7 +15,7 @@ from .ml_services import get_customer_rfm, get_demand_forecast, get_product_reco
 
 class IsOwnerOrAdmin(IsAuthenticated):
     def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.role in ('owner', 'admin', 'warehouse')
+        return super().has_permission(request, view) and getattr(request.user, 'role', None) in ('owner', 'admin', 'warehouse')
 
 
 def get_owner_store_name(user):
@@ -210,7 +210,7 @@ class CategoryPerformanceView(APIView):
         )
 
         # Owner sees only their own products' category performance
-        if hasattr(request, 'user') and request.user.is_authenticated and request.user.role == 'owner':
+        if hasattr(request, 'user') and request.user.is_authenticated and getattr(request.user, 'role', None) == 'owner':
             store_name = f"{request.user.first_name} {request.user.last_name}".strip()
             if store_name:
                 qs = qs.filter(product__owner_name__icontains=store_name)

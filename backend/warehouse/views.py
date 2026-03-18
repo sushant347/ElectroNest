@@ -18,7 +18,7 @@ from admin_panel.models import AuditLog
 
 class IsWarehouseOrOwner(IsAuthenticated):
     def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.role in ('warehouse', 'owner', 'admin')
+        return super().has_permission(request, view) and getattr(request.user, 'role', None) in ('warehouse', 'owner', 'admin')
 
 
 class PurchaseOrderViewSet(viewsets.ModelViewSet):
