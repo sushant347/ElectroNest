@@ -46,7 +46,7 @@ Then:
    | Name | `electronest-api` |
    | Root Directory | `backend` |
    | Runtime | `Python` |
-   | Build Command | `pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_users && python manage.py seed_products` |
+   | Build Command | `pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_users && python manage.py seed_products && python manage.py seed_all_data` |
    | Start Command | `gunicorn page.wsgi --bind 0.0.0.0:$PORT` |
    | Instance Type | **Free** |
 
@@ -129,12 +129,26 @@ git commit -m "Fix migrations: add CreateModel state entries for managed=False t
 git push
 ```
 
+### 6b — Export local SQL Server data (run this on your PC first)
+
+Open terminal in the `Debug\backend` folder and run:
+```bash
+python manage.py export_local_data
+```
+This creates `backend/products/management/commands/transactional_data.json`.
+Then commit it:
+```bash
+git add backend/products/management/commands/transactional_data.json
+git commit -m "Add transactional data export"
+git push
+```
+
 ### 6c — Update build command on Render
 
 1. Go to Render → your `electronest-api` service → **Settings** tab
 2. Find **Build Command** and set it to:
    ```
-   pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_users && python manage.py seed_products
+   pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_users && python manage.py seed_products && python manage.py seed_all_data
    ```
 3. Click **Save Changes**
 4. Click **Manual Deploy** → **Deploy latest commit**
