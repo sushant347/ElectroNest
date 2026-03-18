@@ -782,8 +782,28 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
 
         @media (max-width: 640px) {
           .logo-text { display: none; }
-          .search-wrap { flex: 1; }
+          .search-wrap { flex: 1; min-width: 0; }
+          .search-container { min-width: 0; }
           .signin-btn span:not(:first-child) { display: none; }
+          .navbar-top { gap: 0.5rem; padding: 0.5rem 0.75rem; }
+          .announce-bar { font-size: 0.7rem; padding: 0.3rem 0.5rem; }
+        }
+
+        @media (max-width: 480px) {
+          /* Hide Compare button — too many icons on tiny screens */
+          .action-btn[aria-label="Compare"] { display: none; }
+          .nav-actions { gap: 0; }
+          .action-btn { padding: 0.35rem; }
+          .signin-btn { padding: 0.35rem 0.6rem; font-size: 0.75rem; }
+          .logo-icon { width: 32px; height: 32px; border-radius: 6px; }
+          .logo-icon span { font-size: 0.78rem; }
+          /* Notification dropdown: don't overflow viewport */
+          .search-suggestions { left: 0; right: 0; width: auto; }
+        }
+
+        /* Profile dropdown: keep within viewport on mobile */
+        @media (max-width: 400px) {
+          .profile-dropdown { right: -40px; min-width: 160px; }
         }
       `}</style>
     </>

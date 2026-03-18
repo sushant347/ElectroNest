@@ -257,6 +257,26 @@ export default function WarehouseNavbar() {
           .wh-topbar-left span { display: none; }
           .wh-notif-dropdown { right: -120px; width: 340px; }
         }
+
+        @media (max-width: 540px) {
+          /* Notification dropdown: use full viewport width minus margins */
+          .wh-notif-dropdown {
+            position: fixed;
+            top: 100px;
+            left: 8px;
+            right: 8px;
+            width: auto;
+          }
+          /* User dropdown: prevent going off screen */
+          .wh-nav-dropdown {
+            right: 0;
+            width: min(220px, calc(100vw - 16px));
+          }
+          .wh-nav-links { gap: 0; }
+          .wh-nav-link { padding: 0.5rem 0.5rem; }
+          .wh-navbar-inner { gap: 0.4rem; }
+          .wh-nav-logo-icon { width: 30px; height: 30px; border-radius: 7px; }
+        }
       `}</style>
     </>
   );

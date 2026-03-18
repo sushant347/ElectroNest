@@ -276,6 +276,26 @@ export default function OwnerNavbar() {
           .owner-topbar-left span { display: none; }
           .owner-notif-dropdown { right: -120px; width: 340px; }
         }
+
+        @media (max-width: 540px) {
+          /* Notification dropdown: use full viewport width minus margins */
+          .owner-notif-dropdown {
+            position: fixed;
+            top: 100px;
+            left: 8px;
+            right: 8px;
+            width: auto;
+          }
+          /* User dropdown: prevent going off screen */
+          .owner-nav-dropdown {
+            right: 0;
+            width: min(220px, calc(100vw - 16px));
+          }
+          .owner-nav-links { gap: 0; }
+          .owner-nav-link { padding: 0.5rem 0.5rem; }
+          .owner-navbar-inner { gap: 0.4rem; }
+          .owner-nav-logo-icon { width: 30px; height: 30px; border-radius: 7px; }
+        }
       `}</style>
     </>
   );
