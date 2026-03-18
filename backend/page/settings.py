@@ -69,24 +69,17 @@ WSGI_APPLICATION = 'page.wsgi.application'
 
 
 # ── Database ──
-# Uses Azure SQL in production (via env vars), local SQL Express in dev
-if os.environ.get('DATABASE_URL'):
+import dj_database_url
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # Cloud: Neon PostgreSQL (set via Render environment variable)
     DATABASES = {
-        'default': {
-            'ENGINE': 'mssql',
-            'NAME': os.environ.get('DB_NAME', 'ElectroNestDB'),
-            'HOST': os.environ.get('DB_HOST', 'localhost'),
-            'PORT': os.environ.get('DB_PORT', '1433'),
-            'USER': os.environ.get('DB_USER', ''),
-            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-            'CONN_MAX_AGE': 60,
-            'OPTIONS': {
-                'driver': 'ODBC Driver 18 for SQL Server',
-                'extra_params': 'Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30',
-            },
-        }
+        'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600, ssl_require=True)
     }
 else:
+    # Local: SQL Server Express (unchanged)
     DATABASES = {
         'default': {
             'ENGINE': 'mssql',
