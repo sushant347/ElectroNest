@@ -14,13 +14,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             sql="""
-                IF NOT EXISTS (
-                    SELECT * FROM INFORMATION_SCHEMA.COLUMNS
-                    WHERE TABLE_NAME = 'Orders' AND COLUMN_NAME = 'AddressID'
-                )
-                BEGIN
-                    ALTER TABLE Orders ADD AddressID INT NULL;
-                END
+                ALTER TABLE "Orders" ADD COLUMN IF NOT EXISTS "AddressID" INT NULL;
             """,
             reverse_sql=migrations.RunSQL.noop,
         ),

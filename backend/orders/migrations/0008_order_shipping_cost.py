@@ -15,15 +15,8 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             sql="""
-                IF NOT EXISTS (
-                    SELECT 1 FROM sys.columns
-                    WHERE  object_id = OBJECT_ID('Orders') AND name = 'ShippingCost'
-                )
-                BEGIN
-                    ALTER TABLE Orders
-                    ADD ShippingCost DECIMAL(10,2) NOT NULL DEFAULT 200.00;
-                END
+                ALTER TABLE "Orders" ADD COLUMN IF NOT EXISTS "ShippingCost" DECIMAL(10,2) NOT NULL DEFAULT 200.00;
             """,
-            reverse_sql="ALTER TABLE Orders DROP COLUMN ShippingCost",
+            reverse_sql='ALTER TABLE "Orders" DROP COLUMN IF EXISTS "ShippingCost"',
         ),
     ]
