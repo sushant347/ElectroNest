@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ArrowLeftRight, AlertTriangle, LogOut, Bell, Warehouse, ChevronDown, CheckCheck, ShoppingBag, Info, Send, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Package, ArrowLeftRight, AlertTriangle, LogOut, Bell, Warehouse, ChevronDown, CheckCheck, ShoppingBag, Info, Send, Trash2, Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { warehouseAPI } from '../../services/api';
@@ -21,6 +21,7 @@ export default function WarehouseNavbar() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef(null);
   const notifRef = useRef(null);
 
@@ -52,7 +53,10 @@ export default function WarehouseNavbar() {
   const markRead = async (id) => { try { await warehouseAPI.markNotificationRead(id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n)); } catch { } };
   const markAllRead = async () => { try { await warehouseAPI.markAllNotificationsRead(); setNotifications(prev => prev.map(n => ({ ...n, is_read: true }))); } catch { } };
   const clearAll = async () => { try { await warehouseAPI.clearAllNotifications(); setNotifications([]); } catch { } };
-  const handleLogout = () => { logout(); navigate('/login'); };
+  // Close mobile menu on route change
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  const handleLogout = () => { setMobileOpen(false); logout(); navigate('/login'); };
 
   const relTime = (d) => {
     const ms = Date.now() - new Date(d).getTime();
@@ -92,6 +96,11 @@ export default function WarehouseNavbar() {
               );
             })}
           </div>
+
+          {/* Hamburger — visible on mobile only */}
+          <button className="wh-hamburger" onClick={() => setMobileOpen(o => !o)} aria-label="Toggle menu">
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
 
           <div className="wh-nav-right">
             {/* Notification Bell */}
@@ -168,6 +177,33 @@ export default function WarehouseNavbar() {
         </div>
       </nav>
 
+      {/* ── Mobile Menu Drawer ── */}
+      {mobileOpen && (
+        <div className="wh-mobile-drawer">
+          <nav className="wh-mobile-nav">
+            {warehouseLinks.map((link) => {
+              const isActive = pathname === link.path || pathname.startsWith(link.path + '/');
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`wh-mobile-link ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <link.icon size={18} />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+            <div className="wh-mobile-divider" />
+            <button className="wh-mobile-link wh-mobile-logout" onClick={handleLogout}>
+              <LogOut size={18} />
+              <span>Sign Out</span>
+            </button>
+          </nav>
+        </div>
+      )}
+
       <style>{`
         .wh-topbar { background: #1a242f; border-bottom: 1px solid rgba(255,255,255,0.06); width: 100%; overflow: hidden; box-sizing: border-box; }
         .wh-topbar-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 2rem; font-size: 0.7rem; color: rgba(255,255,255,0.5); width: 100%; box-sizing: border-box; overflow: hidden; }
@@ -177,7 +213,7 @@ export default function WarehouseNavbar() {
         .wh-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.5); animation: wh-pulse-dot 2s infinite; }
         @keyframes wh-pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-        .wh-navbar { background: #232F3E; border-bottom: 3px solid #F97316; position: sticky; top: 0; z-index: 100; width: 100%; max-width: 100%; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.15); box-sizing: border-box; }
+        .wh-navbar { background: #232F3E; border-bottom: 3px solid #F97316; position: sticky; top: 0; z-index: 100; width: 100%; max-width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,0.15); box-sizing: border-box; }
         .wh-navbar-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; padding: 0 2rem; height: 58px; gap: 1.5rem; width: 100%; box-sizing: border-box; }
 
         .wh-nav-logo { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; flex-shrink: 0; }
@@ -245,21 +281,77 @@ export default function WarehouseNavbar() {
         .wh-dropdown-item.logout { color: #ef4444; }
         .wh-dropdown-item.logout:hover { background: #fef2f2; color: #dc2626; }
 
+        /* Hamburger button — hidden on desktop */
+        .wh-hamburger {
+          display: none;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 38px;
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 8px;
+          color: rgba(255,255,255,0.85);
+          cursor: pointer;
+          flex-shrink: 0;
+          margin-left: auto;
+        }
+        .wh-hamburger:hover { background: rgba(255,255,255,0.14); color: #fff; }
+
+        /* Mobile drawer */
+        .wh-mobile-drawer {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          z-index: 999;
+          background: rgba(0,0,0,0.5);
+        }
+        .wh-mobile-nav {
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          background: #232F3E;
+          padding: 1rem 0 0.5rem;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+          display: flex;
+          flex-direction: column;
+        }
+        .wh-mobile-link {
+          display: flex;
+          align-items: center;
+          gap: 0.85rem;
+          padding: 0.85rem 1.5rem;
+          color: rgba(255,255,255,0.75);
+          text-decoration: none;
+          font-size: 0.95rem;
+          font-weight: 500;
+          border: none;
+          background: none;
+          width: 100%;
+          cursor: pointer;
+          font-family: inherit;
+          transition: background 0.15s, color 0.15s;
+          text-align: left;
+        }
+        .wh-mobile-link:hover { background: rgba(255,255,255,0.07); color: #fff; }
+        .wh-mobile-link.active { background: rgba(249,115,22,0.15); color: #F97316; font-weight: 600; }
+        .wh-mobile-logout { color: #f87171; }
+        .wh-mobile-logout:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
+        .wh-mobile-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 0.4rem 0; }
+
         @media (max-width: 768px) {
           .wh-topbar-inner { padding: 0.3rem 1rem; }
           .wh-navbar-inner { padding: 0 1rem; gap: 0.75rem; }
           .wh-nav-logo-text { display: none; }
-          .wh-nav-link span { display: none; }
-          .wh-nav-link { padding: 0.5rem 0.65rem; }
-          .wh-nav-user-info { display: none; }
-          .wh-chevron { display: none; }
-          .wh-nav-links { margin-left: 0; }
           .wh-topbar-left span { display: none; }
           .wh-notif-dropdown { right: -120px; width: 340px; }
         }
 
-        @media (max-width: 540px) {
-          /* Notification dropdown: use full viewport width minus margins */
+        /* On mobile: hide desktop nav links + user button, show hamburger */
+        @media (max-width: 640px) {
+          .wh-hamburger { display: flex; }
+          .wh-nav-links { display: none; }
+          .wh-nav-user-wrap { display: none; }
+          .wh-nav-divider { display: none; }
+          .wh-navbar-inner { padding: 0 0.75rem; gap: 0.5rem; }
           .wh-notif-dropdown {
             position: fixed;
             top: 100px;
@@ -267,15 +359,6 @@ export default function WarehouseNavbar() {
             right: 8px;
             width: auto;
           }
-          /* User dropdown: prevent going off screen */
-          .wh-nav-dropdown {
-            right: 0;
-            width: min(220px, calc(100vw - 16px));
-          }
-          .wh-nav-links { gap: 0; }
-          .wh-nav-link { padding: 0.5rem 0.5rem; }
-          .wh-navbar-inner { gap: 0.4rem; }
-          .wh-nav-logo-icon { width: 30px; height: 30px; border-radius: 7px; }
         }
       `}</style>
     </>

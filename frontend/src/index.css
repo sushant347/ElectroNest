@@ -382,12 +382,18 @@ body {
   overflow-x: hidden;
 }
 
-/* ── All sticky/fixed navbars: clip overflow ── */
-.navbar, .owner-navbar, .wh-navbar,
-.owner-topbar, .wh-topbar, .adm-topbar,
+/* ── Topbars (no dropdowns inside): safe to clip ── */
+.owner-topbar, .wh-topbar,
 .announce-bar, .nav-strip {
   max-width: 100%;
   overflow: hidden;
+}
+
+/* ── Navbar SHELLS must NOT use overflow:hidden — it clips absolute dropdowns ── */
+/* Instead just ensure width is constrained */
+.navbar, .owner-navbar, .wh-navbar, .adm-topbar {
+  max-width: 100%;
+  width: 100%;
 }
 
 /* ── Very small screen (≤ 360px) safety net ── */

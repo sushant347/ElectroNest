@@ -315,7 +315,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           z-index: 100;
           width: 100%;
           max-width: 100%;
-          overflow: hidden;
+          /* NO overflow:hidden — it clips absolutely-positioned dropdowns */
         }
 
         /* ── Top Row ── */
@@ -727,6 +727,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
         .nav-strip {
           background: #37475A;
           width: 100%;
+          /* overflow:hidden here is safe — no absolutely-positioned children inside */
           overflow: hidden;
         }
 
@@ -734,7 +735,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           display: flex;
           align-items: center;
           padding: 0 2rem;
-          overflow-x: auto;
+          overflow-x: auto;     /* scroll within the strip */
           scrollbar-width: none;
           gap: 0;
           width: 100%;
