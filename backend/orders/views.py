@@ -176,6 +176,7 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         from django.db.models import Prefetch
         user = self.request.user
+        payments_prefetch = Prefetch('payments', queryset=Payment.objects.select_related('method'))
         if isinstance(user, CustomUser):
             # Owner: see only orders that contain their products
             # AND only prefetch the details belonging to this owner
@@ -188,23 +189,25 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                     Order.objects
                     .filter(details__product__owner_name__icontains=store_name)
                     .distinct()
-                    .select_related('order_status', 'customer')
-                    .prefetch_related(Prefetch('details', queryset=own_details))
+                    .select_related('order_status', 'customer', 'address')
+                    .prefetch_related(Prefetch('details', queryset=own_details), payments_prefetch)
                 )
             # Admin / warehouse: see all orders — deduplicate details
             return (
                 Order.objects
-                .select_related('order_status', 'customer')
+                .select_related('order_status', 'customer', 'address')
                 .prefetch_related(
-                    Prefetch('details', queryset=OrderDetail.objects.select_related('product').order_by('product_id', 'id').distinct())
+                    Prefetch('details', queryset=OrderDetail.objects.select_related('product').order_by('product_id', 'id').distinct()),
+                    payments_prefetch,
                 ).all()
             )
         # Customers: see only their own orders — deduplicate details
         return (
             Order.objects.filter(customer=user)
-            .select_related('order_status')
+            .select_related('order_status', 'address')
             .prefetch_related(
-                Prefetch('details', queryset=OrderDetail.objects.select_related('product').order_by('product_id', 'id').distinct())
+                Prefetch('details', queryset=OrderDetail.objects.select_related('product').order_by('product_id', 'id').distinct()),
+                payments_prefetch,
             )
         )
 

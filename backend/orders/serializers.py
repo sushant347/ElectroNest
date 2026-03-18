@@ -79,20 +79,21 @@ class OrderSerializer(serializers.ModelSerializer):
         return ', '.join(parts) or 'N/A'
 
     def get_items_count(self, obj):
-        # Deduplicated count
+        # Use prefetched details (no extra query)
         return len(set(d.product_id for d in obj.details.all()))
 
     def get_payment_method(self, obj):
-        payment = Payment.objects.filter(order=obj).select_related('method').first()
+        # Use prefetched payments (no extra query)
+        payments = obj.payments.all()
+        payment = payments[0] if payments else None
         if payment and payment.method:
             return payment.method.name
         return 'N/A'
 
     def get_payment_status(self, obj):
-        payment = Payment.objects.filter(order=obj).first()
-        if payment:
-            return 'Completed'
-        return 'Pending'
+        # Use prefetched payments (no extra query)
+        payments = obj.payments.all()
+        return 'Completed' if payments else 'Pending'
 
 
 class CartSerializer(serializers.ModelSerializer):

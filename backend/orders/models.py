@@ -115,7 +115,7 @@ class PaymentMethod(models.Model):
 
 class Payment(models.Model):
     id               = models.AutoField(primary_key=True, db_column='PaymentID')
-    order            = models.ForeignKey(Order, null=True, blank=True, on_delete=models.SET_NULL, db_column='OrderID')
+    order            = models.ForeignKey(Order, null=True, blank=True, on_delete=models.SET_NULL, db_column='OrderID', related_name='payments')
     method           = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, db_column='MethodID')
     discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0, db_column='DiscountPercent')
     payable_amount   = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, db_column='PayableAmount')
