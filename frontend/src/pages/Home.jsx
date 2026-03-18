@@ -142,6 +142,10 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         return featured
     })()
 
+    const handleAddToCart = (product) => {
+        addToCart(product)
+    }
+
     const handleCategoryClick = (catName) => {
         if (selectedCategory === catName) {
             setSelectedCategory(null)
@@ -257,7 +261,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
                                             <span className="product-price">{formatPrice(product.price)}</span>
                                             {product.oldPrice && <span className="product-old-price">{formatPrice(product.oldPrice)}</span>}
                                         </div>
-                                        <button className="btn btn-primary btn-sm" onClick={() => addToCart(product)} disabled={product.stock <= 0}>
+                                        <button className="btn btn-primary btn-sm" onClick={() => handleAddToCart(product)} disabled={product.stock <= 0}>
                                             {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
                                         </button>
                                     </div>
