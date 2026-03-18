@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-* {
+*, *::before, *::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -357,9 +357,37 @@ img[style*="height"] {
 }
 
 /* ── Prevent horizontal page overflow everywhere ── */
-html, body, #root {
+/* NOTE: max-width:100vw causes ~17px overflow on pages with vertical scrollbars
+   because 100vw includes the scrollbar width. Use 100% instead. */
+html {
   overflow-x: hidden;
-  max-width: 100vw;
+}
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+  width: 100%;
+}
+#root {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* ── All top-level page wrappers: never overflow ── */
+.home, .owner-om, .owner-dash, .owner-pm, .owner-layout,
+.warehouse-layout, .warehouse-main-content, .adm-layout, .adm-main,
+.adm-content, .adm-dash, .wh-page, .owner-dash-section,
+[class*="page-container"], [class*="-page"] {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* ── All sticky/fixed navbars: clip overflow ── */
+.navbar, .owner-navbar, .wh-navbar,
+.owner-topbar, .wh-topbar, .adm-topbar,
+.announce-bar, .nav-strip {
+  max-width: 100%;
+  overflow: hidden;
 }
 
 /* ── Very small screen (≤ 360px) safety net ── */

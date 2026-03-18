@@ -169,16 +169,16 @@ export default function WarehouseNavbar() {
       </nav>
 
       <style>{`
-        .wh-topbar { background: #1a242f; border-bottom: 1px solid rgba(255,255,255,0.06); }
-        .wh-topbar-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 2rem; font-size: 0.7rem; color: rgba(255,255,255,0.5); }
+        .wh-topbar { background: #1a242f; border-bottom: 1px solid rgba(255,255,255,0.06); width: 100%; overflow: hidden; box-sizing: border-box; }
+        .wh-topbar-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 2rem; font-size: 0.7rem; color: rgba(255,255,255,0.5); width: 100%; box-sizing: border-box; overflow: hidden; }
         .wh-topbar-left { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; }
         .wh-topbar-right { display: flex; align-items: center; gap: 1rem; }
         .wh-store-status { display: flex; align-items: center; gap: 0.35rem; font-weight: 600; color: #4ade80; }
         .wh-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.5); animation: wh-pulse-dot 2s infinite; }
         @keyframes wh-pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-        .wh-navbar { background: #232F3E; border-bottom: 3px solid #F97316; position: sticky; top: 0; z-index: 100; width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
-        .wh-navbar-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; padding: 0 2rem; height: 58px; gap: 1.5rem; }
+        .wh-navbar { background: #232F3E; border-bottom: 3px solid #F97316; position: sticky; top: 0; z-index: 100; width: 100%; max-width: 100%; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.15); box-sizing: border-box; }
+        .wh-navbar-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; padding: 0 2rem; height: 58px; gap: 1.5rem; width: 100%; box-sizing: border-box; }
 
         .wh-nav-logo { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; flex-shrink: 0; }
         .wh-nav-logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #F97316, #ea580c); border-radius: 9px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(249,115,22,0.3); }

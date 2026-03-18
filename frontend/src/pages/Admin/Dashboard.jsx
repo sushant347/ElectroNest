@@ -533,7 +533,7 @@ export default function Dashboard() {
 
       {/* ═══ STYLES ═══ */}
       <style>{`
-        .adm-dash{padding:28px 32px 60px;max-width:1600px;margin:0 auto;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+        .adm-dash{padding:28px 32px 60px;max-width:1600px;margin:0 auto;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-sizing:border-box;width:100%;overflow-x:hidden}
 
         /* ── Header ── */
         .dash-header{background:linear-gradient(135deg,#DC2626 0%,#991B1B 100%);border-radius:20px;padding:28px 32px;margin-bottom:28px;color:#fff;position:relative;overflow:hidden}
@@ -566,7 +566,7 @@ export default function Dashboard() {
         .adm-kpi-trend{position:absolute;top:18px;right:18px;font-size:0.78rem;font-weight:700;display:flex;align-items:center;gap:3px}
 
         /* ── Charts ── */
-        .charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;margin-bottom:24px}
+        .charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));gap:20px;margin-bottom:24px}
         .chart-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:22px;transition:box-shadow .2s}
         .chart-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.06)}
         .chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
@@ -600,7 +600,7 @@ export default function Dashboard() {
         .cust-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
         .cust-search{position:relative;display:flex;align-items:center}
         .cust-search-ico{position:absolute;left:12px;color:#9CA3AF;pointer-events:none}
-        .cust-search input{padding:9px 36px 9px 34px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:0.84rem;color:#1e293b;width:230px;font-family:inherit;transition:border-color .2s}
+        .cust-search input{padding:9px 36px 9px 34px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:0.84rem;color:#1e293b;width:min(230px,100%);max-width:100%;font-family:inherit;transition:border-color .2s}
         .cust-search input:focus{outline:none;border-color:#DC2626;box-shadow:0 0 0 3px rgba(220,38,38,0.08)}
         .cust-clear{position:absolute;right:10px;background:none;border:none;cursor:pointer;color:#9CA3AF;display:flex;padding:4px;border-radius:4px}
         .cust-clear:hover{color:#DC2626;background:#fee2e2}

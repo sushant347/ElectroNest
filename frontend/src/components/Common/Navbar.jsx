@@ -127,7 +127,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
     <>
       {/* Announcement Bar */}
       <div className="announce-bar">
-        Free shipping on orders over Rs.5000 &nbsp;·&nbsp; Use code <strong>&nbsp;TECH20&nbsp;</strong> for 20% off
+        Free shipping on orders over Rs.5000 · Use code <strong>TECH20</strong> for 20% off
       </div>
 
       <nav className="navbar">
@@ -298,7 +298,11 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           display: flex;
           align-items: center;
           justify-content: center;
+          flex-wrap: wrap;
           letter-spacing: 0.01em;
+          width: 100%;
+          box-sizing: border-box;
+          overflow: hidden;
         }
 
         /* ── Navbar Shell ── */
@@ -310,6 +314,8 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           top: 0;
           z-index: 100;
           width: 100%;
+          max-width: 100%;
+          overflow: hidden;
         }
 
         /* ── Top Row ── */
@@ -318,6 +324,8 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           align-items: center;
           padding: 0.6rem 2rem;
           gap: 1.25rem;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         /* ── Logo ── */
@@ -450,6 +458,10 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           align-items: center;
           gap: 0.15rem;
           flex-shrink: 0;
+          /* Don't let actions overflow — shrink if needed below 600px */
+        }
+        @media (max-width: 600px) {
+          .nav-actions { flex-shrink: 1; min-width: 0; }
         }
 
         .action-btn {
@@ -714,6 +726,8 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
         /* ── Category Strip ── */
         .nav-strip {
           background: #37475A;
+          width: 100%;
+          overflow: hidden;
         }
 
         .nav-strip-inner {
@@ -723,6 +737,8 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           overflow-x: auto;
           scrollbar-width: none;
           gap: 0;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .nav-strip-inner::-webkit-scrollbar {
