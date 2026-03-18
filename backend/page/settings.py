@@ -138,10 +138,12 @@ STORAGES = {
 }
 
 # ── CORS ──
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    'CORS_ORIGINS',
-    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175'
-).split(',')
+_cors_env = os.environ.get('CORS_ORIGINS', '')
+if _cors_env:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_env.split(',') if o.strip()]
+else:
+    # Development fallback — allow all origins so the deployed Vercel URL works too
+    CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # ── REST Framework ──

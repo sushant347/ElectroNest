@@ -222,9 +222,16 @@ class Command(BaseCommand):
     # ── Reviews ───────────────────────────────────────────────────────────────
     def _seed_reviews(self, cur, rows, valid_product_ids, valid_customer_ids):
         created = skipped = orphaned = 0
-        existing = _ids_in_db(cur, '"Reviews"', 'ReviewID')
+        existing_ids = _ids_in_db(cur, '"Reviews"', 'ReviewID')
+        # Also load existing (ProductID, CustomerID) pairs to respect the unique constraint
+        cur.execute('SELECT "ProductID", "CustomerID" FROM "Reviews"')
+        existing_pairs = {(row[0], row[1]) for row in cur.fetchall()}
         for r in rows:
-            if r['ReviewID'] in existing:
+            if r['ReviewID'] in existing_ids:
+                skipped += 1
+                continue
+            pair = (r['ProductID'], r['CustomerID'])
+            if pair in existing_pairs:
                 skipped += 1
                 continue
             if r['ProductID'] not in valid_product_ids or r['CustomerID'] not in valid_customer_ids:
@@ -239,7 +246,8 @@ class Command(BaseCommand):
                     _val(r.get('ReviewDate')),
                 ]
             )
-            existing.add(r['ReviewID'])
+            existing_ids.add(r['ReviewID'])
+            existing_pairs.add(pair)
             created += 1
         self.stdout.write(self.style.SUCCESS(
             f'  Reviews: {created} created, {skipped} skipped, {orphaned} orphaned (skipped)'
