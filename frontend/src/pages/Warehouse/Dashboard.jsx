@@ -276,6 +276,8 @@ export default function WarehouseDashboard() {
         .wh-modal-table th { padding: 8px 10px; background: #f9fafb; color: #6b7280; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; text-align: left; }
         .wh-modal-table td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; color: #374151; }
         @media (max-width: 1200px) { .wh-stats-grid { grid-template-columns: repeat(2, 1fr); } .wh-bottom-row { grid-template-columns: 1fr; } }
+        @media (max-width: 640px) { .wh-stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; } .wh-stat-card { padding: 14px 12px; gap: 10px; } }
+        @media (max-width: 400px) { .wh-stats-grid { grid-template-columns: 1fr; } }
       `}</style>
     </>
   );

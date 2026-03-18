@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useState } from 'react';
 import {
@@ -17,6 +17,7 @@ const navLinks = [
 export default function AdminLayout() {
   const { user, initialized, logout } = useAuth();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -43,7 +44,7 @@ export default function AdminLayout() {
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/login';
+    navigate('/login');
   };
 
   const SidebarContent = () => (

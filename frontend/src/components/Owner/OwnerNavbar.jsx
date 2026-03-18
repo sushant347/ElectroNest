@@ -197,8 +197,8 @@ export default function OwnerNavbar() {
 
       {/* ── Mobile Menu Drawer ── */}
       {mobileOpen && (
-        <div className="owner-mobile-drawer">
-          <nav className="owner-mobile-nav">
+        <div className="owner-mobile-drawer" onClick={() => setMobileOpen(false)}>
+          <nav className="owner-mobile-nav" onClick={e => e.stopPropagation()}>
             {ownerLinks.map((link) => {
               const isActive = pathname === link.path || pathname.startsWith(link.path + '/');
               return (
@@ -376,6 +376,17 @@ export default function OwnerNavbar() {
           .owner-nav-user-wrap { display: none; }
           .owner-nav-divider { display: none; }
           .owner-navbar-inner { padding: 0 0.75rem; gap: 0.5rem; }
+          /* Logo must NEVER grow — force fixed auto width */
+          .owner-nav-logo {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            max-width: fit-content;
+          }
+          .owner-nav-logo-icon {
+            width: 36px !important;
+            height: 36px !important;
+            flex-shrink: 0;
+          }
           .owner-notif-dropdown {
             position: fixed;
             top: 100px;

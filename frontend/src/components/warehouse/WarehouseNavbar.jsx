@@ -179,8 +179,8 @@ export default function WarehouseNavbar() {
 
       {/* ── Mobile Menu Drawer ── */}
       {mobileOpen && (
-        <div className="wh-mobile-drawer">
-          <nav className="wh-mobile-nav">
+        <div className="wh-mobile-drawer" onClick={() => setMobileOpen(false)}>
+          <nav className="wh-mobile-nav" onClick={e => e.stopPropagation()}>
             {warehouseLinks.map((link) => {
               const isActive = pathname === link.path || pathname.startsWith(link.path + '/');
               return (
@@ -352,6 +352,17 @@ export default function WarehouseNavbar() {
           .wh-nav-user-wrap { display: none; }
           .wh-nav-divider { display: none; }
           .wh-navbar-inner { padding: 0 0.75rem; gap: 0.5rem; }
+          /* Logo must NEVER grow — force fixed auto width */
+          .wh-nav-logo {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            max-width: fit-content;
+          }
+          .wh-nav-logo-icon {
+            width: 36px !important;
+            height: 36px !important;
+            flex-shrink: 0;
+          }
           .wh-notif-dropdown {
             position: fixed;
             top: 100px;
