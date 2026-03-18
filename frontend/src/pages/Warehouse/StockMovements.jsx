@@ -57,7 +57,7 @@ function CommissionPieChart({ data }) {
   const total = data.reduce((s, d) => s + d.commission, 0);
   if (total === 0) return null;
 
-  const CX = 110, CY = 110, OR = 100, IR = 58;
+  const CX = 135, CY = 135, OR = 125, IR = 70;
 
   let cumDeg = 0;
   const segments = data.map((d, i) => {
@@ -78,9 +78,8 @@ function CommissionPieChart({ data }) {
   const active = hovered !== null ? segments[hovered] : null;
 
   const handleMouseMove = (e, i) => {
-    const rect = e.currentTarget.closest('.comm-svg-container').getBoundingClientRect();
     setHovered(i);
-    setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    setTooltip({ x: e.clientX, y: e.clientY });
   };
 
   return (
@@ -92,7 +91,7 @@ function CommissionPieChart({ data }) {
       </div>
       <div className="comm-chart-body">
         <div className="comm-svg-container" onMouseLeave={() => setHovered(null)}>
-          <svg width={220} height={220} viewBox="0 0 220 220" style={{ display: 'block', overflow: 'visible' }}>
+          <svg width={270} height={270} viewBox="0 0 270 270" style={{ display: 'block', overflow: 'visible' }}>
             {/* Drop shadow filter */}
             <defs>
               <filter id="seg-shadow" x="-20%" y="-20%" width="140%" height="140%">
@@ -152,11 +151,19 @@ function CommissionPieChart({ data }) {
             )}
           </svg>
 
-          {/* Floating Tooltip */}
+          {/* Floating Tooltip — fixed so overflow:hidden parents don't clip it */}
           {active && (
             <div
               className="comm-tooltip"
-              style={{ left: tooltip.x + 14, top: tooltip.y - 10 }}
+              style={{
+                position: 'fixed',
+                left: tooltip.x > (typeof window !== 'undefined' ? window.innerWidth / 2 : 400)
+                  ? 'auto' : tooltip.x + 16,
+                right: tooltip.x > (typeof window !== 'undefined' ? window.innerWidth / 2 : 400)
+                  ? (typeof window !== 'undefined' ? window.innerWidth - tooltip.x + 16 : 'auto') : 'auto',
+                top: Math.min(tooltip.y - 10, typeof window !== 'undefined' ? window.innerHeight - 210 : tooltip.y),
+                zIndex: 9999,
+              }}
             >
               <div className="comm-tt-store" style={{ borderLeft: `3px solid ${active.color}` }}>
                 {active.store}
@@ -834,8 +841,8 @@ export default function StockMovements() {
         .comm-chart-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; margin-top: 24px; }
         .comm-chart-header { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 0.95rem; font-weight: 700; color: #1e293b; flex-wrap: wrap; }
         .comm-chart-sub { font-size: 0.72rem; font-weight: 400; color: #9CA3AF; }
-        .comm-chart-body { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
-        .comm-svg-container { position: relative; flex-shrink: 0; width: 220px; height: 220px; overflow: visible; }
+        .comm-chart-body { display: flex; gap: 40px; align-items: center; flex-wrap: wrap; justify-content: center; }
+        .comm-svg-container { position: relative; flex-shrink: 0; width: 270px; height: 270px; overflow: visible; }
         .comm-legend { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 240px; }
         .comm-legend-item { display: flex; gap: 10px; align-items: flex-start; padding: 6px 8px; border-radius: 9px; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s; }
         .comm-legend-item:hover, .comm-legend-item.active { background: #f8fafc; border-color: #e5e7eb; }
@@ -851,8 +858,8 @@ export default function StockMovements() {
         .comm-tag-free { background: #DCFCE7; color: #16A34A; }
         .comm-chart-footer { margin-top: 20px; padding-top: 14px; border-top: 1px solid #f3f4f6; font-size: 0.82rem; color: #6B7280; text-align: right; }
 
-        /* Tooltip */
-        .comm-tooltip { position: absolute; z-index: 50; background: #1e293b; border-radius: 12px; padding: 12px 14px; min-width: 210px; pointer-events: none; box-shadow: 0 8px 30px rgba(0,0,0,0.22); color: #fff; font-size: 0.82rem; }
+        /* Tooltip — uses position:fixed via inline style, so parent overflow:hidden won't clip it */
+        .comm-tooltip { position: fixed; z-index: 9999; background: #1e293b; border-radius: 12px; padding: 12px 14px; min-width: 210px; pointer-events: none; box-shadow: 0 8px 30px rgba(0,0,0,0.22); color: #fff; font-size: 0.82rem; }
         .comm-tt-store { font-size: 0.9rem; font-weight: 800; color: #fff; padding-left: 8px; margin-bottom: 10px; }
         .comm-tt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 3px 0; font-size: 0.8rem; color: #cbd5e1; }
         .comm-tt-row strong { color: #fff; font-weight: 700; white-space: nowrap; }
@@ -898,6 +905,52 @@ export default function StockMovements() {
         .sm-btn-deliver:disabled { opacity: 0.6; cursor: not-allowed; }
         .sm-btn-close-modal { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; background: #F97316; color: #fff; border: none; font-weight: 600; font-size: 0.82rem; cursor: pointer; font-family: inherit; }
         .sm-btn-close-modal:hover { background: #ea580c; }
+
+        /* ══════════════ RESPONSIVE ══════════════ */
+        @media (max-width: 1200px) {
+          .po-cards-grid { grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); }
+        }
+        @media (max-width: 900px) {
+          .sm-page { padding: 1.25rem 1rem; }
+          .ssc-label { min-width: 100px; max-width: 130px; }
+        }
+        @media (max-width: 768px) {
+          .sm-page { padding: 1rem; }
+          .comm-chart-body { flex-direction: column; align-items: center; gap: 20px; }
+          .comm-legend { min-width: unset; width: 100%; }
+          .ssc-label { min-width: 80px; max-width: 100px; font-size: 0.75rem; }
+          .po-card-items { max-height: none; }
+          .po-cards-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+          .sm-page { padding: 0.75rem; }
+          .sm-header { flex-direction: column; gap: 0.5rem; align-items: stretch; }
+          .sm-title { font-size: 1.15rem; }
+          .sm-refresh { justify-content: center; }
+          .sm-tabs { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; gap: 2px; padding: 3px; }
+          .sm-tabs::-webkit-scrollbar { display: none; }
+          .sm-tab { flex-shrink: 0; padding: 8px 12px; font-size: 0.78rem; white-space: nowrap; }
+          .sm-toolbar { flex-direction: column; gap: 10px; }
+          .sm-search-wrap { max-width: 100%; min-width: unset; width: 100%; }
+          .sm-filter-tabs { flex-wrap: wrap; gap: 6px; }
+          .sm-store-filter { width: 100%; }
+          .sm-store-select { width: 100%; box-sizing: border-box; }
+          .comm-chart-wrap { padding: 14px 12px; }
+          .comm-chart-header { font-size: 0.88rem; flex-wrap: wrap; }
+          .comm-legend-breakdown { display: none; }
+          .ssc-wrap { padding: 14px 12px; }
+          .ssc-label { min-width: 65px; max-width: 80px; font-size: 0.7rem; }
+          .ssc-bar-val { position: static; font-size: 0.68rem; margin-left: 4px; white-space: nowrap; }
+          .ssc-bar-track { overflow: visible; }
+          .po-card-header { padding: 10px 14px; }
+          .po-card-info { padding: 10px 14px; }
+          .po-card-items { padding: 8px 14px; }
+          .po-card-footer { padding: 10px 14px; }
+          .po-item-row { gap: 8px; }
+          .po-item-img-wrap { width: 38px; height: 38px; }
+          .sm-modal-footer { flex-wrap: wrap; justify-content: stretch; }
+          .sm-btn-print, .sm-btn-deliver, .sm-btn-close-modal { flex: 1; justify-content: center; }
+        }
 
         @media print {
           @page { size: A4 portrait; margin: 8mm 10mm; }

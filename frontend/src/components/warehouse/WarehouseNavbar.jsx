@@ -97,11 +97,6 @@ export default function WarehouseNavbar() {
             })}
           </div>
 
-          {/* Hamburger — visible on mobile only */}
-          <button className="wh-hamburger" onClick={() => setMobileOpen(o => !o)} aria-label="Toggle menu">
-            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
-
           <div className="wh-nav-right">
             {/* Notification Bell */}
             <div className="wh-notif-wrap" ref={notifRef}>
@@ -174,6 +169,11 @@ export default function WarehouseNavbar() {
               )}
             </div>
           </div>
+
+          {/* Hamburger — after nav-right so bell sits to its left */}
+          <button className="wh-hamburger" onClick={() => setMobileOpen(o => !o)} aria-label="Toggle menu">
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
       </nav>
 
@@ -294,7 +294,6 @@ export default function WarehouseNavbar() {
           color: rgba(255,255,255,0.85);
           cursor: pointer;
           flex-shrink: 0;
-          margin-left: auto;
         }
         .wh-hamburger:hover { background: rgba(255,255,255,0.14); color: #fff; }
 
@@ -339,25 +338,28 @@ export default function WarehouseNavbar() {
 
         @media (max-width: 768px) {
           .wh-topbar-inner { padding: 0.3rem 1rem; }
-          .wh-navbar-inner { padding: 0 1rem; gap: 0.75rem; }
           .wh-nav-logo-text { display: none; }
           .wh-topbar-left span { display: none; }
-          .wh-notif-dropdown { right: -120px; width: 340px; }
         }
 
-        /* On mobile: hide desktop nav links + user button, show hamburger */
-        @media (max-width: 640px) {
+        /* iPad + tablet + mobile: collapse nav links into drawer */
+        @media (max-width: 1024px) {
           .wh-hamburger { display: flex; }
           .wh-nav-links { display: none; }
-          .wh-nav-user-wrap { display: none; }
-          .wh-nav-divider { display: none; }
-          .wh-navbar-inner { padding: 0 0.75rem; gap: 0.5rem; }
-          /* Logo must NEVER grow — force fixed auto width */
+          .wh-nav-right { margin-left: auto; }
+          .wh-navbar-inner { padding: 0 1rem; gap: 0.75rem; }
           .wh-nav-logo {
             flex: 0 0 auto !important;
             width: auto !important;
             max-width: fit-content;
           }
+        }
+
+        /* Mobile only: hide user button, keep bell + hamburger */
+        @media (max-width: 640px) {
+          .wh-nav-user-wrap { display: none; }
+          .wh-nav-divider { display: none; }
+          .wh-navbar-inner { padding: 0 0.75rem; gap: 0.5rem; }
           .wh-nav-logo-icon {
             width: 36px !important;
             height: 36px !important;

@@ -197,12 +197,12 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
 
           {/* Actions */}
           <div className="nav-actions">
-            <Link to="/compare" className="action-btn" aria-label="Compare">
+            <Link to="/compare" className={`action-btn${compareCount > 0 ? ' action-active' : ''}`} aria-label="Compare">
               <FiBarChart2 size={20} />
               <span className="action-label">Compare</span>
               {compareCount > 0 && <span className="action-badge">{compareCount}</span>}
             </Link>
-            <Link to="/wishlist" className="action-btn" aria-label="Wishlist">
+            <Link to="/wishlist" className={`action-btn${wishlistCount > 0 ? ' action-active' : ''}`} aria-label="Wishlist">
               <FiHeart size={20} />
               <span className="action-label">Wishlist</span>
               {wishlistCount > 0 && <span className="action-badge">{wishlistCount}</span>}
@@ -483,6 +483,13 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
         .action-btn:hover {
           background: rgba(255,255,255,0.08);
           color: #fff;
+        }
+
+        .action-active {
+          color: #F97316 !important;
+        }
+        .action-active:hover {
+          color: #fb923c !important;
         }
 
         .action-label {
@@ -807,15 +814,16 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
         }
 
         @media (max-width: 480px) {
-          /* Hide Compare button — too many icons on tiny screens */
-          .action-btn[aria-label="Compare"] { display: none; }
           .nav-actions { gap: 0; }
-          .action-btn { padding: 0.35rem; }
-          .signin-btn { padding: 0.35rem 0.6rem; font-size: 0.75rem; }
+          .action-btn { padding: 0.3rem; }
+          .signin-btn { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
           .logo-icon { width: 32px; height: 32px; border-radius: 6px; }
           .logo-icon span { font-size: 0.78rem; }
-          /* Notification dropdown: don't overflow viewport */
           .search-suggestions { left: 0; right: 0; width: auto; }
+        }
+        /* Only hide compare on very small phones where it truly won't fit */
+        @media (max-width: 360px) {
+          .action-btn[aria-label="Compare"] { display: none; }
         }
 
         /* Profile dropdown: keep within viewport on mobile */

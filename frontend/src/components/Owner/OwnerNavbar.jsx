@@ -108,11 +108,6 @@ export default function OwnerNavbar() {
             })}
           </div>
 
-          {/* Hamburger — visible on mobile only */}
-          <button className="owner-hamburger" onClick={() => setMobileOpen(o => !o)} aria-label="Toggle menu">
-            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
-
           <div className="owner-nav-right">
             {/* Notification Bell */}
             <div className="owner-notif-wrap" ref={notifRef}>
@@ -192,6 +187,11 @@ export default function OwnerNavbar() {
               )}
             </div>
           </div>
+
+          {/* Hamburger — after nav-right so bell sits to its left */}
+          <button className="owner-hamburger" onClick={() => setMobileOpen(o => !o)} aria-label="Toggle menu">
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
       </nav>
 
@@ -313,7 +313,6 @@ export default function OwnerNavbar() {
           color: rgba(255,255,255,0.85);
           cursor: pointer;
           flex-shrink: 0;
-          margin-left: auto;
         }
         .owner-hamburger:hover { background: rgba(255,255,255,0.14); color: #fff; }
 
@@ -363,25 +362,28 @@ export default function OwnerNavbar() {
 
         @media (max-width: 768px) {
           .owner-topbar-inner { padding: 0.3rem 1rem; }
-          .owner-navbar-inner { padding: 0 1rem; gap: 0.75rem; }
           .owner-nav-logo-text { display: none; }
           .owner-topbar-left span { display: none; }
-          .owner-notif-dropdown { right: -120px; width: 340px; }
         }
 
-        /* On mobile: hide desktop nav links + user button, show hamburger */
-        @media (max-width: 640px) {
+        /* iPad + tablet + mobile: collapse nav links into drawer */
+        @media (max-width: 1024px) {
           .owner-hamburger { display: flex; }
           .owner-nav-links { display: none; }
-          .owner-nav-user-wrap { display: none; }
-          .owner-nav-divider { display: none; }
-          .owner-navbar-inner { padding: 0 0.75rem; gap: 0.5rem; }
-          /* Logo must NEVER grow — force fixed auto width */
+          .owner-nav-right { margin-left: auto; }
+          .owner-navbar-inner { padding: 0 1rem; gap: 0.75rem; }
           .owner-nav-logo {
             flex: 0 0 auto !important;
             width: auto !important;
             max-width: fit-content;
           }
+        }
+
+        /* Mobile only: hide user button, keep bell + hamburger */
+        @media (max-width: 640px) {
+          .owner-nav-user-wrap { display: none; }
+          .owner-nav-divider { display: none; }
+          .owner-navbar-inner { padding: 0 0.75rem; gap: 0.5rem; }
           .owner-nav-logo-icon {
             width: 36px !important;
             height: 36px !important;
