@@ -80,6 +80,26 @@ class Command(BaseCommand):
             prod_created += 1
         self.stdout.write(self.style.SUCCESS(f'Products: {prod_created} created, {prod_skipped} skipped'))
 
+        # ── OrderStatus ──
+        from orders.models import OrderStatus
+        order_statuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned', 'Refunded']
+        status_created = 0
+        for name in order_statuses:
+            _, created = OrderStatus.objects.get_or_create(name=name)
+            if created:
+                status_created += 1
+        self.stdout.write(self.style.SUCCESS(f'OrderStatus: {status_created} created, {len(order_statuses) - status_created} skipped'))
+
+        # ── PaymentMethods ──
+        from orders.models import PaymentMethod
+        payment_methods = ['Cash on Delivery', 'eSewa', 'Khalti', 'Bank Transfer', 'Credit Card', 'Debit Card']
+        method_created = 0
+        for name in payment_methods:
+            _, created = PaymentMethod.objects.get_or_create(name=name)
+            if created:
+                method_created += 1
+        self.stdout.write(self.style.SUCCESS(f'PaymentMethods: {method_created} created, {len(payment_methods) - method_created} skipped'))
+
         # Reset PostgreSQL sequences so future auto-increment IDs don't conflict
         from django.db import connection
         with connection.cursor() as cursor:

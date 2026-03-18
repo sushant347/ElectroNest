@@ -244,134 +244,80 @@ class CustomerAddressViewSet(viewsets.ModelViewSet):
     serializer_class   = CustomerAddressSerializer
     permission_classes = [AllowAny]  # We handle auth manually
 
-    def get_customer_id(self):
-        """Get customer ID from token."""
-        customer = get_customer_from_token(self.request)
-        if customer:
-            return customer.id
-        return None
+    def _get_customer(self):
+        return get_customer_from_token(self.request)
 
     def get_queryset(self):
-        customer_id = self.get_customer_id()
-        if not customer_id:
-            return []
-        
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT AddressID, CustomerID, Street, City, Province, PostalCode, Country, AddressType
-                FROM Customer_Address WHERE CustomerID = %s
-            """, [customer_id])
-            rows = cursor.fetchall()
-        
-        class AddrObj:
-            def __init__(self, row):
-                self.id, self.customer_id, self.street, self.city, self.province, \
-                self.postal_code, self.country, self.address_type = row
-        return [AddrObj(r) for r in rows]
+        customer = self._get_customer()
+        if not customer:
+            return CustomerAddress.objects.none()
+        return CustomerAddress.objects.filter(customer_id=customer.id)
 
     def create(self, request, *args, **kwargs):
-        customer_id = self.get_customer_id()
-        if not customer_id:
+        customer = self._get_customer()
+        if not customer:
             return Response({'detail': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
 
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            # Return first validation error in a format the frontend expects
             first_error = next(iter(serializer.errors.values()))[0]
             return Response({'detail': str(first_error)}, status=status.HTTP_400_BAD_REQUEST)
         data = serializer.validated_data
 
         address_type = data.get('address_type', 'Shipping')
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT COUNT(*) FROM Customer_Address 
-                WHERE CustomerID = %s AND AddressType = %s
-            """, [customer_id, address_type])
-            count = cursor.fetchone()[0]
-
         max_count = 2 if address_type == 'Billing' else 4
+        count = CustomerAddress.objects.filter(customer_id=customer.id, address_type=address_type).count()
         if count >= max_count:
             return Response(
                 {'detail': f'Maximum {max_count} {address_type.lower()} addresses allowed'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO Customer_Address 
-                (CustomerID, Street, City, Province, PostalCode, Country, AddressType)
-                OUTPUT INSERTED.AddressID
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, [
-                customer_id,
-                data.get('street', ''),
-                data.get('city', ''),
-                data.get('province', ''),
-                data.get('postal_code', ''),
-                data.get('country', 'Nepal'),
-                address_type,
-            ])
-            new_id = cursor.fetchone()[0]
+        address = CustomerAddress.objects.create(
+            customer_id  = customer.id,
+            street       = data.get('street', ''),
+            city         = data.get('city', ''),
+            province     = data.get('province', ''),
+            postal_code  = data.get('postal_code', ''),
+            country      = data.get('country', 'Nepal'),
+            address_type = address_type,
+        )
+        return Response(CustomerAddressSerializer(address).data, status=status.HTTP_201_CREATED)
 
-        return Response({
-            'id':           new_id,
-            'street':       data.get('street', ''),
-            'city':         data.get('city', ''),
-            'province':     data.get('province', ''),
-            'postal_code':  data.get('postal_code', ''),
-            'country':      data.get('country', 'Nepal'),
-            'address_type': address_type,
-        }, status=status.HTTP_201_CREATED)
-
-    def perform_create(self, serializer):
-        # Overridden by create() above — this is never called directly
-        pass
-    
     def destroy(self, request, *args, **kwargs):
-        customer_id = self.get_customer_id()
-        if not customer_id:
+        customer = self._get_customer()
+        if not customer:
             return Response({'detail': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
-        
+
         pk = kwargs.get('pk')
-        from django.db import connection
-        
-        # Verify this address belongs to the customer
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT COUNT(*) FROM Customer_Address WHERE AddressID = %s AND CustomerID = %s
-            """, [pk, customer_id])
-            if cursor.fetchone()[0] == 0:
-                return Response({'detail': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
-        
-        with connection.cursor() as cursor:
-            # Nullify any orders referencing this address before deleting
-            cursor.execute("UPDATE Orders SET AddressID = NULL WHERE AddressID = %s", [pk])
-            cursor.execute("DELETE FROM Customer_Address WHERE AddressID = %s AND CustomerID = %s", [pk, customer_id])
+        try:
+            address = CustomerAddress.objects.get(id=pk, customer_id=customer.id)
+        except CustomerAddress.DoesNotExist:
+            return Response({'detail': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Nullify any orders referencing this address before deleting
+        from orders.models import Order as OrderModel
+        OrderModel.objects.filter(address_id=pk).update(address=None)
+        address.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
     def update(self, request, *args, **kwargs):
-        customer_id = self.get_customer_id()
-        if not customer_id:
+        customer = self._get_customer()
+        if not customer:
             return Response({'detail': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
-        
+
         pk = kwargs.get('pk')
+        try:
+            address = CustomerAddress.objects.get(id=pk, customer_id=customer.id)
+        except CustomerAddress.DoesNotExist:
+            return Response({'detail': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
+
         data = request.data
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                UPDATE Customer_Address SET
-                    Street = %s, City = %s, Province = %s, 
-                    PostalCode = %s, Country = %s, AddressType = %s
-                WHERE AddressID = %s
-            """, [
-                data.get('street', ''),
-                data.get('city', ''),
-                data.get('province', ''),
-                data.get('postal_code', ''),
-                data.get('country', 'Nepal'),
-                data.get('address_type', 'Shipping'),
-                pk
-            ])
-        return Response({'id': pk, **data})
+        address.street       = data.get('street', address.street)
+        address.city         = data.get('city', address.city)
+        address.province     = data.get('province', address.province)
+        address.postal_code  = data.get('postal_code', address.postal_code)
+        address.country      = data.get('country', address.country)
+        address.address_type = data.get('address_type', address.address_type)
+        address.save()
+        return Response(CustomerAddressSerializer(address).data)

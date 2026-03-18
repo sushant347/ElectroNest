@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from django.db import connection
+from django.db import transaction
 from .models import CustomUser, CustomerAddress
 from products.models import Customer
 
@@ -72,15 +72,16 @@ class RegisterSerializer(serializers.Serializer):
             raise serializers.ValidationError({'email': 'Email already registered'})
         return data
 
+    @transaction.atomic
     def create(self, validated_data):
         from datetime import datetime
-        
+
         # Format phone with country code
         phone = validated_data.get('phone', '')
         country_code = validated_data.get('countryCode', '+977')
         if phone and not phone.startswith('+'):
             phone = f"{country_code}{phone}"
-        
+
         # 1. Create Customer record in Customers table ONLY (no CustomUser)
         customer = Customer.objects.create(
             first_name        = validated_data['firstName'],
@@ -93,24 +94,19 @@ class RegisterSerializer(serializers.Serializer):
             is_active         = True,
             password          = make_password(validated_data['password']),
         )
-        
-        # 2. Create address in Customer_Address table if city provided
+
+        # 2. Create address using Django ORM (no raw SQL — avoids SQL Server vs PostgreSQL syntax issues)
         city = validated_data.get('city', '')
         if city:
-            with connection.cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO Customer_Address 
-                    (CustomerID, Street, City, Province, PostalCode, Country, AddressType)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, [
-                    customer.id,
-                    validated_data.get('street', ''),
-                    city,
-                    validated_data.get('province', ''),
-                    validated_data.get('postal_code', ''),
-                    validated_data.get('country', 'Nepal'),
-                    'Shipping',
-                ])
-        
+            CustomerAddress.objects.create(
+                customer     = customer,
+                street       = validated_data.get('street', ''),
+                city         = city,
+                province     = validated_data.get('province', ''),
+                postal_code  = validated_data.get('postal_code', ''),
+                country      = validated_data.get('country', 'Nepal'),
+                address_type = 'Shipping',
+            )
+
         # Return the Customer object (not CustomUser)
         return customer
