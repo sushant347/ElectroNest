@@ -243,6 +243,7 @@ export default function App() {
       }
       return [...prev, { ...product, quantity: qty }]
     })
+    addToast({ type: 'cart', product })
     // Sync with backend
     if (user && user.role === 'customer') {
       try {
@@ -286,6 +287,7 @@ export default function App() {
     const exists = wishlistItems.find(item => item.id === product.id)
     if (exists) {
       setWishlistItems(prev => prev.filter(item => item.id !== product.id))
+      addToast({ type: 'wishlist-remove', product })
       if (user && user.role === 'customer' && exists.wishlistItemId) {
         try {
           await customerAPI.removeFromWishlist(exists.wishlistItemId)
@@ -295,6 +297,7 @@ export default function App() {
       }
     } else {
       setWishlistItems(prev => [...prev, { ...product, addedDaysAgo: 0, inStock: true, rating: product.rating || 4.5 }])
+      addToast({ type: 'wishlist-add', product })
       if (user && user.role === 'customer') {
         try {
           await customerAPI.addToWishlist(product.id)
@@ -498,20 +501,30 @@ export default function App() {
       {!hideCustomerChrome && <Footer />}
       <div className="toast-container">
         {toasts.map(t => (
-          <div key={t.id} className="toast-message">
+          <div key={t.id} className={`toast-message${t.type === 'cart' ? ' toast-cart' : ''}${t.type === 'wishlist-add' || t.type === 'wishlist-remove' ? ' toast-wishlist' : ''}`}>
             {t.type === 'warning' ? (
               <span style={{ flex: 1, padding: '0 8px' }}>{t.message}</span>
+            ) : t.type === 'wishlist-add' || t.type === 'wishlist-remove' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 28, fontWeight: 900, color: '#ffffff', lineHeight: 1, textShadow: '0 0 0 #ef4444' }}>🤍</span>
+                <span style={{ fontWeight: 700, fontSize: 15, color: '#ffffff' }}>
+                  {t.type === 'wishlist-add' ? 'Added to Wishlist' : 'Removed from Wishlist'}
+                </span>
+              </div>
             ) : (
               <>
-                <img src={t.product.image} alt="" className="toast-img" />
+                {t.product.image
+                  ? <img src={t.product.image} alt="" className="toast-img" />
+                  : <div className="toast-img toast-img-placeholder" />}
                 <div className="toast-info">
+                  <span className="toast-name" title={t.product.name}>{t.product.name}</span>
                   <span className="toast-price">{new Intl.NumberFormat("en-IN", { style: "currency", currency: "NPR", maximumFractionDigits: 0 }).format(t.product.price)}</span>
-                  <span className="toast-desc" title={t.product.name}>{t.product.name}</span>
                 </div>
-                <span className="toast-status">
-                  {t.type === 'add' ? 'Added to comparison' : 'Removed from comparison'}
+                <span className={`toast-status${t.type === 'cart' ? ' toast-status-cart' : ''}`}>
+                  {t.type === 'cart' ? 'Added to Cart' : t.type === 'add' ? 'Added to comparison' : 'Removed from comparison'}
                 </span>
                 <div className="toast-actions">
+                  {t.type === 'cart' && <Link to="/cart" className="toast-link toast-link-cart">View Cart</Link>}
                   {t.type === 'add' && <Link to="/compare" className="toast-link">View Comparison</Link>}
                   <button onClick={() => removeToast(t.id)} className="toast-close">
                     <X size={16} />
@@ -533,6 +546,8 @@ export default function App() {
           flex-direction: column;
           gap: 10px;
           pointer-events: none;
+          max-width: 90vw;
+          padding: 0 12px;
         }
         .toast-message {
           background: linear-gradient(to right, #ffffff, #f8fafc);
@@ -549,11 +564,28 @@ export default function App() {
           gap: 12px;
           min-width: fit-content;
           pointer-events: auto;
+          max-width: 100%;
+        }
+        .toast-message.toast-wishlist {
+          background: #ef4444;
+          color: #ffffff;
+          border: none;
+          padding: 14px 20px;
         }
         .toast-info {
           display: flex;
           flex-direction: column;
           gap: 2px;
+          min-width: 0;
+        }
+        .toast-info .toast-name {
+          color: inherit;
+        }
+        .toast-name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 120px;
         }
         .toast-price {
           color: #16a34a;
@@ -593,6 +625,7 @@ export default function App() {
           border-radius: 8px;
           object-fit: cover;
           border: 2px solid rgba(255,255,255,0.15);
+          flex-shrink: 0;
         }
         .toast-close {
           background: none;
@@ -605,6 +638,7 @@ export default function App() {
           justify-content: center;
           border-radius: 50%;
           transition: all 0.2s;
+          flex-shrink: 0;
         }
         .toast-close:hover {
           background: #f1f5f9;
@@ -613,6 +647,46 @@ export default function App() {
         @keyframes slideUp {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        /* Mobile responsiveness */
+        @media (max-width: 640px) {
+          .toast-container {
+            bottom: 16px;
+            left: 12px;
+            right: 12px;
+            transform: none;
+            max-width: none;
+            padding: 0;
+          }
+          .toast-message {
+            padding: 10px 12px;
+            font-size: 13px;
+            gap: 10px;
+            width: 100%;
+          }
+          .toast-message.toast-wishlist {
+            padding: 12px 16px;
+            font-size: 14px;
+          }
+          .toast-img {
+            width: 40px;
+            height: 40px;
+          }
+          .toast-name {
+            max-width: 80px;
+          }
+          .toast-actions {
+            gap: 8px;
+            margin-left: auto;
+            flex-shrink: 0;
+          }
+          .toast-link {
+            font-size: 11px;
+            padding: 4px 8px;
+          }
+          .toast-close {
+            padding: 2px;
+          }
         }
       `}</style>
     </div>
