@@ -5,6 +5,18 @@ from django.utils import timezone
 from datetime import timedelta
 
 
+def _read_sql(query, params=None):
+    """
+    Execute a raw SQL query and return a pandas DataFrame.
+    Uses Django's cursor directly — works with pandas 3.x on any DB backend.
+    """
+    with connection.cursor() as cur:
+        cur.execute(query, params or [])
+        cols = [c[0] for c in cur.description]
+        rows = cur.fetchall()
+    return pd.DataFrame(rows, columns=cols)
+
+
 def get_customer_rfm(days=90):
     """
     Calculates Recency, Frequency, and Monetary (RFM) scores for customers
@@ -14,14 +26,14 @@ def get_customer_rfm(days=90):
     from_date = now - timedelta(days=days)
 
     query = """
-        SELECT o.CustomerID, c.Email, o.OrderDate, o.TotalAmount
-        FROM Orders o
-        JOIN Customers c ON o.CustomerID = c.CustomerID
-        LEFT JOIN OrderStatus os ON o.OrderStatusID = os.OrderStatusID
-        WHERE o.OrderDate >= %s AND (os.StatusName IS NULL OR os.StatusName != 'Cancelled')
+        SELECT o."CustomerID", c."Email", o."OrderDate", o."TotalAmount"
+        FROM "Orders" o
+        JOIN "Customers" c ON o."CustomerID" = c."CustomerID"
+        LEFT JOIN "OrderStatus" os ON o."OrderStatusID" = os."OrderStatusID"
+        WHERE o."OrderDate" >= %s AND (os."StatusName" IS NULL OR os."StatusName" != 'Cancelled')
     """
 
-    df = pd.read_sql(query, connection, params=[from_date])
+    df = _read_sql(query, [from_date])
 
     if df.empty:
         return []
@@ -93,15 +105,15 @@ def get_churn_prediction(days=90, churn_threshold_days=30):
     from_date = now - timedelta(days=days)
 
     query = """
-        SELECT o.CustomerID,
-               c.FirstName, c.LastName, c.Email,
-               o.OrderDate, o.TotalAmount
-        FROM Orders o
-        JOIN Customers c ON o.CustomerID = c.CustomerID
-        LEFT JOIN OrderStatus os ON o.OrderStatusID = os.OrderStatusID
-        WHERE o.OrderDate >= %s AND (os.StatusName IS NULL OR os.StatusName <> 'Cancelled')
+        SELECT o."CustomerID",
+               c."FirstName", c."LastName", c."Email",
+               o."OrderDate", o."TotalAmount"
+        FROM "Orders" o
+        JOIN "Customers" c ON o."CustomerID" = c."CustomerID"
+        LEFT JOIN "OrderStatus" os ON o."OrderStatusID" = os."OrderStatusID"
+        WHERE o."OrderDate" >= %s AND (os."StatusName" IS NULL OR os."StatusName" <> 'Cancelled')
     """
-    df = pd.read_sql(query, connection, params=[from_date])
+    df = _read_sql(query, [from_date])
 
     if df.empty or len(df) < 5:
         return {'error': 'Not enough order data for churn prediction', 'customers': [], 'summary': {}}
@@ -203,11 +215,11 @@ def get_dynamic_pricing(product_id):
 
     # Get product info
     query_product = """
-        SELECT p.ProductID, p.ProductName, p.SellingPrice, p.CostPrice,
-               p.Stock, p.ReorderLevel, p.UnitsSold
-        FROM Products p WHERE p.ProductID = %s
+        SELECT p."ProductID", p."ProductName", p."SellingPrice", p."CostPrice",
+               p."Stock", p."ReorderLevel", p."UnitsSold"
+        FROM "Products" p WHERE p."ProductID" = %s
     """
-    prod_df = pd.read_sql(query_product, connection, params=[product_id])
+    prod_df = _read_sql(query_product, [product_id])
     if prod_df.empty:
         return {'error': 'Product not found'}
 
@@ -220,15 +232,15 @@ def get_dynamic_pricing(product_id):
 
     # Recent demand: last 30 days vs previous 30 days
     query_demand = """
-        SELECT o.OrderDate, od.Quantity
-        FROM OrderDetails od
-        JOIN Orders o ON od.OrderID = o.OrderID
-        LEFT JOIN OrderStatus os ON o.OrderStatusID = os.OrderStatusID
-        WHERE od.ProductID = %s AND o.OrderDate >= %s
-          AND (os.StatusName IS NULL OR os.StatusName <> 'Cancelled')
+        SELECT o."OrderDate", od."Quantity"
+        FROM "OrderDetails" od
+        JOIN "Orders" o ON od."OrderID" = o."OrderID"
+        LEFT JOIN "OrderStatus" os ON o."OrderStatusID" = os."OrderStatusID"
+        WHERE od."ProductID" = %s AND o."OrderDate" >= %s
+          AND (os."StatusName" IS NULL OR os."StatusName" <> 'Cancelled')
     """
     from_date_60 = now - timedelta(days=60)
-    demand_df = pd.read_sql(query_demand, connection, params=[product_id, from_date_60])
+    demand_df = _read_sql(query_demand, [product_id, from_date_60])
 
     if demand_df.empty:
         return {
@@ -324,16 +336,16 @@ def get_demand_forecast(product_id, days_history=30, forecast_days=7):
     from_date = now - timedelta(days=days_history)
 
     query = """
-        SELECT o.OrderDate AS date, od.Quantity AS quantity
-        FROM OrderDetails od
-        JOIN Orders o ON od.OrderID = o.OrderID
-        LEFT JOIN OrderStatus os ON o.OrderStatusID = os.OrderStatusID
-        WHERE od.ProductID = %s
-          AND o.OrderDate >= %s
-          AND (os.StatusName IS NULL OR os.StatusName != 'Cancelled')
+        SELECT o."OrderDate" AS date, od."Quantity" AS quantity
+        FROM "OrderDetails" od
+        JOIN "Orders" o ON od."OrderID" = o."OrderID"
+        LEFT JOIN "OrderStatus" os ON o."OrderStatusID" = os."OrderStatusID"
+        WHERE od."ProductID" = %s
+          AND o."OrderDate" >= %s
+          AND (os."StatusName" IS NULL OR os."StatusName" != 'Cancelled')
     """
 
-    df = pd.read_sql(query, connection, params=[product_id, from_date])
+    df = _read_sql(query, [product_id, from_date])
 
     if df.empty:
         return {"error": "Not enough data for forecasting"}
@@ -373,16 +385,16 @@ def get_product_recommendations(product_id, limit=5):
     Market Basket Analysis finding products frequently bought together.
     """
     query = """
-        SELECT p.ProductID AS id, p.ProductName AS name,
-               p.ProductImageURL AS image_url, p.SellingPrice AS price
-        FROM OrderDetails od
-        JOIN Products p ON od.ProductID = p.ProductID
-        WHERE od.OrderID IN (
-            SELECT OrderID FROM OrderDetails WHERE ProductID = %s
-        ) AND od.ProductID != %s
+        SELECT p."ProductID" AS id, p."ProductName" AS name,
+               p."ProductImageURL" AS image_url, p."SellingPrice" AS price
+        FROM "OrderDetails" od
+        JOIN "Products" p ON od."ProductID" = p."ProductID"
+        WHERE od."OrderID" IN (
+            SELECT "OrderID" FROM "OrderDetails" WHERE "ProductID" = %s
+        ) AND od."ProductID" != %s
     """
 
-    df = pd.read_sql(query, connection, params=[product_id, product_id])
+    df = _read_sql(query, [product_id, product_id])
 
     if df.empty:
         return []
@@ -572,25 +584,25 @@ def get_comprehensive_forecast(product_id, days_history=30, forecast_days=7):
 
     # ── Fetch raw order data from database ──
     query = """
-        SELECT o.OrderDate AS date,
-               od.Quantity  AS quantity,
-               od.UnitPrice AS unit_price,
-               p.CostPrice  AS cost_price,
-               p.SellingPrice AS selling_price,
-               p.Stock       AS current_stock,
-               p.ReorderLevel AS reorder_level,
-               p.ProductName AS product_name,
-               p.ProductDescription AS description,
-               p.ProductImageURL AS image_url
-        FROM OrderDetails od
-        JOIN Orders o ON od.OrderID = o.OrderID
-        JOIN Products p ON od.ProductID = p.ProductID
-        LEFT JOIN OrderStatus os ON o.OrderStatusID = os.OrderStatusID
-        WHERE od.ProductID = %s
-          AND o.OrderDate >= %s
-          AND (os.StatusName IS NULL OR os.StatusName != 'Cancelled')
+        SELECT o."OrderDate" AS date,
+               od."Quantity"  AS quantity,
+               od."UnitPrice" AS unit_price,
+               p."CostPrice"  AS cost_price,
+               p."SellingPrice" AS selling_price,
+               p."Stock"       AS current_stock,
+               p."ReorderLevel" AS reorder_level,
+               p."ProductName" AS product_name,
+               p."ProductDescription" AS description,
+               p."ProductImageURL" AS image_url
+        FROM "OrderDetails" od
+        JOIN "Orders" o ON od."OrderID" = o."OrderID"
+        JOIN "Products" p ON od."ProductID" = p."ProductID"
+        LEFT JOIN "OrderStatus" os ON o."OrderStatusID" = os."OrderStatusID"
+        WHERE od."ProductID" = %s
+          AND o."OrderDate" >= %s
+          AND (os."StatusName" IS NULL OR os."StatusName" != 'Cancelled')
     """
-    df = pd.read_sql(query, connection, params=[product_id, from_date])
+    df = _read_sql(query, [product_id, from_date])
 
     if df.empty:
         return {'error': 'Not enough sales data for forecasting'}
