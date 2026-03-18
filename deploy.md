@@ -46,7 +46,7 @@ Then:
    | Name | `electronest-api` |
    | Root Directory | `backend` |
    | Runtime | `Python` |
-   | Build Command | `pip install -r requirements.txt && python manage.py collectstatic --noinput` |
+   | Build Command | `pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_users && python manage.py seed_products` |
    | Start Command | `gunicorn page.wsgi --bind 0.0.0.0:$PORT` |
    | Instance Type | **Free** |
 
@@ -100,6 +100,52 @@ Then:
 1. Go back to Render → your `electronest-api` service → **Environment** tab
 2. Change `CORS_ORIGINS` value to your exact Vercel URL (copy from Step 4)
 3. Click **Save Changes** → Render redeploys automatically
+
+---
+
+## STEP 6 — Reset Database & Redeploy (if migration errors occurred)
+
+If you get migration errors (e.g. "relation does not exist", "column does not exist"), reset Neon and redeploy:
+
+### 6a — Reset Neon database
+
+1. Go to [neon.tech](https://neon.tech) → open your `electronest` project
+2. Click **SQL Editor** tab
+3. Paste and run this SQL:
+   ```sql
+   DROP SCHEMA public CASCADE;
+   CREATE SCHEMA public;
+   GRANT ALL ON SCHEMA public TO neondb_owner;
+   GRANT ALL ON SCHEMA public TO public;
+   ```
+4. Click **Run** — this wipes all tables
+
+### 6b — Push new code to GitHub
+
+In your terminal (inside the `Debug` folder):
+```bash
+git add backend/orders/migrations/0001_initial.py backend/products/migrations/0001_initial.py backend/accounts/migrations/0001_initial.py backend/orders/migrations/ backend/products/migrations/ backend/admin_panel/migrations/ backend/requirements.txt deploy.md
+git commit -m "Fix migrations: add CreateModel state entries for managed=False tables"
+git push
+```
+
+### 6c — Update build command on Render
+
+1. Go to Render → your `electronest-api` service → **Settings** tab
+2. Find **Build Command** and set it to:
+   ```
+   pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_users && python manage.py seed_products
+   ```
+3. Click **Save Changes**
+4. Click **Manual Deploy** → **Deploy latest commit**
+5. Watch the build logs — it should end with:
+   ```
+   Categories: 12 created, 0 skipped
+   Suppliers: 8 created, 0 skipped
+   Products: 426 created, 0 skipped
+   Sequences reset.
+   Done — database seeded successfully.
+   ```
 
 ---
 

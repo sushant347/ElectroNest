@@ -26,6 +26,15 @@ class Migration(migrations.Migration):
             ''',
             reverse_sql='DROP TABLE IF EXISTS "OrderStatus" CASCADE;',
         ),
+        # State-only entry so Django migration state knows about OrderStatus
+        migrations.CreateModel(
+            name='OrderStatus',
+            fields=[
+                ('id',   models.AutoField(db_column='OrderStatusID', primary_key=True, serialize=False)),
+                ('name', models.CharField(db_column='StatusName', max_length=50, unique=True)),
+            ],
+            options={'db_table': 'OrderStatus', 'managed': False},
+        ),
 
         # ── PaymentMethods ────────────────────────────────────────────────────
         migrations.RunSQL(
@@ -36,6 +45,15 @@ class Migration(migrations.Migration):
                 );
             ''',
             reverse_sql='DROP TABLE IF EXISTS "PaymentMethods" CASCADE;',
+        ),
+        # State-only entry
+        migrations.CreateModel(
+            name='PaymentMethod',
+            fields=[
+                ('id',   models.AutoField(db_column='MethodID', primary_key=True, serialize=False)),
+                ('name', models.CharField(db_column='MethodName', max_length=50, unique=True)),
+            ],
+            options={'db_table': 'PaymentMethods', 'managed': False},
         ),
 
         # ── Cart ─────────────────────────────────────────────────────────────
@@ -71,6 +89,25 @@ class Migration(migrations.Migration):
                 );
             ''',
             reverse_sql='DROP TABLE IF EXISTS "Orders" CASCADE;',
+        ),
+        # State-only entry so Django migration state knows about Order
+        migrations.CreateModel(
+            name='Order',
+            fields=[
+                ('id',                      models.AutoField(db_column='OrderID', primary_key=True, serialize=False)),
+                ('order_number',            models.CharField(db_column='OrderNumber', max_length=50, unique=True)),
+                ('order_date',              models.DateTimeField(auto_now_add=True, db_column='OrderDate')),
+                ('total_amount',            models.DecimalField(db_column='TotalAmount', decimal_places=2, max_digits=10)),
+                ('shipping_cost',           models.DecimalField(db_column='ShippingCost', decimal_places=2, default=200, max_digits=10)),
+                ('estimated_delivery_date', models.DateTimeField(blank=True, db_column='EstimatedDeliveryDate', null=True)),
+                ('tracking_number',         models.CharField(blank=True, db_column='TrackingNumber', default='', max_length=50)),
+                ('created_at',              models.DateTimeField(auto_now_add=True, db_column='CreatedAt')),
+                ('updated_at',              models.DateTimeField(auto_now=True, db_column='UpdatedAt')),
+                ('customer',                models.ForeignKey(db_column='CustomerID', on_delete=django.db.models.deletion.CASCADE, to='products.customer')),
+                ('order_status',            models.ForeignKey(blank=True, db_column='OrderStatusID', null=True, on_delete=django.db.models.deletion.SET_NULL, to='orders.orderstatus')),
+                ('address',                 models.ForeignKey(blank=True, db_column='AddressID', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='orders', to='accounts.customeraddress')),
+            ],
+            options={'db_table': 'Orders', 'managed': False},
         ),
 
         # ── OrderDetails ──────────────────────────────────────────────────────
