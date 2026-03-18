@@ -177,49 +177,58 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
         from django.db.models import Prefetch
         user = self.request.user
         payments_prefetch = Prefetch('payments', queryset=Payment.objects.select_related('method'))
+        # All detail queries use deep select_related to eliminate N+1 for category/supplier
+        _detail_qs = (
+            OrderDetail.objects
+            .select_related('product__category', 'product__supplier')
+            .order_by('id')
+        )
         if isinstance(user, CustomUser):
             # Owner: see only orders that contain their products
-            # AND only prefetch the details belonging to this owner
             if user.role == 'owner':
                 store_name = f"{user.first_name} {user.last_name}".strip()
+                if not store_name:
+                    return Order.objects.none()
                 # Step 1: get owner's product IDs (small set, fast)
                 owner_product_ids = list(
                     Product.objects.filter(owner_name__icontains=store_name)
                     .values_list('id', flat=True)
                 )
+                if not owner_product_ids:
+                    return Order.objects.none()
                 # Step 2: get order IDs that contain those products (no JOIN on outer query)
                 owner_order_ids = list(
                     OrderDetail.objects.filter(product_id__in=owner_product_ids)
                     .values_list('order_id', flat=True).distinct()
                 )
+                if not owner_order_ids:
+                    return Order.objects.none()
                 own_details = (
                     OrderDetail.objects
                     .filter(product_id__in=owner_product_ids)
-                    .select_related('product')
+                    .select_related('product__category', 'product__supplier')
+                    .order_by('id')
                 )
                 return (
                     Order.objects
                     .filter(id__in=owner_order_ids)
                     .select_related('order_status', 'customer', 'address')
                     .prefetch_related(Prefetch('details', queryset=own_details), payments_prefetch)
+                    .order_by('-order_date')
                 )
-            # Admin / warehouse: see all orders — deduplicate details
+            # Admin / warehouse: see all orders
             return (
                 Order.objects
                 .select_related('order_status', 'customer', 'address')
-                .prefetch_related(
-                    Prefetch('details', queryset=OrderDetail.objects.select_related('product').order_by('product_id', 'id').distinct()),
-                    payments_prefetch,
-                ).all()
+                .prefetch_related(Prefetch('details', queryset=_detail_qs), payments_prefetch)
+                .order_by('-order_date')
             )
-        # Customers: see only their own orders — deduplicate details
+        # Customers: see only their own orders
         return (
             Order.objects.filter(customer=user)
             .select_related('order_status', 'address')
-            .prefetch_related(
-                Prefetch('details', queryset=OrderDetail.objects.select_related('product').order_by('product_id', 'id').distinct()),
-                payments_prefetch,
-            )
+            .prefetch_related(Prefetch('details', queryset=_detail_qs), payments_prefetch)
+            .order_by('-order_date')
         )
 
     @transaction.atomic
