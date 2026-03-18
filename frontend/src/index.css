@@ -163,11 +163,10 @@ table {
     width: 100% !important;
   }
 
-  /* Collapse owner/warehouse navbar to top bar on mobile */
-  [class*="owner-nav"],
-  [class*="warehouse-nav"] {
+  /* Owner/warehouse navbar shells: constrain width, never scroll */
+  .owner-navbar, .wh-navbar {
     width: 100% !important;
-    overflow-x: auto !important;
+    overflow: visible !important;
   }
 }
 
