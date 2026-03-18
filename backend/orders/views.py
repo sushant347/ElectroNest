@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from django.db import transaction
+from django.db.models import Avg, Count, Prefetch
 from decimal import Decimal
 import uuid
 
@@ -659,7 +660,13 @@ class CompareListViewSet(viewsets.ModelViewSet):
     MAX_COMPARE = 3
 
     def get_queryset(self):
-        return CompareList.objects.filter(customer=self.request.user).select_related('product')
+        annotated_products = Product.objects.annotate(
+            average_rating=Avg('reviews__rating'),
+            review_count=Count('reviews'),
+        )
+        return CompareList.objects.filter(
+            customer=self.request.user
+        ).prefetch_related(Prefetch('product', queryset=annotated_products))
 
     def create(self, request, *args, **kwargs):
         product_id = request.data.get('product')
