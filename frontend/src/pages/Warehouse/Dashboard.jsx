@@ -276,7 +276,29 @@ export default function WarehouseDashboard() {
         .wh-modal-table th { padding: 8px 10px; background: #f9fafb; color: #6b7280; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; text-align: left; }
         .wh-modal-table td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; color: #374151; }
         @media (max-width: 1200px) { .wh-stats-grid { grid-template-columns: repeat(2, 1fr); } .wh-bottom-row { grid-template-columns: 1fr; } }
-        @media (max-width: 640px) { .wh-stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; } .wh-stat-card { padding: 14px 12px; gap: 10px; } }
+        @media (max-width: 768px) {
+          .wh-dashboard { padding: 1rem; }
+          .wh-card { padding: 16px 14px; }
+          .wh-page-title { font-size: 1.3rem; }
+        }
+        @media (max-width: 640px) {
+          .wh-dashboard { padding: 0.75rem; }
+          .wh-stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+          .wh-stat-card { padding: 14px 12px; gap: 10px; }
+          .wh-card { padding: 14px 12px; }
+          /* Let long product names wrap — no truncation on mobile */
+          .wh-alert-name { white-space: normal !important; overflow: visible !important; text-overflow: unset !important; word-break: break-word; line-height: 1.35; }
+          .wh-po-supplier { white-space: normal !important; word-break: break-word; }
+          /* Badge moves to its own line when name is long */
+          .wh-alert-top { flex-wrap: wrap; align-items: flex-start; gap: 4px; }
+          .wh-severity { flex-shrink: 0; }
+          /* PO items stack when content is wide */
+          .wh-po-item { flex-wrap: wrap; gap: 6px; }
+          .wh-po-status { align-self: flex-start; }
+          /* Deliver rows */
+          .wh-deliver-row { flex-wrap: wrap; gap: 8px; }
+          .wh-deliver-meta { white-space: normal !important; overflow: visible !important; text-overflow: unset !important; word-break: break-word; }
+        }
         @media (max-width: 400px) { .wh-stats-grid { grid-template-columns: 1fr; } }
       `}</style>
     </>

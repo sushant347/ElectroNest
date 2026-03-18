@@ -340,6 +340,8 @@ export default function WarehouseNavbar() {
           .wh-topbar-inner { padding: 0.3rem 1rem; }
           .wh-nav-logo-text { display: none; }
           .wh-topbar-left span { display: none; }
+          /* Keep notification dropdown in-viewport on tablets */
+          .wh-notif-dropdown { right: 0; width: 340px; }
         }
 
         /* iPad + tablet + mobile: collapse nav links into drawer */

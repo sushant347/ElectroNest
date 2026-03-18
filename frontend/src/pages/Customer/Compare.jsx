@@ -281,9 +281,36 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
   };
 
   return (
-    <section style={styles.page}>
+    <section className="cmp-page" style={styles.page}>
+      <style>{`
+        @media (max-width: 900px) {
+          .cmp-page { padding: 28px 16px 48px !important; }
+          .cmp-table { min-width: 600px !important; }
+          .cmp-table th { width: 120px !important; padding: 14px 10px !important; font-size: 13px !important; }
+          .cmp-table td { padding: 14px 10px !important; }
+          .cmp-table img { width: 90px !important; height: 90px !important; margin-bottom: 10px !important; }
+        }
+        @media (max-width: 640px) {
+          .cmp-page { padding: 20px 12px 36px !important; }
+          .cmp-table { min-width: 480px !important; }
+          .cmp-table th { width: 100px !important; padding: 10px 8px !important; font-size: 12px !important; }
+          .cmp-table td { padding: 10px 8px !important; }
+          .cmp-table img { width: 72px !important; height: 72px !important; margin-bottom: 8px !important; }
+          .cmp-table h3 { font-size: 13px !important; margin-bottom: 4px !important; }
+          .cmp-table-container { border-radius: 12px !important; }
+          .cmp-header { margin-bottom: 24px !important; }
+        }
+        @media (max-width: 420px) {
+          .cmp-page { padding: 14px 10px 28px !important; }
+          .cmp-table { min-width: 380px !important; }
+          .cmp-table th { width: 82px !important; padding: 8px 6px !important; font-size: 11px !important; }
+          .cmp-table td { padding: 8px 5px !important; }
+          .cmp-table img { width: 56px !important; height: 56px !important; }
+          .cmp-table h3 { font-size: 12px !important; }
+        }
+      `}</style>
       <div style={styles.container}>
-        <div style={styles.headerWrap}>
+        <div className="cmp-header" style={styles.headerWrap}>
           <div>
             <span style={styles.pill}>
               <Scale size={13} /> Compare Products
@@ -309,8 +336,8 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
             </Link>
           </div>
         ) : (
-          <div style={styles.tableContainer}>
-            <table style={styles.table}>
+          <div className="cmp-table-container" style={styles.tableContainer}>
+            <table className="cmp-table" style={styles.table}>
               <tbody>
                 <tr>
                   <th style={styles.th}>Product</th>
