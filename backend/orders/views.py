@@ -182,13 +182,24 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
             # AND only prefetch the details belonging to this owner
             if user.role == 'owner':
                 store_name = f"{user.first_name} {user.last_name}".strip()
-                own_details = OrderDetail.objects.filter(
-                    product__owner_name__icontains=store_name
-                ).select_related('product')
+                # Step 1: get owner's product IDs (small set, fast)
+                owner_product_ids = list(
+                    Product.objects.filter(owner_name__icontains=store_name)
+                    .values_list('id', flat=True)
+                )
+                # Step 2: get order IDs that contain those products (no JOIN on outer query)
+                owner_order_ids = list(
+                    OrderDetail.objects.filter(product_id__in=owner_product_ids)
+                    .values_list('order_id', flat=True).distinct()
+                )
+                own_details = (
+                    OrderDetail.objects
+                    .filter(product_id__in=owner_product_ids)
+                    .select_related('product')
+                )
                 return (
                     Order.objects
-                    .filter(details__product__owner_name__icontains=store_name)
-                    .distinct()
+                    .filter(id__in=owner_order_ids)
                     .select_related('order_status', 'customer', 'address')
                     .prefetch_related(Prefetch('details', queryset=own_details), payments_prefetch)
                 )

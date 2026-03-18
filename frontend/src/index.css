@@ -45,6 +45,228 @@ a:hover {
   color: #ea580c;
 }
 
+/* ══════════════════════════════════════════════════════
+   GLOBAL RESPONSIVE STYLES
+   Works for all panels: customer, admin, owner, warehouse
+   ══════════════════════════════════════════════════════ */
+
+/* ── Every table gets horizontal scroll on small screens ── */
+table {
+  width: 100%;
+  min-width: 0;
+}
+
+.table-wrapper,
+.adm-table-wrapper,
+.wh-table-wrapper,
+.owner-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Auto-wrap any table that isn't already inside a scroll container */
+@media (max-width: 768px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Keep thead/tbody/tr as-is inside the scrollable table */
+  thead, tbody, tfoot, tr, th, td {
+    display: revert;
+  }
+}
+
+/* ── Cards / stat grids stack on mobile ── */
+@media (max-width: 640px) {
+  /* Any CSS grid with auto columns collapses to 1 column */
+  .stats-grid,
+  .cards-grid,
+  .overview-grid,
+  [class*="grid-cols"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Flex rows become columns */
+  .adm-stats-row,
+  .wh-stats-row,
+  .owner-stats-row {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Cards full width */
+  .adm-stat-card,
+  .wh-stat-card,
+  .owner-stat-card,
+  [class*="stat-card"],
+  [class*="overview-card"] {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* ── Modals: full-screen on phones ── */
+@media (max-width: 640px) {
+  /* Any modal/dialog overlay */
+  [class*="modal-overlay"],
+  [class*="-overlay"] {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+
+  [class*="modal-content"],
+  [class*="-modal"],
+  [class*="modal-box"] {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 90vh !important;
+    border-radius: 1rem 1rem 0 0 !important;
+    margin: 0 !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* ── Admin panel: main content fills screen on mobile ── */
+@media (max-width: 768px) {
+  .adm-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .adm-sidebar {
+    display: none !important;
+  }
+
+  .adm-content {
+    padding: 0.75rem !important;
+  }
+
+  .adm-topbar {
+    padding: 0.5rem 0.75rem !important;
+  }
+}
+
+/* ── Owner & Warehouse panels: stack nav + content on mobile ── */
+@media (max-width: 768px) {
+  .owner-layout,
+  .warehouse-layout {
+    flex-direction: column !important;
+  }
+
+  .owner-main-content,
+  .warehouse-main-content {
+    padding: 0.75rem !important;
+    width: 100% !important;
+  }
+
+  /* Collapse owner/warehouse navbar to top bar on mobile */
+  [class*="owner-nav"],
+  [class*="warehouse-nav"] {
+    width: 100% !important;
+    overflow-x: auto !important;
+  }
+}
+
+/* ── Customer pages: comfortable padding on mobile ── */
+@media (max-width: 640px) {
+  /* Product grid: 2 columns on phone */
+  .product-grid,
+  [class*="products-grid"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Cart, checkout: remove side padding */
+  .cart-container,
+  .checkout-container,
+  [class*="page-container"] {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  /* Buttons: full width on mobile */
+  [class*="checkout-btn"],
+  [class*="place-order"] {
+    width: 100% !important;
+  }
+
+  /* Compare page: allow scroll */
+  [class*="compare-table"],
+  [class*="compare-grid"] {
+    overflow-x: auto !important;
+    display: block !important;
+  }
+}
+
+/* ── Typography scales down on mobile ── */
+@media (max-width: 640px) {
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+  h3 { font-size: 1.1rem !important; }
+
+  [class*="page-title"],
+  [class*="section-title"] {
+    font-size: 1.25rem !important;
+  }
+}
+
+/* ── Inputs & selects: full width on mobile ── */
+@media (max-width: 640px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+    max-width: 100% !important;
+  }
+}
+
+/* ── Charts: don't overflow ── */
+@media (max-width: 768px) {
+  [class*="chart-container"],
+  [class*="recharts-wrapper"],
+  .recharts-responsive-container {
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+}
+
+/* ── Footer: stack on mobile ── */
+@media (max-width: 640px) {
+  [class*="footer-grid"],
+  [class*="footer-columns"] {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 1.5rem !important;
+  }
+}
+
+/* ── Tablet adjustments (641px – 1024px) ── */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .product-grid,
+  [class*="products-grid"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  [class*="modal-content"],
+  [class*="-modal"],
+  [class*="modal-box"] {
+    max-width: 90vw !important;
+    width: 90vw !important;
+  }
+}
+
+/* ── Prevent horizontal page overflow everywhere ── */
+html, body, #root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 /* ── Print Styles (StockMovements warehouse modal) ── */
 @media print {
   @page { size: A4 portrait; margin: 8mm 10mm; }
