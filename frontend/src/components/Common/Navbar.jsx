@@ -476,10 +476,14 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
         }
 
         .action-active {
-          color: #F97316 !important;
+          color: #fff !important;
         }
         .action-active:hover {
-          color: #fb923c !important;
+          color: #ffffff !important;
+        }
+        .action-active[aria-label="Wishlist"] svg {
+          fill: #fff;
+          stroke: none;
         }
 
         .action-label {
