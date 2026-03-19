@@ -3,13 +3,12 @@ import { FiFacebook, FiTwitter, FiInstagram, FiYoutube, FiMail, FiPhone, FiMapPi
 import electronestLogo from '../images/Electronest.png'
 
 const features = [
-  { icon: FiTruck, title: 'Free Shipping', desc: 'On orders over ₹5000' },
+  { icon: FiTruck, title: 'Free Shipping', desc: 'On orders over ₹500000' },
   { icon: FiShield, title: 'Secure Payment', desc: '100% protected' },
   { icon: FiCreditCard, title: 'Easy Returns', desc: '30-day returns' },
   { icon: FiHeadphones, title: '24/7 Support', desc: 'Dedicated support' },
 ]
 
-const quickLinks = ['Laptops', 'Smartphones', 'Audio', 'Cameras', 'Tablets', 'Wearables', 'Gaming', 'Accessories']
 const supportLinks = [
   { label: 'Contact Us', path: '/support/contact' },
   { label: 'FAQ', path: '/support/faq' },
@@ -41,6 +40,7 @@ export default function Footer() {
           <div className="footer-brand">
             <Link to="/" className="footer-logo">
               <img src={electronestLogo} alt="ElectroNest" className="footer-logo-img" />
+              <span className="footer-logo-name">Electro<span style={{ color: '#F97316' }}>Nest</span></span>
             </Link>
             <p className="footer-desc">Your premium destination for cutting-edge technology and electronics at competitive prices.</p>
             <div className="social-links">
@@ -48,16 +48,27 @@ export default function Footer() {
                 <a key={i} href="#" className="social-link"><Icon size={16} /></a>
               ))}
             </div>
-          </div>
-
-          {/* Quick Links */}
-          <div>
-            <h3 className="footer-heading">Quick Links</h3>
-            <ul className="footer-list">
-              {quickLinks.map((link) => (
-                <li key={link}><a href="#">{link}</a></li>
-              ))}
-            </ul>
+            {/* We Accept */}
+            <div style={{ marginTop: '1.25rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.6rem' }}>We Accept</div>
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* eSewa */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#60BB46', borderRadius: 8, padding: '5px 12px' }}>
+                  <svg width="18" height="18" viewBox="0 0 48 48" fill="none"><path d="M14 24C14 19.5 17.5 16 22 16H34" stroke="white" strokeWidth="3" strokeLinecap="round"/><path d="M14 24H34" stroke="white" strokeWidth="3" strokeLinecap="round"/><path d="M14 24C14 28.5 17.5 32 22 32H34" stroke="white" strokeWidth="3" strokeLinecap="round"/></svg>
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.8rem', fontFamily: 'inherit' }}>eSewa</span>
+                </div>
+                {/* Khalti */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#5C2D91', borderRadius: 8, padding: '5px 12px' }}>
+                  <svg width="18" height="18" viewBox="0 0 48 48" fill="none"><path d="M15 14V34" stroke="white" strokeWidth="3" strokeLinecap="round"/><path d="M33 14L21 24L33 34" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.8rem', fontFamily: 'inherit' }}>Khalti</span>
+                </div>
+                {/* Bank */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#2563EB', borderRadius: 8, padding: '5px 12px' }}>
+                  <svg width="18" height="18" viewBox="0 0 48 48" fill="none"><path d="M11 25V37H15V25H11ZM21 25V37H25V25H21ZM31 25V37H35V25H31ZM4 17L23 7L42 17V21H4V17ZM8 39V43H38V39H8Z" fill="white"/></svg>
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.8rem', fontFamily: 'inherit' }}>Bank</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Support */}
@@ -139,12 +150,7 @@ export default function Footer() {
           padding: 2.5rem 2.5rem 2rem;
         }
 
-        .footer-grid {
-          display: grid;
-          grid-template-columns: 1.5fr 1fr 1fr 1fr;
-          gap: 3rem;
-          margin-bottom: 2.5rem;
-        }
+        .footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; }
 
         .footer-logo {
           display: flex;
@@ -156,10 +162,18 @@ export default function Footer() {
 
         .footer-logo-img {
           height: 36px;
-          width: auto;
-          max-width: 160px;
+          width: 36px;
           object-fit: contain;
           display: block;
+          flex-shrink: 0;
+        }
+
+        .footer-logo-name {
+          font-size: 1.15rem;
+          font-weight: 800;
+          color: #fff;
+          letter-spacing: -0.01em;
+          white-space: nowrap;
         }
 
         .footer-desc {
@@ -268,10 +282,7 @@ export default function Footer() {
             grid-template-columns: repeat(2, 1fr);
             padding: 1.25rem 1rem;
           }
-          .footer-grid {
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-          }
+          .footer-grid { grid-template-columns: 1fr 1fr; gap: 2rem; }
           .footer-brand {
             grid-column: 1 / -1;
           }
@@ -286,11 +297,10 @@ export default function Footer() {
           .features-bar {
             grid-template-columns: 1fr;
           }
-          .footer-grid {
-            grid-template-columns: 1fr;
-          }
+          .footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; }
         }
       `}</style>
     </footer>
   )
 }
+
