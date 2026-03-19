@@ -316,12 +316,15 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                             (coupon.owner_store_name or '').strip().lower() == store_name.lower()
                         )
                     )
-                    raw_pct  = Decimal(str(coupon.discount_percent)) if coupon_applies else Decimal('0')
-                    discount = min(raw_pct, Decimal('100'))          # clamp: can't exceed 100 %
-                    payable  = store_total * (1 - discount / 100)
-                    if coupon_applies and coupon.max_discount and store_total - payable > coupon.max_discount:
-                        payable = store_total - Decimal(str(coupon.max_discount))
-                    payable = max(payable, Decimal('0'))              # floor: can't go negative
+                    discount = Decimal(str(coupon.discount_percent)) if coupon_applies else Decimal('0')
+                    if coupon_applies and coupon.max_discount:
+                        # max_discount caps the ORDER BASE used for % calculation, not the rupee amount.
+                        # e.g. 40% with max_discount=20000 → 40% of min(order, 20000).
+                        effective_base = min(store_total, Decimal(str(coupon.max_discount)))
+                    else:
+                        effective_base = store_total
+                    discount_amount = effective_base * discount / 100
+                    payable = store_total - discount_amount
 
                     shipping_cost = self._compute_shipping(addr, coupon_applies, coupon)
 

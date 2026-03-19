@@ -539,13 +539,13 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
 
   const couponDiscount = (() => {
     if (!appliedCoupon) return 0;
-    const pct        = Math.min(Number(appliedCoupon.discount_percent) || 0, 100); // clamp to [0, 100]
-    const minOrder   = Number(appliedCoupon.min_order_amount) || 0;
-    const maxDisc    = appliedCoupon.max_discount ? Number(appliedCoupon.max_discount) : null;
-    if (storeSubtotal < minOrder) return 0;
-    let disc = Math.round(storeSubtotal * pct / 100);
-    if (maxDisc !== null && maxDisc > 0) disc = Math.min(disc, maxDisc);
-    return Math.min(disc, storeSubtotal); // safety: discount can never exceed the applicable subtotal
+    if (storeSubtotal < appliedCoupon.min_order_amount) return 0;
+    // max_discount limits the ORDER BASE on which % is calculated, not the discount rupee amount.
+    // e.g. 40% with max_discount=20000 → always gives 40% of 20000 = 8000 for large orders.
+    const base = appliedCoupon.max_discount
+      ? Math.min(storeSubtotal, Number(appliedCoupon.max_discount))
+      : storeSubtotal;
+    return Math.round(base * appliedCoupon.discount_percent / 100);
   })();
 
   const total = subtotal + shipping - couponDiscount;
