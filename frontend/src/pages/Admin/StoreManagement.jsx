@@ -1,13 +1,35 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Store, Search, RefreshCw, AlertCircle, TrendingUp,
   Package, ShoppingBag, DollarSign, ChevronDown,
   ChevronUp, Eye, Award, ArrowUpRight, X
 } from 'lucide-react';
 import {
-  BarChart, Bar, LineChart, Line, ComposedChart,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
+  BarChart, Bar, ComposedChart,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, Line
 } from 'recharts';
+
+// Bulletproof chart wrapper — measures its own pixel width, bypasses ResizeObserver issues
+function ChartWrapper({ height, children }) {
+  const ref = useRef(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    if (!ref.current) return;
+    // Measure immediately
+    setWidth(Math.floor(ref.current.getBoundingClientRect().width) || 300);
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.floor(entry.contentRect.width);
+      if (w > 0) setWidth(w);
+    });
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} style={{ width: '100%', height }}>
+      {width > 0 && children(width)}
+    </div>
+  );
+}
 import { adminAPI } from '../../services/api';
 
 const fmt = (n) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(n || 0);
@@ -190,12 +212,12 @@ export default function StoreManagement() {
   return (
     <div className="sm-page">
       <style>{`
-        .sm-page { padding: 24px 28px 48px; max-width: 1440px; margin: 0 auto; box-sizing: border-box; width: 100%; overflow-x: hidden; }
+        .sm-page { padding: 24px 28px 48px; max-width: 1440px; margin: 0 auto; box-sizing: border-box; width: 100%; }
         .sm-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
         .sm-table-detail { display: grid; grid-template-columns: 1fr 380px; gap: 20px; align-items: start; }
         .sm-table-detail-single { display: grid; grid-template-columns: 1fr; gap: 20px; }
         .sm-period-btns { display: flex; background: #f3f4f6; border-radius: 9px; padding: 3px; gap: 2px; flex-wrap: wrap; }
-        .sm-chart-box { min-width: 0; width: 100%; overflow: hidden; }
+        .sm-chart-box { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; position: relative; display: block; }
         .sm-tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
         .sm-tbl-scroll table { min-width: 480px; }
         .sm-detail-panel { min-width: 0; width: 100%; box-sizing: border-box; }
@@ -297,24 +319,26 @@ export default function StoreManagement() {
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : displayTrend.length > 0 ? (
-          <div className="sm-chart-box">
-          <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={displayTrend} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
-                tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={40} />
-              <Tooltip
-                formatter={(v, n) => [n === 'Orders' ? fmtNum(v) : fmt(v), n]}
-                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 11 }}
-              />
-              <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Orders" fill="#2563EB" fillOpacity={0.18} stroke="#2563EB" strokeWidth={1} radius={[3, 3, 0, 0]} />
-              <Line type="monotone" dataKey="Revenue" stroke="#F97316" strokeWidth={2.5} dot={false} />
-              <Line type="monotone" dataKey="Profit" stroke="#16A34A" strokeWidth={1.8} dot={false} strokeDasharray="4 2" />
-            </ComposedChart>
-          </ResponsiveContainer>
-          </div>
+          <ChartWrapper height={220}>
+            {(w) => (
+              <ComposedChart width={w} height={220} data={displayTrend} margin={{ top: 5, right: 38, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                <YAxis yAxisId="rev" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
+                  tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={40} />
+                <YAxis yAxisId="ord" orientation="right" tick={{ fontSize: 9, fill: '#2563EB' }} tickLine={false} axisLine={false}
+                  tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} width={30} />
+                <Tooltip
+                  formatter={(v, n) => [n === 'Orders' ? fmtNum(v) : fmt(v), n]}
+                  contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 11 }}
+                />
+                <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+                <Bar yAxisId="ord" dataKey="Orders" fill="#2563EB" fillOpacity={0.3} stroke="#2563EB" strokeWidth={1} radius={[3, 3, 0, 0]} />
+                <Line yAxisId="rev" type="monotone" dataKey="Revenue" stroke="#F97316" strokeWidth={2.5} dot={false} />
+                <Line yAxisId="rev" type="monotone" dataKey="Profit" stroke="#16A34A" strokeWidth={1.8} dot={false} strokeDasharray="4 2" />
+              </ComposedChart>
+            )}
+          </ChartWrapper>
         ) : loading ? (
           <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', fontSize: '0.85rem' }}>Loading data...</div>
         ) : (
@@ -328,7 +352,7 @@ export default function StoreManagement() {
       {/* Store Table + Detail Panel */}
       <div className={selectedStore ? 'sm-table-detail' : 'sm-table-detail-single'}>
         {/* Store Table */}
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', border: '1.5px solid #e5e7eb', borderRadius: 9, padding: '7px 14px', flex: 1, minWidth: 180 }}>
               <Search size={14} color="#9CA3AF" />
@@ -454,7 +478,7 @@ export default function StoreManagement() {
 
         {/* Store Detail Panel */}
         {selectedStore && (
-          <div className="sm-detail-panel" style={{ background: '#fff', borderRadius: 14, border: '2px solid #F97316', overflow: 'hidden' }}>
+          <div className="sm-detail-panel" style={{ background: '#fff', borderRadius: 14, border: '2px solid #F97316' }}>
             {/* Header */}
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -522,19 +546,21 @@ export default function StoreManagement() {
                   <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading...
                 </div>
               ) : storeTrend.length > 0 ? (
-                <div className="sm-chart-box">
-                <ResponsiveContainer width="100%" height={140}>
-                  <ComposedChart data={storeTrend} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                    <YAxis tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
-                      tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={36} />
-                    <Tooltip formatter={(v, n) => [n === 'Orders' ? fmtNum(v) : fmt(v), n]} contentStyle={{ borderRadius: 6, fontSize: 11 }} />
-                    <Bar dataKey="Orders" fill="#2563EB" fillOpacity={0.18} stroke="#2563EB" strokeWidth={1} radius={[3, 3, 0, 0]} />
-                    <Line type="monotone" dataKey="Revenue" stroke="#F97316" strokeWidth={2} dot={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-                </div>
+                <ChartWrapper height={140}>
+                  {(w) => (
+                    <ComposedChart width={w} height={140} data={storeTrend} margin={{ top: 5, right: 30, left: -8, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                      <YAxis yAxisId="rev" tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
+                        tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={36} />
+                      <YAxis yAxisId="ord" orientation="right" tick={{ fontSize: 8, fill: '#2563EB' }} tickLine={false} axisLine={false}
+                        tickFormatter={v => String(v)} width={26} />
+                      <Tooltip formatter={(v, n) => [n === 'Orders' ? fmtNum(v) : fmt(v), n]} contentStyle={{ borderRadius: 6, fontSize: 11 }} />
+                      <Bar yAxisId="ord" dataKey="Orders" fill="#2563EB" fillOpacity={0.3} stroke="#2563EB" strokeWidth={1} radius={[3, 3, 0, 0]} />
+                      <Line yAxisId="rev" type="monotone" dataKey="Revenue" stroke="#F97316" strokeWidth={2} dot={false} />
+                    </ComposedChart>
+                  )}
+                </ChartWrapper>
               ) : (
                 <div style={{ height: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', gap: 6 }}>
                   <TrendingUp size={22} color="#e5e7eb" />
@@ -572,32 +598,30 @@ export default function StoreManagement() {
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '16px', marginTop: 24, boxSizing: 'border-box', width: '100%' }}>
           <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Store Revenue Comparison</div>
           <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Top 10 stores by revenue · Based on top product sales</div>
-          <div className="sm-chart-box">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart
-              data={[...stores].sort((a, b) => b.revenue - a.revenue).slice(0, 10).map(s => ({
-                name: s.name.split(' ')[0],
-                fullName: s.name,
-                Revenue: s.revenue,
-              }))}
-              margin={{ top: 5, right: 8, left: -10, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
-                tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={38} />
-              <Tooltip
-                formatter={(v, n, props) => [fmt(v), props.payload.fullName]}
-                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 11 }}
-              />
-              <Bar dataKey="Revenue" radius={[6, 6, 0, 0]}>
-                {[...stores].sort((a, b) => b.revenue - a.revenue).slice(0, 10).map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          </div>
+          <ChartWrapper height={200}>
+            {(w) => {
+              const top10 = [...stores].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+              return (
+                <BarChart
+                  width={w} height={200}
+                  data={top10.map(s => ({ name: s.name.split(' ')[0], fullName: s.name, Revenue: s.revenue }))}
+                  margin={{ top: 5, right: 8, left: -10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
+                    tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={38} />
+                  <Tooltip
+                    formatter={(v, n, props) => [fmt(v), props.payload.fullName]}
+                    contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 11 }}
+                  />
+                  <Bar dataKey="Revenue" radius={[6, 6, 0, 0]}>
+                    {top10.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Bar>
+                </BarChart>
+              );
+            }}
+          </ChartWrapper>
         </div>
       )}
     </div>

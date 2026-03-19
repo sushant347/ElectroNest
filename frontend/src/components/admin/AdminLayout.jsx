@@ -489,7 +489,7 @@ export default function AdminLayout() {
         }
         .adm-main.sidebar-expanded { margin-left: 240px; }
         .adm-main.sidebar-collapsed { margin-left: 64px; }
-        .adm-content { flex: 1; overflow-x: hidden; }
+        .adm-content { flex: 1; overflow-x: clip; }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
