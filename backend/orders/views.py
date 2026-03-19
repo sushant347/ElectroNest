@@ -316,10 +316,12 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                             (coupon.owner_store_name or '').strip().lower() == store_name.lower()
                         )
                     )
-                    discount = Decimal(str(coupon.discount_percent)) if coupon_applies else Decimal('0')
-                    payable = store_total * (1 - discount / 100)
+                    raw_pct  = Decimal(str(coupon.discount_percent)) if coupon_applies else Decimal('0')
+                    discount = min(raw_pct, Decimal('100'))          # clamp: can't exceed 100 %
+                    payable  = store_total * (1 - discount / 100)
                     if coupon_applies and coupon.max_discount and store_total - payable > coupon.max_discount:
-                        payable = store_total - coupon.max_discount
+                        payable = store_total - Decimal(str(coupon.max_discount))
+                    payable = max(payable, Decimal('0'))              # floor: can't go negative
 
                     shipping_cost = self._compute_shipping(addr, coupon_applies, coupon)
 

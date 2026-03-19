@@ -539,10 +539,13 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
 
   const couponDiscount = (() => {
     if (!appliedCoupon) return 0;
-    if (storeSubtotal < appliedCoupon.min_order_amount) return 0;
-    let disc = Math.round(storeSubtotal * appliedCoupon.discount_percent / 100);
-    if (appliedCoupon.max_discount) disc = Math.min(disc, appliedCoupon.max_discount);
-    return disc;
+    const pct        = Math.min(Number(appliedCoupon.discount_percent) || 0, 100); // clamp to [0, 100]
+    const minOrder   = Number(appliedCoupon.min_order_amount) || 0;
+    const maxDisc    = appliedCoupon.max_discount ? Number(appliedCoupon.max_discount) : null;
+    if (storeSubtotal < minOrder) return 0;
+    let disc = Math.round(storeSubtotal * pct / 100);
+    if (maxDisc !== null && maxDisc > 0) disc = Math.min(disc, maxDisc);
+    return Math.min(disc, storeSubtotal); // safety: discount can never exceed the applicable subtotal
   })();
 
   const total = subtotal + shipping - couponDiscount;
