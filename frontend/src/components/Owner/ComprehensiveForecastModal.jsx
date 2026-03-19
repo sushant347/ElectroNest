@@ -946,10 +946,12 @@ export default function ComprehensiveForecastModal({ product, onClose }) {
                   <TrendRow label="Units Growth"    value={fmtN(ti?.units?.growth_rate_pct)}   suffix="%" delta={ti?.units?.growth_rate_pct}/>
                 </div>
                 <div className="cfm-metric-group">
-                  <div className="cfm-metric-group-title">Efficiency</div>
+                  <div className="cfm-metric-group-title">Efficiency & Quality</div>
                   <TrendRow label="Gross Margin"          value={fmtN((data.margin_ratio||0)*100)} suffix="%"/>
                   <TrendRow label="Inv. Turnover"         value={fmtN(data.metrics?.inventory_turnover)} suffix="×"/>
                   <TrendRow label="Break-Even"            value={fmtN(data.metrics?.break_even_units)} suffix=" units/day"/>
+                  {data.metrics?.mape != null && <TrendRow label="Forecast MAPE" value={fmtN(data.metrics.mape)} suffix="%"/>}
+                  {data.metrics?.demand_volatility != null && <TrendRow label="Demand Volatility" value={fmtN(data.metrics.demand_volatility)} suffix="%"/>}
                 </div>
                 <div className="cfm-metric-group">
                   <div className="cfm-metric-group-title">7-Day Moving Averages</div>
