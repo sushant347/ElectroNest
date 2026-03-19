@@ -531,9 +531,10 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
   /* coupon discount — only applies to items from the coupon's store */
   const storeSubtotal = (() => {
     if (!appliedCoupon?.owner_name) return subtotal; // platform-wide: all items
-    return checkoutItems
-      .filter(i => (i.owner_name || i.product_detail?.owner_name || '').toLowerCase() === appliedCoupon.owner_name.toLowerCase())
-      .reduce((acc, i) => acc + i.price * i.quantity, 0);
+    const filtered = checkoutItems
+      .filter(i => (i.owner_name || i.product_detail?.owner_name || '').toLowerCase() === appliedCoupon.owner_name.toLowerCase());
+    // Fall back to full subtotal if no items matched the owner filter (handles owner_name data inconsistency)
+    return filtered.length > 0 ? filtered.reduce((acc, i) => acc + i.price * i.quantity, 0) : subtotal;
   })();
 
   const couponDiscount = (() => {
@@ -564,7 +565,9 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
       const eligibleItems = c.owner_name
         ? checkoutItems.filter(i => (i.owner_name || i.product_detail?.owner_name || '').toLowerCase() === c.owner_name.toLowerCase())
         : checkoutItems;
-      const eligibleSubtotal = eligibleItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+      // Fall back to all items if owner filter returned nothing (handles owner_name data inconsistency)
+      const eligibleForMin = eligibleItems.length > 0 ? eligibleItems : checkoutItems;
+      const eligibleSubtotal = eligibleForMin.reduce((acc, i) => acc + i.price * i.quantity, 0);
       if (c.min_order_amount && eligibleSubtotal < c.min_order_amount) {
         setCouponError(`Minimum order of Rs.${c.min_order_amount} from ${c.owner_name || 'this store'} required for this coupon.`);
         setAppliedCoupon(null);
@@ -1251,6 +1254,64 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                       ))}
                     </div>
                     <div style={s.divider} />
+                    {/* Coupon input — mobile */}
+                    {!appliedCoupon ? (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>Have a promo code?</div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <input
+                            type="text"
+                            value={couponCode}
+                            onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(''); }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                            placeholder="ENTER CODE"
+                            style={{
+                              flex: 1, padding: '8px 12px', border: `1.5px solid ${couponError ? '#fca5a5' : '#e2e8f0'}`,
+                              borderRadius: 8, fontSize: 13, fontFamily: 'inherit', fontWeight: 700,
+                              letterSpacing: '0.08em', outline: 'none', background: '#f8fafc',
+                              color: '#1e293b', textTransform: 'uppercase',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyCoupon}
+                            disabled={couponLoading || !couponCode.trim()}
+                            style={{
+                              padding: '8px 14px', borderRadius: 8, background: '#1e293b', color: '#fff',
+                              border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                              fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: couponLoading || !couponCode.trim() ? 0.6 : 1,
+                            }}
+                          >
+                            {couponLoading ? '...' : 'Apply'}
+                          </button>
+                        </div>
+                        {couponError && (
+                          <div style={{ fontSize: 11, color: '#dc2626', marginTop: 5, fontWeight: 500 }}>{couponError}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', background: '#f0fdf4', border: '1.5px solid #86efac',
+                        borderRadius: 8, marginBottom: 14,
+                      }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a' }}>
+                            🎉 Coupon applied: <span style={{ letterSpacing: '0.08em' }}>{appliedCoupon.code}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: '#4ade80', marginTop: 1 }}>
+                            You save {formatPrice(couponDiscount)}!
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveCoupon}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
                     <div style={s.summaryRow}>
                       <span>Subtotal ({totalItems} items)</span>
                       <span style={s.summaryVal}>{formatPrice(subtotal)}</span>
