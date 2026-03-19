@@ -2,14 +2,15 @@ import { Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-d
 import { useAuth } from '../../context/AuthContext';
 import { useState } from 'react';
 import {
-  LayoutDashboard, Users, Truck, ScrollText, BarChart3, LogOut,
-  Shield, ChevronDown, Menu, X, ChevronRight
+  LayoutDashboard, Users, Store, ScrollText, BarChart3, LogOut,
+  Shield, Menu, X, ChevronRight, Tag
 } from 'lucide-react';
 
 const navLinks = [
   { label: 'Dashboard',       path: '/admin/dashboard',  icon: LayoutDashboard, color: '#DC2626' },
   { label: 'User Management', path: '/admin/users',      icon: Users,           color: '#DC2626' },
-  { label: 'Suppliers',       path: '/admin/suppliers',  icon: Truck,           color: '#EA580C' },
+  { label: 'Stores',          path: '/admin/stores',     icon: Store,           color: '#F97316' },
+  { label: 'Global Coupons',  path: '/admin/coupons',    icon: Tag,             color: '#7C3AED' },
   { label: 'System Logs',     path: '/admin/logs',       icon: ScrollText,      color: '#2563EB' },
   { label: 'Analytics',       path: '/admin/analytics',  icon: BarChart3,       color: '#16A34A' },
 ];

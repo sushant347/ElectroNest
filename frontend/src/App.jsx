@@ -8,6 +8,7 @@ import ProtectedRoute from './components/Common/ProtectedRoute'
 import { useAuth } from './context/AuthContext'
 import { customerAPI } from './services/api'
 import Home from './pages/Home'
+import AboutUs from './pages/AboutUs'
 import Wishlist from './pages/Customer/Wishlist'
 import Cart from './pages/Customer/Cart'
 import Login from './pages/Customer/Login'
@@ -36,7 +37,8 @@ import WarehouseLayout from './components/warehouse/WarehouseLayout'
 // Admin Pages
 import AdminDashboard from './pages/Admin/Dashboard'
 import UserManagement from './pages/Admin/UserManagement'
-import SupplierManagement from './pages/Admin/SupplierManagement'
+import StoreManagement from './pages/Admin/StoreManagement'
+import AdminCoupons from './pages/Admin/AdminCoupons'
 import SystemLogs from './pages/Admin/SystemLogs'
 import AnalyticsSummary from './pages/Admin/AnalyticsSummary'
 import AdminLayout from './components/admin/AdminLayout'
@@ -449,6 +451,7 @@ export default function App() {
           <Route path="/" element={<HomeRoute addToCart={addToCart} toggleWishlist={toggleWishlist} wishlistItems={wishlistItems} toggleCompare={toggleCompare} compareItems={compareItems} />} />
           <Route path="/product/:id" element={<ProductDetail addToCart={addToCart} toggleWishlist={toggleWishlist} wishlistItems={wishlistItems} />} />
           <Route path="/login" element={<LoginRoute />} />
+          <Route path="/about" element={<AboutUs />} />
 
           {/* Customer-only routes */}
           <Route path="/wishlist" element={<ProtectedRoute allowedRoles={['customer']}><Wishlist items={wishlistItems} removeFromWishlist={removeFromWishlist} addToCart={addToCart} clearWishlist={clearWishlist} moveAllToCart={moveAllToCart} buyNowFromWishlist={buyNowFromWishlist} /></ProtectedRoute>} />
@@ -489,7 +492,8 @@ export default function App() {
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="users" element={<UserManagement />} />
-            <Route path="suppliers" element={<SupplierManagement />} />
+            <Route path="stores" element={<StoreManagement />} />
+            <Route path="coupons" element={<AdminCoupons />} />
             <Route path="logs" element={<SystemLogs />} />
             <Route path="analytics" element={<AnalyticsSummary />} />
           </Route>
