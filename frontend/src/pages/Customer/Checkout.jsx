@@ -444,6 +444,102 @@ const s = {
 };
 
 /* ── Component ───────────────────────────────────────────── */
+/* ── Coupon Box Component ─────────────────────────────────── */
+function CouponBox({ couponCode, setCouponCode, appliedCoupon, couponLoading, couponError, setCouponError, couponDiscount, handleApplyCoupon, handleRemoveCoupon, formatPrice }) {
+  if (appliedCoupon) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 14px', marginBottom: 14, borderRadius: 10,
+        background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+        border: '1.5px solid #86efac',
+        boxShadow: '0 2px 8px rgba(22,163,74,0.1)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/>
+              <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#15803d', letterSpacing: '0.04em' }}>
+              <code style={{ background: '#bbf7d0', padding: '2px 7px', borderRadius: 5, fontFamily: 'monospace', fontSize: 12 }}>{appliedCoupon.code}</code>
+              <span style={{ marginLeft: 6 }}>applied!</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2, fontWeight: 600 }}>
+              You save {formatPrice(couponDiscount)} {appliedCoupon.free_delivery ? '+ Free Shipping 🎉' : ''}
+            </div>
+          </div>
+        </div>
+        <button type="button" onClick={handleRemoveCoupon}
+          style={{ background: 'rgba(22,163,74,0.12)', border: 'none', cursor: 'pointer', color: '#16a34a', padding: 6, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <X size={13} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {/* Ticket header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+          <path d="M13 5v2M13 17v2M13 11v2"/>
+        </svg>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Have a coupon code?</span>
+      </div>
+      {/* Ticket-style input */}
+      <div style={{
+        display: 'flex', gap: 0, border: `2px dashed ${couponError ? '#fca5a5' : '#F97316'}`,
+        borderRadius: 10, overflow: 'hidden', background: '#fff',
+        boxShadow: couponError ? '0 0 0 3px rgba(252,165,165,0.2)' : '0 0 0 3px rgba(249,115,22,0.06)',
+      }}>
+        {/* Scissor notch left */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '0 10px', background: '#FFF7ED', borderRight: '2px dashed #F97316', flexShrink: 0 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+            <line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/>
+            <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+          </svg>
+        </div>
+        <input
+          type="text"
+          value={couponCode}
+          onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(''); }}
+          onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+          placeholder="ENTER CODE"
+          style={{
+            flex: 1, padding: '10px 12px', border: 'none', fontSize: 13, fontFamily: 'monospace',
+            fontWeight: 800, letterSpacing: '0.1em', outline: 'none', background: 'transparent',
+            color: '#1e293b', textTransform: 'uppercase',
+          }}
+        />
+        <button
+          type="button"
+          onClick={handleApplyCoupon}
+          disabled={couponLoading || !couponCode.trim()}
+          style={{
+            padding: '0 16px', background: couponLoading || !couponCode.trim() ? '#e2e8f0' : '#F97316',
+            color: couponLoading || !couponCode.trim() ? '#94a3b8' : '#fff',
+            border: 'none', fontSize: 12, fontWeight: 800, cursor: couponLoading || !couponCode.trim() ? 'not-allowed' : 'pointer',
+            fontFamily: 'inherit', whiteSpace: 'nowrap', transition: 'all .15s', flexShrink: 0,
+          }}
+        >
+          {couponLoading ? '...' : 'Apply'}
+        </button>
+      </div>
+      {couponError && (
+        <div style={{ fontSize: 11, color: '#dc2626', marginTop: 5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          {couponError}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
 
   /* -- form state -- */
@@ -1258,63 +1354,13 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                     </div>
                     <div style={s.divider} />
                     {/* Coupon input — mobile */}
-                    {!appliedCoupon ? (
-                      <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>Have a promo code?</div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <input
-                            type="text"
-                            value={couponCode}
-                            onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(''); }}
-                            onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
-                            placeholder="ENTER CODE"
-                            style={{
-                              flex: 1, padding: '8px 12px', border: `1.5px solid ${couponError ? '#fca5a5' : '#e2e8f0'}`,
-                              borderRadius: 8, fontSize: 13, fontFamily: 'inherit', fontWeight: 700,
-                              letterSpacing: '0.08em', outline: 'none', background: '#f8fafc',
-                              color: '#1e293b', textTransform: 'uppercase',
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={handleApplyCoupon}
-                            disabled={couponLoading || !couponCode.trim()}
-                            style={{
-                              padding: '8px 14px', borderRadius: 8, background: '#1e293b', color: '#fff',
-                              border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                              fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: couponLoading || !couponCode.trim() ? 0.6 : 1,
-                            }}
-                          >
-                            {couponLoading ? '...' : 'Apply'}
-                          </button>
-                        </div>
-                        {couponError && (
-                          <div style={{ fontSize: 11, color: '#dc2626', marginTop: 5, fontWeight: 500 }}>{couponError}</div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '8px 12px', background: '#f0fdf4', border: '1.5px solid #86efac',
-                        borderRadius: 8, marginBottom: 14,
-                      }}>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a' }}>
-                            🎉 Coupon applied: <span style={{ letterSpacing: '0.08em' }}>{appliedCoupon.code}</span>
-                          </div>
-                          <div style={{ fontSize: 11, color: '#4ade80', marginTop: 1 }}>
-                            You save {formatPrice(couponDiscount)}!
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleRemoveCoupon}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    )}
+                    <CouponBox
+                      couponCode={couponCode} setCouponCode={setCouponCode}
+                      appliedCoupon={appliedCoupon} couponLoading={couponLoading}
+                      couponError={couponError} setCouponError={setCouponError}
+                      couponDiscount={couponDiscount} handleApplyCoupon={handleApplyCoupon}
+                      handleRemoveCoupon={handleRemoveCoupon} formatPrice={formatPrice}
+                    />
                     <div style={s.summaryRow}>
                       <span>Subtotal ({totalItems} items)</span>
                       <span style={s.summaryVal}>{formatPrice(subtotal)}</span>
@@ -1372,63 +1418,13 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                   <div style={s.divider} />
 
                   {/* Coupon Code Input */}
-                  {!appliedCoupon ? (
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>Have a promo code?</div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <input
-                          type="text"
-                          value={couponCode}
-                          onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(''); }}
-                          onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
-                          placeholder="ENTER CODE"
-                          style={{
-                            flex: 1, padding: '8px 12px', border: `1.5px solid ${couponError ? '#fca5a5' : '#e2e8f0'}`,
-                            borderRadius: 8, fontSize: 13, fontFamily: 'inherit', fontWeight: 700,
-                            letterSpacing: '0.08em', outline: 'none', background: '#f8fafc',
-                            color: '#1e293b', textTransform: 'uppercase',
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleApplyCoupon}
-                          disabled={couponLoading || !couponCode.trim()}
-                          style={{
-                            padding: '8px 14px', borderRadius: 8, background: '#1e293b', color: '#fff',
-                            border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                            fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: couponLoading || !couponCode.trim() ? 0.6 : 1,
-                          }}
-                        >
-                          {couponLoading ? '...' : 'Apply'}
-                        </button>
-                      </div>
-                      {couponError && (
-                        <div style={{ fontSize: 11, color: '#dc2626', marginTop: 5, fontWeight: 500 }}>{couponError}</div>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '8px 12px', background: '#f0fdf4', border: '1.5px solid #86efac',
-                      borderRadius: 8, marginBottom: 14,
-                    }}>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a' }}>
-                          🎉 Coupon applied: <span style={{ letterSpacing: '0.08em' }}>{appliedCoupon.code}</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: '#4ade80', marginTop: 1 }}>
-                          You save {formatPrice(couponDiscount)}!
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleRemoveCoupon}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
+                  <CouponBox
+                    couponCode={couponCode} setCouponCode={setCouponCode}
+                    appliedCoupon={appliedCoupon} couponLoading={couponLoading}
+                    couponError={couponError} setCouponError={setCouponError}
+                    couponDiscount={couponDiscount} handleApplyCoupon={handleApplyCoupon}
+                    handleRemoveCoupon={handleRemoveCoupon} formatPrice={formatPrice}
+                  />
 
                   <div style={s.summaryRow}>
                     <span>Subtotal ({totalItems} items)</span>
