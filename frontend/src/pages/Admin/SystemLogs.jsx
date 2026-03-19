@@ -32,6 +32,96 @@ function ActionBadge({ action }) {
   );
 }
 
+function parseVal(v) {
+  if (!v) return null;
+  if (typeof v === 'object') return v;
+  try { return JSON.parse(v); } catch { return null; }
+}
+
+const SKIP_FIELDS = new Set(['password', 'last_login']);
+
+function fmtJson(obj) {
+  if (!obj) return '';
+  const filtered = Object.fromEntries(
+    Object.entries(obj).filter(([k]) => !SKIP_FIELDS.has(k))
+  );
+  return JSON.stringify(filtered, null, 2);
+}
+
+function DiffViewer({ oldValues, newValues, action }) {
+  const [open, setOpen] = useState(false);
+  const old = parseVal(oldValues);
+  const nw  = parseVal(newValues);
+
+  const isCreate = action === 'CREATE' || action === 'INSERT';
+  const isDelete = action === 'DELETE';
+
+  // For UPDATE: count changed fields for badge
+  let changedCount = 0;
+  if (!isCreate && !isDelete && old && nw) {
+    const keys = [...new Set([...Object.keys(old), ...Object.keys(nw)])].filter(k => !SKIP_FIELDS.has(k));
+    changedCount = keys.filter(k => JSON.stringify(old[k]) !== JSON.stringify(nw[k])).length;
+  }
+
+  if (!old && !nw) return <span style={{ color: '#D1D5DB' }}>—</span>;
+
+  const btnColor  = isCreate ? '#16A34A' : isDelete ? '#DC2626' : '#2563EB';
+  const btnBg     = isCreate ? '#F0FDF4' : isDelete ? '#FEF2F2' : '#EFF6FF';
+  const btnBorder = isCreate ? '#BBF7D0' : isDelete ? '#FECACA' : '#BFDBFE';
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '4px 11px', borderRadius: 7, cursor: 'pointer',
+          fontSize: '0.74rem', fontWeight: 700, transition: 'all 0.15s',
+          background: open ? btnBg : '#F8FAFC',
+          border: `1.5px solid ${open ? btnBorder : '#E5E7EB'}`,
+          color: open ? btnColor : '#6B7280',
+        }}
+      >
+        <span style={{ fontSize: '0.6rem' }}>{open ? '▼' : '▶'}</span>
+        {isCreate ? 'New Record' : isDelete ? 'Deleted' : 'View Changes'}
+        {!isCreate && !isDelete && changedCount > 0 && (
+          <span style={{ background: '#F97316', color: '#fff', borderRadius: 10, padding: '0 6px', fontSize: '0.62rem', fontWeight: 800, lineHeight: '16px' }}>
+            {changedCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 400 }}>
+          {/* BEFORE block — show for UPDATE and DELETE */}
+          {!isCreate && old && (
+            <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid #FECACA' }}>
+              <div style={{ background: '#FEF2F2', padding: '5px 12px', fontSize: '0.67rem', fontWeight: 700, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #FECACA' }}>
+                ● Before
+              </div>
+              <pre style={{ margin: 0, padding: '10px 12px', background: '#FFFAFA', fontSize: '0.72rem', fontFamily: 'monospace', color: '#7F1D1D', overflowX: 'auto', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                {fmtJson(old)}
+              </pre>
+            </div>
+          )}
+
+          {/* AFTER block — show for UPDATE and CREATE */}
+          {!isDelete && nw && (
+            <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid #BBF7D0' }}>
+              <div style={{ background: '#F0FDF4', padding: '5px 12px', fontSize: '0.67rem', fontWeight: 700, color: '#16A34A', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #BBF7D0' }}>
+                ● After
+              </div>
+              <pre style={{ margin: 0, padding: '10px 12px', background: '#F7FFF9', fontSize: '0.72rem', fontFamily: 'monospace', color: '#14532D', overflowX: 'auto', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                {fmtJson(nw)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SystemLogs() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -280,23 +370,7 @@ export default function SystemLogs() {
                 </td>
                 <td className="sl-changes-cell">
                   {log.old_values || log.new_values ? (
-                    <details className="sl-details">
-                      <summary>View changes</summary>
-                      <div className="sl-changes-content">
-                        {log.old_values && (
-                          <div className="sl-change-block old">
-                            <span className="sl-change-label">Before:</span>
-                            <code>{typeof log.old_values === 'string' ? log.old_values.substring(0, 200) : JSON.stringify(log.old_values).substring(0, 200)}</code>
-                          </div>
-                        )}
-                        {log.new_values && (
-                          <div className="sl-change-block new">
-                            <span className="sl-change-label">After:</span>
-                            <code>{typeof log.new_values === 'string' ? log.new_values.substring(0, 200) : JSON.stringify(log.new_values).substring(0, 200)}</code>
-                          </div>
-                        )}
-                      </div>
-                    </details>
+                    <DiffViewer oldValues={log.old_values} newValues={log.new_values} action={(log.action || '').toUpperCase()} />
                   ) : <span style={{ color: '#D1D5DB' }}>—</span>}
                 </td>
               </tr>
@@ -405,8 +479,15 @@ export default function SystemLogs() {
         .sl-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         @media (max-width: 768px) {
-          .sl-page { padding: 16px; }
+          .sl-page { padding: 12px; }
+          .sl-header { flex-direction: column; gap: 8px; }
           .sl-filter-row { flex-direction: column; }
+          .sl-action-chips { gap: 4px; }
+          .sl-chip { padding: 5px 10px; font-size: 0.73rem; }
+          .sl-table th, .sl-table td { padding: 8px 10px; font-size: 0.78rem; }
+          .sl-changes-cell { max-width: 160px; }
+          .sl-pagination { flex-direction: column; align-items: center; gap: 8px; }
+          .sl-stats-bar { padding: 8px 10px; gap: 6px; }
         }
       `}</style>
     </div>
