@@ -1,829 +1,361 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { FiSearch, FiHeart, FiShoppingCart, FiUser, FiChevronDown, FiBarChart2, FiGrid, FiPackage, FiStar, FiLogOut } from 'react-icons/fi'
+import { FiSearch, FiHeart, FiShoppingCart, FiUser, FiChevronDown, FiBarChart2, FiGrid, FiPackage, FiStar, FiLogOut, FiMenu } from 'react-icons/fi'
 import electronestLogo from '../images/Electronest.png'
 import { useAuth } from '../../context/AuthContext'
 import { customerAPI } from '../../services/api'
 
-const navItems = [
+const NAV_LINKS = [
   { label: 'Home', path: '/' },
-  { label: 'Laptops', path: '/?cat=Laptops' },
-  { label: 'Smartphones', path: '/?cat=Smartphones' },
-  {label : 'Gaming', path: '/?cat=Gaming'},
-  {label : 'Tablets', path: '/?cat=Tablets'},
-  { label: 'Smart Home', path: '/?cat=Smart Home' },
-  { label: 'Headphones', path: '/?cat=Headphones' },
-  {label : 'Display', path: '/?cat=Display'},
-  { label: 'Cameras', path: '/?cat=Cameras' },
-  {label : 'Drones', path: '/?cat=Drones'},
-  {label : 'Smart Watches', path: '/?cat=Smart Watches'},
-  {label : 'Speakers', path: '/?cat=Speakers'},
-  { label: 'Accessories', path: '/?cat=Accessories' },
+  { label: 'About Us', path: '/about' },
+  { label: 'Contact Us', path: '/support/contact' },
 ]
 
-export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount = 0, user = null}) {
+export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount = 0, user = null }) {
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchVal, setSearchVal] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
+  const [catOpen, setCatOpen] = useState(false)
   const [suggestions, setSuggestions] = useState([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const [activeSuggestion, setActiveSuggestion] = useState(-1)
+  const [showSugg, setShowSugg] = useState(false)
+  const [activeSugg, setActiveSugg] = useState(-1)
+  const [categories, setCategories] = useState([])
+  const [hovCat, setHovCat] = useState(null)
+  const [catProds, setCatProds] = useState([])
   const profileRef = useRef(null)
   const searchRef = useRef(null)
-  const debounceRef = useRef(null)
+  const catRef = useRef(null)
+  const debouncRef = useRef(null)
+  const catDbRef = useRef(null)
   const location = useLocation()
   const navigate = useNavigate()
   const { logout } = useAuth()
 
-  // Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false)
-      if (searchRef.current && !searchRef.current.contains(e.target)) setShowSuggestions(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    customerAPI.getCategories().then(res => {
+      const data = res.data?.results || res.data || []
+      setCategories(data)
+      if (data.length > 0) setHovCat(data[0])
+    }).catch(() => { })
   }, [])
 
-  // Close dropdown on route change
-  useEffect(() => { setProfileOpen(false); setShowSuggestions(false) }, [location.pathname])
+  useEffect(() => {
+    if (!hovCat) return
+    if (catDbRef.current) clearTimeout(catDbRef.current)
+    catDbRef.current = setTimeout(async () => {
+      try {
+        const res = await customerAPI.getProducts({ category: hovCat.id, page_size: 6 })
+        setCatProds((res.data?.results || res.data || []).slice(0, 6))
+      } catch { setCatProds([]) }
+    }, 200)
+  }, [hovCat])
 
-  // Fetch search suggestions with debounce
-  const fetchSuggestions = useCallback((query) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (!query.trim() || query.trim().length < 2) {
-      setSuggestions([])
-      setShowSuggestions(false)
-      return
+  useEffect(() => {
+    const h = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false)
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowSugg(false)
+      if (catRef.current && !catRef.current.contains(e.target)) setCatOpen(false)
     }
-    debounceRef.current = setTimeout(async () => {
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  useEffect(() => { setProfileOpen(false); setShowSugg(false); setCatOpen(false) }, [location.pathname])
+
+  const fetchSugg = useCallback((query) => {
+    if (debouncRef.current) clearTimeout(debouncRef.current)
+    if (!query.trim() || query.trim().length < 2) { setSuggestions([]); setShowSugg(false); return }
+    debouncRef.current = setTimeout(async () => {
       try {
         const res = await customerAPI.getProducts({ search: query.trim(), page_size: 8 })
-        const products = res.data?.results || res.data || []
-        const mapped = products.slice(0, 8).map(p => ({
-          id: p.id,
-          name: p.name || p.ProductName,
-          brand: p.brand || p.Brand || '',
-          category: p.category_name || '',
-          image: p.image_url || p.ProductImageURL || '',
+        const items = (res.data?.results || res.data || []).slice(0, 8).map(p => ({
+          id: p.id, name: p.name || p.ProductName, brand: p.brand || p.Brand || '',
+          category: p.category_name || '', image: p.image_url || p.ProductImageURL || '',
           price: parseFloat(p.selling_price || p.SellingPrice || 0),
         }))
-        setSuggestions(mapped)
-        setShowSuggestions(mapped.length > 0)
-        setActiveSuggestion(-1)
-      } catch {
-        setSuggestions([])
-        setShowSuggestions(false)
-      }
+        setSuggestions(items); setShowSugg(items.length > 0); setActiveSugg(-1)
+      } catch { setSuggestions([]); setShowSugg(false) }
     }, 300)
   }, [])
 
-  const handleSearchInput = (e) => {
-    const val = e.target.value
-    setSearchVal(val)
-    fetchSuggestions(val)
+  const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
+
+  const isActive = (item) => {
+    if (item.path === '/') return location.pathname === '/' && !new URLSearchParams(location.search).get('cat')
+    if (item.path === '/about') return location.pathname === '/about'
+    if (item.path === '/support/contact') return location.pathname === '/support/contact'
+    return false
   }
 
-  const handleSuggestionClick = (product) => {
-    setSearchVal('')
-    setSuggestions([])
-    setShowSuggestions(false)
-    navigate(`/product/${product.id}`)
-  }
-
-  const handleSearchKeyDown = (e) => {
-    if (!showSuggestions || suggestions.length === 0) return
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setActiveSuggestion(prev => Math.min(prev + 1, suggestions.length - 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setActiveSuggestion(prev => Math.max(prev - 1, -1))
-    } else if (e.key === 'Enter' && activeSuggestion >= 0) {
-      e.preventDefault()
-      handleSuggestionClick(suggestions[activeSuggestion])
-    }
-  }
-
-  const handleLogout = () => {
-    setProfileOpen(false)
-    logout()
-    navigate('/login')
-  }
+  const handleLogout = () => { setProfileOpen(false); logout(); navigate('/login') }
 
   const handleSearch = (e) => {
-    e.preventDefault()
-    setShowSuggestions(false)
-    if (searchVal.trim()) {
-      navigate(`/?search=${encodeURIComponent(searchVal.trim())}`)
-      setSearchVal('')
-      setSuggestions([])
-    }
+    e.preventDefault(); setShowSugg(false)
+    if (searchVal.trim()) { navigate(`/?search=${encodeURIComponent(searchVal.trim())}`); setSearchVal(''); setSuggestions([]) }
   }
 
-  const formatSuggestionPrice = (price) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(price)
+  const onSuggClick = (p) => { setSearchVal(''); setSuggestions([]); setShowSugg(false); navigate(`/product/${p.id}`) }
+
+  const onKey = (e) => {
+    if (!showSugg || !suggestions.length) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveSugg(s => Math.min(s + 1, suggestions.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveSugg(s => Math.max(s - 1, -1)) }
+    else if (e.key === 'Enter' && activeSugg >= 0) { e.preventDefault(); onSuggClick(suggestions[activeSugg]) }
+  }
 
   return (
     <>
-      {/* Announcement Bar */}
-      <div className="announce-bar">
-        Free shipping on orders over Rs.5000 · Use code <strong>TECH20</strong> for 20% off
-      </div>
+      <nav className="nb">
 
-      <nav className="navbar">
-        {/* Main Top Row */}
-        <div className="navbar-top">
-
+        {/* TOP ROW */}
+        <div className="nb-top">
           {/* Logo */}
-          <Link to="/" className="logo">
-            <img src={electronestLogo} alt="ElectroNest" className="logo-img" />
-            <div className="logo-text">
-              <span className="logo-name">Electro<span className="logo-accent">Nest</span></span>
-              <span className="logo-tagline">Premium Electronics</span>
+          <Link to="/" className="nb-logo">
+            <img src={electronestLogo} alt="ElectroNest" className="nb-logo-img" />
+            <div className="nb-logo-text">
+              <span className="nb-logo-name">Electro<span style={{ color: '#F97316' }}>Nest</span></span>
+              <span className="nb-logo-tag">Premium Electronics</span>
             </div>
           </Link>
 
           {/* Search */}
-          <div className="search-container" ref={searchRef}>
-            <form className={`search-wrap ${searchFocused ? 'active' : ''}`} onSubmit={handleSearch}>
-              <input
-                type="text"
-                value={searchVal}
-                onChange={handleSearchInput}
-                onKeyDown={handleSearchKeyDown}
-                placeholder="Search laptops, phones, accessories..."
-                onFocus={() => { setSearchFocused(true); if (suggestions.length > 0) setShowSuggestions(true) }}
-                onBlur={() => setSearchFocused(false)}
-              />
-              {searchVal && (
-                <button type="button" className="search-clear" onClick={() => { setSearchVal(''); setSuggestions([]); setShowSuggestions(false) }}>✕</button>
-              )}
-              <button type="submit" className="search-btn"><FiSearch size={18} /></button>
+          <div className="nb-srch-wrap" ref={searchRef}>
+            <form className={`nb-srch${searchFocused ? ' focused' : ''}`} onSubmit={handleSearch}>
+              <input type="text" value={searchVal} onChange={e => { setSearchVal(e.target.value); fetchSugg(e.target.value) }}
+                onKeyDown={onKey} placeholder="Search products, brands and more..."
+                onFocus={() => { setSearchFocused(true); if (suggestions.length > 0) setShowSugg(true) }}
+                onBlur={() => setSearchFocused(false)} />
+              {searchVal && <button type="button" className="nb-srch-clr" onClick={() => { setSearchVal(''); setSuggestions([]); setShowSugg(false) }}>✕</button>}
+              <button type="submit" className="nb-srch-btn"><FiSearch size={18} /></button>
             </form>
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="search-suggestions">
-                {suggestions.map((product, idx) => (
-                  <div
-                    key={product.id}
-                    className={`search-suggestion-item ${idx === activeSuggestion ? 'active' : ''}`}
-                    onMouseDown={() => handleSuggestionClick(product)}
-                    onMouseEnter={() => setActiveSuggestion(idx)}
-                  >
-                    <div className="suggestion-img-wrap">
-                      {product.image ? (
-                        <img src={product.image} alt={product.name} className="suggestion-img" />
-                      ) : (
-                        <div className="suggestion-img-placeholder"><FiSearch size={14} /></div>
-                      )}
+            {showSugg && suggestions.length > 0 && (
+              <div className="nb-suggs">
+                {suggestions.map((p, i) => (
+                  <div key={p.id} className={`nb-sugg${i === activeSugg ? ' hi' : ''}`} onMouseDown={() => onSuggClick(p)} onMouseEnter={() => setActiveSugg(i)}>
+                    <div className="nb-sugg-img">{p.image ? <img src={p.image} alt={p.name} /> : <FiSearch size={13} />}</div>
+                    <div className="nb-sugg-info">
+                      <span className="nb-sugg-nm">{p.name}</span>
+                      <span className="nb-sugg-meta">{p.brand}{p.category && ` · ${p.category}`}</span>
                     </div>
-                    <div className="suggestion-info">
-                      <span className="suggestion-name">{product.name}</span>
-                      <span className="suggestion-meta">
-                        {product.brand && <span>{product.brand}</span>}
-                        {product.category && <span> · {product.category}</span>}
-                      </span>
-                    </div>
-                    <span className="suggestion-price">{formatSuggestionPrice(product.price)}</span>
+                    <span className="nb-sugg-price">{fmt(p.price)}</span>
                   </div>
                 ))}
-                <div className="search-suggestion-footer" onMouseDown={() => { setShowSuggestions(false); if (searchVal.trim()) { navigate(`/?search=${encodeURIComponent(searchVal.trim())}`); setSearchVal(''); setSuggestions([]) } }}>
-                  <FiSearch size={13} /> View all results for "{searchVal}"
+                <div className="nb-sugg-footer" onMouseDown={() => { setShowSugg(false); if (searchVal.trim()) { navigate(`/?search=${encodeURIComponent(searchVal.trim())}`); setSearchVal(''); setSuggestions([]) } }}>
+                  <FiSearch size={12} /> View all results for "{searchVal}"
                 </div>
               </div>
             )}
           </div>
 
           {/* Actions */}
-          <div className="nav-actions">
-            <Link to="/compare" className={`action-btn${compareCount > 0 ? ' action-active' : ''}`} aria-label="Compare">
+          <div className="nb-acts">
+            <Link to="/compare" className={`nb-act${compareCount > 0 ? ' on' : ''}`}>
               <FiBarChart2 size={20} />
-              <span className="action-label">Compare</span>
-              {compareCount > 0 && <span className="action-badge">{compareCount}</span>}
+              <span className="nb-act-lbl">Compare</span>
+              {compareCount > 0 && <span className="nb-bdg">{compareCount}</span>}
             </Link>
-            <Link to="/wishlist" className={`action-btn${wishlistCount > 0 ? ' action-active' : ''}`} aria-label="Wishlist">
-              <FiHeart size={20} />
-              <span className="action-label">Wishlist</span>
-              {wishlistCount > 0 && <span className="action-badge">{wishlistCount}</span>}
+            <Link to="/wishlist" className={`nb-act${wishlistCount > 0 ? ' on' : ''}`}>
+              <FiHeart size={20} style={wishlistCount > 0 ? { fill: '#fff', stroke: '#fff' } : {}} />
+              <span className="nb-act-lbl">Wishlist</span>
+              {wishlistCount > 0 && <span className="nb-bdg">{wishlistCount}</span>}
             </Link>
-            <Link to="/cart" className="action-btn" aria-label="Cart">
+            <Link to="/cart" className="nb-act">
               <FiShoppingCart size={20} />
-              <span className="action-label">Cart</span>
-              {cartCount > 0 && <span className="action-badge">{cartCount}</span>}
+              <span className="nb-act-lbl">Cart</span>
+              {cartCount > 0 && <span className="nb-bdg">{cartCount}</span>}
             </Link>
-            <div className="divider" />
+            <div className="nb-div" />
             {user ? (
               <>
                 {(user.role === 'owner' || user.role === 'warehouse' || user.role === 'admin') && (
-                  <Link
-                    to={user.role === 'owner' ? '/owner/dashboard' : user.role === 'warehouse' ? '/warehouse/dashboard' : '/admin/dashboard'}
-                    className="action-btn owner-link"
-                    aria-label="Dashboard"
-                  >
-                    <FiGrid size={18} />
-                    <span className="action-label">Dashboard</span>
+                  <Link to={user.role === 'owner' ? '/owner/dashboard' : user.role === 'warehouse' ? '/warehouse/dashboard' : '/admin/dashboard'} className="nb-act nb-dash">
+                    <FiGrid size={18} /><span className="nb-act-lbl">Dashboard</span>
                   </Link>
                 )}
-                <div className="profile-dropdown-wrap" ref={profileRef}>
-                  <button className="signin-btn" onClick={() => setProfileOpen(p => !p)}>
-                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#F97316', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                      {(user.firstName || user.first_name || '')?.charAt(0)}
-                    </div>
-                    <span>{user.firstName || user.first_name || 'User'}</span>
-                    <FiChevronDown size={14} style={{ transition: 'transform 0.2s', transform: profileOpen ? 'rotate(180deg)' : 'rotate(0)' }} />
+                <div className="nb-prof" ref={profileRef}>
+                  <button className="nb-sign-btn nb-sign-icon" onClick={() => setProfileOpen(p => !p)}>
+                    <FiUser size={18} />
                   </button>
                   {profileOpen && (
-                    <div className="profile-dropdown">
-                      <Link to="/profile" className="profile-dropdown-item" onClick={() => setProfileOpen(false)}>
-                        <FiUser size={15} /> My Profile
-                      </Link>
-                      <Link to="/orders" className="profile-dropdown-item" onClick={() => setProfileOpen(false)}>
-                        <FiPackage size={15} /> My Orders
-                      </Link>
-                      <Link to="/reviews" className="profile-dropdown-item" onClick={() => setProfileOpen(false)}>
-                        <FiStar size={15} /> My Reviews
-                      </Link>
-                      <div className="profile-dropdown-divider" />
-                      <button className="profile-dropdown-item profile-dropdown-logout" onClick={handleLogout}>
-                        <FiLogOut size={15} /> Sign Out
-                      </button>
+                    <div className="nb-dd">
+                      <div className="nb-dd-greet">Hi, {user.firstName || user.first_name || 'User'} 👋</div>
+                      <div className="nb-dd-sep" />
+                      <Link to="/profile" className="nb-dd-item" onClick={() => setProfileOpen(false)}><FiUser size={14} /> My Profile</Link>
+                      <Link to="/orders" className="nb-dd-item" onClick={() => setProfileOpen(false)}><FiPackage size={14} /> My Orders</Link>
+                      <Link to="/reviews" className="nb-dd-item" onClick={() => setProfileOpen(false)}><FiStar size={14} /> My Reviews</Link>
+                      <div className="nb-dd-sep" />
+                      <button className="nb-dd-item nb-dd-out" onClick={handleLogout}><FiLogOut size={14} /> Sign Out</button>
                     </div>
                   )}
                 </div>
               </>
             ) : (
-              <Link to="/login" className="signin-btn">
-                <FiUser size={17} />
-                <span>Sign In</span>
-                <FiChevronDown size={14} />
+              <Link to="/login" className="nb-sign-btn">
+                <FiUser size={17} /><span>Sign In</span><FiChevronDown size={13} />
               </Link>
             )}
           </div>
         </div>
 
-        {/* Category Nav */}
-        <div className="nav-strip">
-          <div className="nav-strip-inner">
-            {navItems.map((item) => {
-              const urlCat = new URLSearchParams(location.search).get('cat')
-              const itemCat = new URLSearchParams(item.path.split('?')[1] || '').get('cat')
-              const isActive = item.path === '/' 
-                ? (location.pathname === '/' && !urlCat)
-                : (urlCat === itemCat)
-              return (
-                <Link
-                  key={item.label}
-                  to={item.path}
-                  className={`nav-link ${isActive ? 'nav-link-active' : ''}`}
-                  onClick={() => { if (item.path === '/') window.scrollTo({ top: 0, left: 0, behavior: 'smooth' }) }}
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
+        {/* STRIP */}
+        <div className="nb-strip">
+
+          {/* Categories Mega Dropdown — outside overflow container so dropdown is never clipped */}
+          <div className="nb-cat-wrap" ref={catRef} onMouseEnter={() => setCatOpen(true)} onMouseLeave={() => setCatOpen(false)}>
+            <button className={`nb-cat-btn${catOpen ? ' open' : ''}`} onClick={() => setCatOpen(p => !p)}>
+              <FiMenu size={16} />
+              <span>Categories</span>
+              <FiChevronDown size={13} style={{ transition: 'transform .2s', transform: catOpen ? 'rotate(180deg)' : '' }} />
+            </button>
+
+            {catOpen && (
+              <div className="nb-mega">
+                {/* Left: scrollable category list */}
+                <div className="nb-mega-left">
+                  {categories.map(cat => (
+                    <div key={cat.id} className={`nb-mega-cat${hovCat?.id === cat.id ? ' hi' : ''}`}
+                      onMouseEnter={() => setHovCat(cat)}
+                      onClick={() => { navigate(`/?cat=${encodeURIComponent(cat.name)}`); setCatOpen(false) }}>
+                      <span>{cat.name}</span>
+                      <span className="nb-mega-arr">›</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Right: products */}
+                <div className="nb-mega-right">
+                  {hovCat && (
+                    <>
+                      <div className="nb-mega-rhdr">
+                        <span className="nb-mega-rtitle">{hovCat.name}</span>
+                        <button className="nb-mega-vall" onClick={() => { navigate(`/?cat=${encodeURIComponent(hovCat.name)}`); setCatOpen(false) }}>View All →</button>
+                      </div>
+                      <div className="nb-mega-pgrid">
+                        {catProds.length > 0 ? catProds.map(p => (
+                          <div key={p.id} className="nb-mega-pcard" onClick={() => { navigate(`/product/${p.id}`); setCatOpen(false) }}>
+                            <div className="nb-mega-pimg">{p.image_url ? <img src={p.image_url} alt={p.name} /> : <div className="nb-mega-pph" />}</div>
+                            <span className="nb-mega-pnm">{p.name}</span>
+                            {p.brand && <span className="nb-mega-pbrand">{p.brand}</span>}
+                            <span className="nb-mega-pprice">{fmt(parseFloat(p.selling_price || 0))}</span>
+                          </div>
+                        )) : <div className="nb-mega-empty">Loading…</div>}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Nav links — in scrollable strip */}
+          <div className="nb-strip-in">
+            {NAV_LINKS.map(item => (
+              <Link key={item.label} to={item.path} className={`nb-link${isActive(item) ? ' act' : ''}`}>
+                {item.label}
+              </Link>
+            ))}
           </div>
         </div>
       </nav>
 
-      <style>{`
-        /* ── Announcement Bar ── */
-        .announce-bar {
-          background: #F97316;
-          color: #fff;
-          font-size: 0.78rem;
-          font-weight: 500;
-          text-align: center;
-          padding: 0.4rem 1rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-wrap: wrap;
-          letter-spacing: 0.01em;
-          width: 100%;
-          box-sizing: border-box;
-          overflow: hidden;
-        }
-
-        /* ── Navbar Shell ── */
-        .navbar {
-          background: #232F3E;
-          border-bottom: 1px solid rgba(0,0,0,0.1);
-          box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          width: 100%;
-          max-width: 100%;
-          /* NO overflow:hidden — it clips absolutely-positioned dropdowns */
-        }
-
-        /* ── Top Row ── */
-        .navbar-top {
-          display: flex;
-          align-items: center;
-          padding: 0.6rem 2rem;
-          gap: 1.25rem;
-          width: 100%;
-          box-sizing: border-box;
-        }
-
-        /* ── Logo ── */
-        .logo {
-          display: flex;
-          align-items: center;
-          gap: 0.6rem;
-          text-decoration: none;
-          flex-shrink: 0;
-        }
-
-        .logo-img {
-          height: 36px;
-          width: auto;
-          object-fit: contain;
-          display: block;
-          flex-shrink: 0;
-        }
-
-        .logo-text {
-          display: flex;
-          flex-direction: column;
-          line-height: 1.15;
-        }
-
-        .logo-name {
-          font-size: 1.15rem;
-          font-weight: 700;
-          color: #fff;
-          letter-spacing: -0.02em;
-        }
-
-        .logo-accent {
-          color: #F97316;
-        }
-
-        .logo-tagline {
-          font-size: 0.62rem;
-          font-weight: 400;
-          color: rgba(255,255,255,0.5);
-          letter-spacing: 0.03em;
-          text-transform: uppercase;
-        }
-
-        /* ── Search Container ── */
-        .search-container {
-          flex: 1;
-          position: relative;
-        }
-
-        /* ── Search (Amazon-style) ── */
-        .search-wrap {
-          display: flex;
-          align-items: center;
-          background: #fff;
-          border: 2px solid transparent;
-          border-radius: 6px;
-          padding: 0 0 0 0.85rem;
-          transition: border-color 0.15s;
-          height: 40px;
-          overflow: hidden;
-        }
-
-        .search-wrap.active {
-          border-color: #F97316;
-        }
-
-        .search-wrap input {
-          flex: 1;
-          border: none;
-          background: transparent;
-          font-size: 0.88rem;
-          font-family: inherit;
-          color: #1e293b;
-          outline: none;
-          min-width: 0;
-          height: 100%;
-        }
-
-        .search-wrap input::placeholder {
-          color: #94a3b8;
-        }
-
-        .search-clear {
-          background: none;
-          border: none;
-          color: #94a3b8;
-          cursor: pointer;
-          font-size: 0.75rem;
-          padding: 0.2rem 0.5rem;
-          line-height: 1;
-          flex-shrink: 0;
-        }
-
-        .search-clear:hover {
-          color: #475569;
-        }
-
-        .search-btn {
-          background: #F97316;
-          color: #fff;
-          border: none;
-          border-radius: 0 4px 4px 0;
-          padding: 0 1rem;
-          height: 100%;
-          cursor: pointer;
-          flex-shrink: 0;
-          transition: background 0.15s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .search-btn:hover {
-          background: #ea580c;
-        }
-
-        /* ── Actions ── */
-        .nav-actions {
-          display: flex;
-          align-items: center;
-          gap: 0.15rem;
-          flex-shrink: 0;
-          /* Don't let actions overflow — shrink if needed below 600px */
-        }
-        @media (max-width: 600px) {
-          .nav-actions { flex-shrink: 1; min-width: 0; }
-        }
-
-        .action-btn {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.1rem;
-          padding: 0.35rem 0.7rem;
-          background: transparent;
-          border: none;
-          border-radius: 6px;
-          color: rgba(255,255,255,0.8);
-          cursor: pointer;
-          transition: color 0.15s, background 0.15s;
-          font-family: inherit;
-        }
-
-        .action-btn:hover {
-          background: rgba(255,255,255,0.08);
-          color: #fff;
-        }
-
-        .action-active {
-          color: #fff !important;
-        }
-        .action-active:hover {
-          color: #ffffff !important;
-        }
-        .action-active[aria-label="Wishlist"] svg {
-          fill: #fff;
-          stroke: none;
-        }
-
-        .action-label {
-          font-size: 0.65rem;
-          font-weight: 500;
-          color: inherit;
-          line-height: 1;
-        }
-
-        .action-badge {
-          position: absolute;
-          top: 0;
-          right: 4px;
-          background: #F97316;
-          color: #fff;
-          font-size: 0.58rem;
-          font-weight: 700;
-          min-width: 16px;
-          height: 16px;
-          border-radius: 50px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 3px;
-          border: 1.5px solid #232F3E;
-        }
-
-        .divider {
-          width: 1px;
-          height: 26px;
-          background: rgba(255,255,255,0.15);
-          margin: 0 0.4rem;
-          flex-shrink: 0;
-        }
-
-        .owner-link {
-          background: rgba(249,115,22,0.12);
-          border-radius: 8px;
-          padding: 6px 10px !important;
-          border: 1px solid rgba(249,115,22,0.25);
-        }
-        .owner-link:hover {
-          background: rgba(249,115,22,0.22) !important;
-          border-color: rgba(249,115,22,0.4);
-        }
-
-        .profile-dropdown-wrap {
-          position: relative;
-        }
-
-        .signin-btn {
-          display: flex;
-          align-items: center;
-          gap: 0.35rem;
-          padding: 0.45rem 0.9rem;
-          background: transparent;
-          color: rgba(255,255,255,0.85);
-          border: 1px solid rgba(255,255,255,0.2);
-          border-radius: 6px;
-          font-size: 0.82rem;
-          font-weight: 500;
-          font-family: inherit;
-          cursor: pointer;
-          transition: color 0.15s, border-color 0.15s, background 0.15s;
-          white-space: nowrap;
-          text-decoration: none;
-        }
-
-        .profile-dropdown {
-          position: absolute;
-          top: calc(100% + 8px);
-          right: 0;
-          background: #fff;
-          border: 1px solid #e2e8f0;
-          border-radius: 10px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-          min-width: 180px;
-          padding: 6px 0;
-          z-index: 200;
-          animation: dropdownFade 0.15s ease;
-        }
-
-        @keyframes dropdownFade {
-          from { opacity: 0; transform: translateY(-6px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .profile-dropdown-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 16px;
-          font-size: 0.85rem;
-          font-weight: 500;
-          color: #334155;
-          text-decoration: none;
-          cursor: pointer;
-          transition: background 0.12s;
-          border: none;
-          background: none;
-          width: 100%;
-          font-family: inherit;
-        }
-
-        .profile-dropdown-item:hover {
-          background: #f8fafc;
-        }
-
-        .profile-dropdown-logout {
-          color: #ef4444;
-        }
-        .profile-dropdown-logout:hover {
-          background: #fef2f2;
-        }
-
-        .profile-dropdown-divider {
-          height: 1px;
-          background: #e2e8f0;
-          margin: 4px 0;
-        }
-
-        .signin-btn:hover {
-          border-color: rgba(255,255,255,0.4);
-          color: #fff;
-          background: rgba(255,255,255,0.06);
-        }
-
-        /* ── Search Suggestions Dropdown ── */
-        .search-suggestions {
-          position: absolute;
-          top: calc(100% + 4px);
-          left: 0;
-          right: 0;
-          background: #fff;
-          border: 1px solid #e2e8f0;
-          border-radius: 10px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-          z-index: 300;
-          max-height: 420px;
-          overflow-y: auto;
-          animation: suggestFade 0.15s ease;
-        }
-
-        @keyframes suggestFade {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .search-suggestion-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 8px 14px;
-          cursor: pointer;
-          transition: background 0.1s;
-          border-bottom: 1px solid #f3f4f6;
-        }
-
-        .search-suggestion-item:last-of-type {
-          border-bottom: none;
-        }
-
-        .search-suggestion-item:hover,
-        .search-suggestion-item.active {
-          background: #FFF7ED;
-        }
-
-        .suggestion-img-wrap {
-          width: 40px;
-          height: 40px;
-          border-radius: 8px;
-          overflow: hidden;
-          flex-shrink: 0;
-          background: #f3f4f6;
-        }
-
-        .suggestion-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .suggestion-img-placeholder {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #9ca3af;
-        }
-
-        .suggestion-info {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .suggestion-name {
-          display: block;
-          font-size: 0.82rem;
-          font-weight: 600;
-          color: #1e293b;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .suggestion-meta {
-          display: block;
-          font-size: 0.68rem;
-          color: #9ca3af;
-          margin-top: 1px;
-        }
-
-        .suggestion-price {
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: #16A34A;
-          white-space: nowrap;
-          flex-shrink: 0;
-        }
-
-        .search-suggestion-footer {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 10px 14px;
-          font-size: 0.78rem;
-          font-weight: 600;
-          color: #F97316;
-          cursor: pointer;
-          border-top: 1px solid #e5e7eb;
-          background: #fafbfc;
-          border-radius: 0 0 10px 10px;
-          transition: background 0.1s;
-        }
-
-        .search-suggestion-footer:hover {
-          background: #FFF7ED;
-        }
-
-        /* ── Category Strip ── */
-        .nav-strip {
-          background: #37475A;
-          width: 100%;
-          /* overflow:hidden here is safe — no absolutely-positioned children inside */
-          overflow: hidden;
-        }
-
-        .nav-strip-inner {
-          display: flex;
-          align-items: center;
-          padding: 0 2rem;
-          overflow-x: auto;     /* scroll within the strip */
-          scrollbar-width: none;
-          gap: 0;
-          width: 100%;
-          box-sizing: border-box;
-        }
-
-        .nav-strip-inner::-webkit-scrollbar {
-          display: none;
-        }
-
-        .nav-link {
-          position: relative;
-          padding: 0.55rem 0.9rem;
-          color: rgba(255,255,255,0.8);
-          text-decoration: none;
-          font-size: 0.82rem;
-          font-weight: 400;
-          white-space: nowrap;
-          transition: color 0.15s;
-        }
-
-        .nav-link::after {
-          content: '';
-          position: absolute;
-          bottom: 0;
-          left: 50%;
-          transform: translateX(-50%) scaleX(0);
-          width: 80%;
-          height: 2px;
-          background: #F97316;
-          transition: transform 0.15s ease;
-        }
-
-        .nav-link:hover {
-          color: #fff;
-        }
-
-        .nav-link:hover::after {
-          transform: translateX(-50%) scaleX(1);
-        }
-
-        .nav-link-active {
-          color: #fff;
-          font-weight: 600;
-        }
-
-        .nav-link-active::after {
-          transform: translateX(-50%) scaleX(1);
-        }
-
-        /* ── Responsive ── */
-        @media (max-width: 900px) {
-          .navbar-top {
-            padding: 0.6rem 1rem;
-            gap: 0.75rem;
-          }
-          .action-label { display: none; }
-          .action-btn { padding: 0.4rem; }
-        }
-
-        @media (max-width: 640px) {
-          .logo-img { height: 28px !important; }
-          .logo-text { display: none; }
-          .search-wrap { flex: 1; min-width: 0; }
-          .search-container { min-width: 0; }
-          .signin-btn span:not(:first-child) { display: none; }
-          .navbar-top { gap: 0.5rem; padding: 0.5rem 0.75rem; }
-          .announce-bar { font-size: 0.7rem; padding: 0.3rem 0.5rem; }
-        }
-
-        @media (max-width: 480px) {
-          .nav-actions { gap: 0; }
-          .action-btn { padding: 0.3rem; }
-          .signin-btn { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
-          .logo-img { height: 26px !important; }
-          .search-suggestions { left: 0; right: 0; width: auto; }
-        }
-        /* Only hide compare on very small phones where it truly won't fit */
-        @media (max-width: 360px) {
-          .action-btn[aria-label="Compare"] { display: none; }
-        }
-
-        /* Profile dropdown: keep within viewport on mobile */
-        @media (max-width: 400px) {
-          .profile-dropdown { right: -40px; min-width: 160px; }
-        }
-      `}</style>
+      <style>{NB_CSS}</style>
     </>
   )
 }
+
+const NB_CSS = `
+.nb{background:#232F3E;box-shadow:0 2px 8px rgba(0,0,0,.18);position:sticky;top:0;z-index:200;width:100%;}
+/* TOP ROW */
+.nb-top{display:flex;align-items:center;padding:.55rem 1.5rem;gap:1.1rem;width:100%;box-sizing:border-box;}
+/* Logo */
+.nb-logo{display:flex;align-items:center;gap:.55rem;text-decoration:none;flex-shrink:0;}
+.nb-logo-img{height:38px;width:auto;object-fit:contain;}
+.nb-logo-text{display:flex;flex-direction:column;line-height:1.15;}
+.nb-logo-name{font-size:1.12rem;font-weight:700;color:#fff;letter-spacing:-.02em;}
+.nb-logo-tag{font-size:.58rem;font-weight:400;color:rgba(255,255,255,.42);letter-spacing:.05em;text-transform:uppercase;}
+/* Search */
+.nb-srch-wrap{flex:1;position:relative;min-width:0;}
+.nb-srch{display:flex;align-items:center;background:#fff;border:2px solid transparent;border-radius:6px;height:40px;overflow:hidden;transition:border-color .15s;padding:0 0 0 .85rem;}
+.nb-srch.focused{border-color:#F97316;}
+.nb-srch input{flex:1;border:none;background:transparent;font-size:.87rem;font-family:inherit;color:#1e293b;outline:none;min-width:0;height:100%;}
+.nb-srch input::placeholder{color:#94a3b8;}
+.nb-srch-clr{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.73rem;padding:.2rem .5rem;flex-shrink:0;}
+.nb-srch-btn{background:#F97316;color:#fff;border:none;border-radius:0 4px 4px 0;padding:0 1rem;height:100%;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+.nb-srch-btn:hover{background:#ea580c;}
+/* Suggestions */
+.nb-suggs{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.14);z-index:500;max-height:380px;overflow-y:auto;animation:nbFd .15s ease;}
+@keyframes nbFd{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.nb-sugg{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .1s;border-bottom:1px solid #f3f4f6;}
+.nb-sugg:hover,.nb-sugg.hi{background:#FFF7ED;}
+.nb-sugg-img{width:40px;height:40px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#9ca3af;}
+.nb-sugg-img img{width:100%;height:100%;object-fit:cover;}
+.nb-sugg-info{flex:1;min-width:0;}
+.nb-sugg-nm{display:block;font-size:.82rem;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.nb-sugg-meta{display:block;font-size:.68rem;color:#9ca3af;margin-top:1px;}
+.nb-sugg-price{font-size:.8rem;font-weight:700;color:#16A34A;white-space:nowrap;flex-shrink:0;}
+.nb-sugg-footer{display:flex;align-items:center;gap:6px;padding:10px 14px;font-size:.78rem;font-weight:600;color:#F97316;cursor:pointer;border-top:1px solid #e5e7eb;background:#fafbfc;border-radius:0 0 10px 10px;transition:background .1s;}
+.nb-sugg-footer:hover{background:#FFF7ED;}
+/* Actions */
+.nb-acts{display:flex;align-items:center;gap:.05rem;flex-shrink:0;}
+.nb-act{position:relative;display:flex;flex-direction:column;align-items:center;gap:.1rem;padding:.35rem .65rem;background:transparent;border:none;border-radius:6px;color:rgba(255,255,255,.72);cursor:pointer;transition:color .15s,background .15s;text-decoration:none;font-family:inherit;}
+.nb-act:hover{background:rgba(255,255,255,.08);color:#fff;}
+.nb-act.on{color:#fff;}
+.nb-act-lbl{font-size:.61rem;font-weight:500;color:inherit;line-height:1;}
+.nb-bdg{position:absolute;top:0;right:4px;background:#F97316;color:#fff;font-size:.54rem;font-weight:700;min-width:16px;height:16px;border-radius:50px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid #232F3E;}
+.nb-div{width:1px;height:26px;background:rgba(255,255,255,.12);margin:0 .25rem;flex-shrink:0;}
+.nb-dash{background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.22);border-radius:8px;}
+.nb-dash:hover{background:rgba(249,115,22,.22)!important;}
+/* Profile */
+.nb-prof{position:relative;}
+.nb-sign-btn{display:flex;align-items:center;gap:.35rem;padding:.42rem .85rem;background:transparent;color:rgba(255,255,255,.82);border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.82rem;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s;white-space:nowrap;text-decoration:none;}
+.nb-sign-btn:hover{border-color:rgba(255,255,255,.4);color:#fff;background:rgba(255,255,255,.06);}
+.nb-avatar{width:22px;height:22px;border-radius:50%;background:#F97316;display:flex;align-items:center;justify-content:center;color:white;font-size:.7rem;font-weight:bold;flex-shrink:0;}
+.nb-sign-icon{padding:.42rem .6rem;}
+.nb-dd-greet{padding:11px 16px;font-size:.88rem;font-weight:700;color:#1e293b;background:#f8fafc;border-radius:10px 10px 0 0;}
+.nb-dd{position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.14);min-width:180px;padding:6px 0;z-index:400;animation:nbFd .15s ease;}
+.nb-dd-item{display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:.84rem;font-weight:500;color:#334155;text-decoration:none;cursor:pointer;transition:background .12s;border:none;background:none;width:100%;font-family:inherit;}
+.nb-dd-item:hover{background:#f8fafc;}
+.nb-dd-sep{height:1px;background:#e2e8f0;margin:4px 0;}
+.nb-dd-out{color:#ef4444;}
+.nb-dd-out:hover{background:#fef2f2;}
+/* Strip */
+.nb-strip{background:#37475A;width:100%;display:flex;align-items:stretch;}
+.nb-strip-in{display:flex;align-items:center;padding:0 1rem;flex:1;overflow-x:auto;scrollbar-width:none;box-sizing:border-box;}
+.nb-strip-in::-webkit-scrollbar{display:none;}
+/* Categories button */
+.nb-cat-wrap{position:relative;flex-shrink:0;}
+.nb-cat-btn{display:flex;align-items:center;gap:.5rem;padding:.58rem 1.15rem;background:#F97316;color:#fff;border:none;font-size:.86rem;font-weight:700;font-family:inherit;cursor:pointer;transition:background .15s;white-space:nowrap;}
+.nb-cat-btn:hover,.nb-cat-btn.open{background:#ea580c;}
+/* Mega dropdown */
+.nb-mega{position:absolute;top:100%;left:0;display:flex;background:#fff;border:1px solid #e2e8f0;border-radius:0 8px 8px 8px;box-shadow:0 16px 48px rgba(0,0,0,.18);z-index:600;width:720px;max-height:440px;animation:nbFd .18s ease;overflow:hidden;}
+.nb-mega-left{width:210px;min-width:210px;border-right:1px solid #f0f0f0;overflow-y:auto;background:#fafafa;scrollbar-width:thin;flex-shrink:0;scrollbar-gutter:stable;}
+.nb-mega-left::-webkit-scrollbar{width:3px;}
+.nb-mega-left::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:3px;}
+.nb-mega-left::-webkit-scrollbar-track{background:transparent;}
+.nb-mega-cat{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;font-size:.87rem;font-weight:500;color:#374151;cursor:pointer;transition:background .12s,color .12s;border-bottom:1px solid #f3f4f6;white-space:nowrap;}
+.nb-mega-cat:hover,.nb-mega-cat.hi{background:#FFF7ED;color:#F97316;}
+.nb-mega-arr{color:#d1d5db;font-size:1rem;}
+.nb-mega-cat.hi .nb-mega-arr{color:#F97316;}
+.nb-mega-right{flex:1;padding:1rem;overflow-y:auto;background:#fff;}
+.nb-mega-rhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;}
+.nb-mega-rtitle{font-size:1rem;font-weight:700;color:#1e293b;}
+.nb-mega-vall{font-size:.78rem;font-weight:600;color:#F97316;background:none;border:none;cursor:pointer;font-family:inherit;padding:0;}
+.nb-mega-vall:hover{color:#ea580c;}
+.nb-mega-pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;}
+.nb-mega-pcard{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.6rem .45rem;background:#f9fafb;border:1px solid #f0f0f0;border-radius:8px;cursor:pointer;transition:box-shadow .15s,border-color .15s;text-align:center;}
+.nb-mega-pcard:hover{box-shadow:0 4px 12px rgba(249,115,22,.12);border-color:#fed7aa;}
+.nb-mega-pimg{width:58px;height:58px;border-radius:8px;overflow:hidden;background:#fff;flex-shrink:0;border:1px solid #f0f0f0;display:flex;align-items:center;justify-content:center;}
+.nb-mega-pimg img{width:100%;height:100%;object-fit:cover;}
+.nb-mega-pph{width:100%;height:100%;background:#e5e7eb;}
+.nb-mega-pnm{font-size:.7rem;font-weight:600;color:#374151;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:2.6rem;}
+.nb-mega-pbrand{font-size:.63rem;font-weight:500;color:#fff;background:#F97316;border-radius:3px;padding:1px 5px;}
+.nb-mega-pprice{font-size:.7rem;font-weight:700;color:#16a34a;}
+.nb-mega-empty{grid-column:1/-1;text-align:center;color:#9ca3af;font-size:.85rem;padding:2rem 0;}
+/* Nav links */
+.nb-link{position:relative;padding:.6rem 1rem;color:rgba(255,255,255,.75);text-decoration:none;font-size:.85rem;font-weight:400;white-space:nowrap;transition:color .15s;}
+.nb-link:hover{color:#fff;}
+.nb-link.act{color:#fff;font-weight:600;background:rgba(249,115,22,.25);border-radius:4px;}
+.nb-link.act::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:75%;height:2.5px;background:#F97316;border-radius:2px 2px 0 0;}
+/* Responsive */
+@media(max-width:900px){.nb-top{padding:.5rem 1rem;gap:.65rem;}.nb-act-lbl{display:none;}.nb-act{padding:.4rem;}.nb-logo-text{display:none;}.nb-mega{width:380px;}.nb-mega-pgrid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:640px){.nb-top{padding:.45rem .75rem;gap:.4rem;}.nb-strip-in{padding:0 .5rem;}.nb-mega{width:calc(100vw - 16px);max-height:340px;}.nb-mega-left{width:140px;min-width:140px;}.nb-mega-pgrid{grid-template-columns:repeat(2,1fr);}.nb-srch input{font-size:16px;}.nb-acts{gap:0;}}
+`
