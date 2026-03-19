@@ -27,20 +27,14 @@ const PERIODS = [
 
 function StatCard({ icon: Icon, label, value, sub, color }) {
   return (
-    <div style={{
-      background: '#fff', borderRadius: 14, padding: '18px 20px',
-      border: '1px solid #e5e7eb', display: 'flex', gap: 14, alignItems: 'flex-start',
-    }}>
-      <div style={{
-        width: 44, height: 44, borderRadius: 12,
-        background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      }}>
-        <Icon size={20} color={color} />
+    <div className="sm-stat-card">
+      <div className="sm-stat-icon" style={{ background: `${color}18` }}>
+        <Icon size={18} color={color} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '0.73rem', color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>{label}</div>
-        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#111827', lineHeight: 1.2 }}>{value}</div>
-        {sub && <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: 3 }}>{sub}</div>}
+        <div className="sm-stat-label">{label}</div>
+        <div className="sm-stat-val">{value}</div>
+        {sub && <div className="sm-stat-sub">{sub}</div>}
       </div>
     </div>
   );
@@ -196,24 +190,43 @@ export default function StoreManagement() {
   return (
     <div className="sm-page">
       <style>{`
-        .sm-page { padding: 28px 32px 48px; max-width: 1440px; margin: 0 auto; box-sizing: border-box; width: 100%; overflow-x: hidden; }
+        .sm-page { padding: 24px 28px 48px; max-width: 1440px; margin: 0 auto; box-sizing: border-box; width: 100%; overflow-x: hidden; }
         .sm-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
         .sm-table-detail { display: grid; grid-template-columns: 1fr 380px; gap: 20px; align-items: start; }
         .sm-table-detail-single { display: grid; grid-template-columns: 1fr; gap: 20px; }
         .sm-period-btns { display: flex; background: #f3f4f6; border-radius: 9px; padding: 3px; gap: 2px; flex-wrap: wrap; }
         .sm-chart-box { min-width: 0; width: 100%; overflow: hidden; }
         .sm-tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
-        .sm-tbl-scroll table { min-width: 520px; }
+        .sm-tbl-scroll table { min-width: 480px; }
         .sm-detail-panel { min-width: 0; width: 100%; box-sizing: border-box; }
+
+        /* Stat card */
+        .sm-stat-card { background:#fff; border-radius:14px; padding:14px 16px; border:1px solid #e5e7eb; display:flex; gap:12px; align-items:flex-start; box-sizing:border-box; min-width:0; overflow:hidden; }
+        .sm-stat-icon { width:40px; height:40px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .sm-stat-label { font-size:0.7rem; color:#6B7280; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:3px; }
+        .sm-stat-val { font-size:1.35rem; font-weight:800; color:#111827; line-height:1.2; word-break:break-word; overflow-wrap:anywhere; }
+        .sm-stat-sub { font-size:0.7rem; color:#9CA3AF; margin-top:3px; }
+
         @media (max-width: 900px) {
           .sm-stats-grid { grid-template-columns: repeat(2, 1fr); }
           .sm-table-detail { grid-template-columns: 1fr !important; }
         }
-        @media (max-width: 600px) {
-          .sm-page { padding: 10px 10px 28px; }
+        @media (max-width: 640px) {
+          .sm-page { padding: 12px 12px 28px; }
           .sm-stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-          .sm-header-row { flex-direction: column; align-items: flex-start !important; }
-          .sm-header-actions { width: 100%; justify-content: space-between; }
+          .sm-stat-card { padding: 10px 12px; gap: 9px; }
+          .sm-stat-icon { width:34px; height:34px; border-radius:9px; }
+          .sm-stat-val { font-size: 1rem; }
+          .sm-stat-label { font-size: 0.63rem; }
+          .sm-stat-sub { font-size: 0.63rem; }
+          .sm-header-row { flex-direction: column; align-items: flex-start !important; gap: 10px !important; }
+          .sm-header-actions { width: 100%; }
+          .sm-period-btns { flex: 1; }
+        }
+        @media (max-width: 400px) {
+          .sm-page { padding: 8px 8px 24px; }
+          .sm-stat-val { font-size: 0.88rem; }
+          .sm-stats-grid { gap: 6px; }
         }
       `}</style>
       {/* Header */}
@@ -261,7 +274,7 @@ export default function StoreManagement() {
       </div>
 
       {/* Revenue Trend Chart */}
-      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '20px 24px', marginBottom: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '16px', marginBottom: 24, boxSizing: 'border-box', width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
           <div>
             <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827' }}>
@@ -285,17 +298,17 @@ export default function StoreManagement() {
           </div>
         ) : displayTrend.length > 0 ? (
           <div className="sm-chart-box">
-          <ResponsiveContainer width="100%" height={240}>
-            <ComposedChart data={displayTrend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <ResponsiveContainer width="100%" height={220}>
+            <ComposedChart data={displayTrend} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
-                tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={48} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
+                tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={40} />
               <Tooltip
                 formatter={(v, n) => [n === 'Orders' ? fmtNum(v) : fmt(v), n]}
-                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
+                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 11 }}
               />
-              <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
+              <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="Orders" fill="#2563EB" fillOpacity={0.18} stroke="#2563EB" strokeWidth={1} radius={[3, 3, 0, 0]} />
               <Line type="monotone" dataKey="Revenue" stroke="#F97316" strokeWidth={2.5} dot={false} />
               <Line type="monotone" dataKey="Profit" stroke="#16A34A" strokeWidth={1.8} dot={false} strokeDasharray="4 2" />
@@ -556,7 +569,7 @@ export default function StoreManagement() {
 
       {/* Performance Comparison Bar Chart */}
       {!loading && stores.length > 1 && stores.some(s => s.revenue > 0) && (
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '20px 24px', marginTop: 24 }}>
+        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '16px', marginTop: 24, boxSizing: 'border-box', width: '100%' }}>
           <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Store Revenue Comparison</div>
           <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Top 10 stores by revenue · Based on top product sales</div>
           <div className="sm-chart-box">
@@ -567,15 +580,15 @@ export default function StoreManagement() {
                 fullName: s.name,
                 Revenue: s.revenue,
               }))}
-              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+              margin={{ top: 5, right: 8, left: -10, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
-                tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
+                tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={38} />
               <Tooltip
                 formatter={(v, n, props) => [fmt(v), props.payload.fullName]}
-                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
+                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 11 }}
               />
               <Bar dataKey="Revenue" radius={[6, 6, 0, 0]}>
                 {[...stores].sort((a, b) => b.revenue - a.revenue).slice(0, 10).map((_, i) => (
