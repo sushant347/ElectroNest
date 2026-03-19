@@ -361,6 +361,23 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [coupons, setCoupons] = useState([]);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const alsoRef = useRef(null);
+  const [alsoCanLeft, setAlsoCanLeft] = useState(false);
+  const [alsoCanRight, setAlsoCanRight] = useState(true);
+
+  const scrollAlso = (dir) => alsoRef.current?.scrollBy({ left: dir * 260, behavior: 'smooth' });
+  const onAlsoScroll = () => {
+    const el = alsoRef.current;
+    if (!el) return;
+    setAlsoCanLeft(el.scrollLeft > 4);
+    setAlsoCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    const el = alsoRef.current;
+    if (!el) return;
+    setAlsoCanRight(el.scrollWidth > el.clientWidth + 4);
+  }, [relatedProducts]);
 
   useEffect(() => {
     const load = async () => {
@@ -608,36 +625,48 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
           <div style={s.alsoLikeSection}>
             <h2 style={s.alsoLikeTitle}>You May Also Like</h2>
             <p style={s.alsoLikeSub}>Discover more from <strong>{product.category}</strong></p>
-            <div style={s.alsoLikeGrid}>
-              {relatedProducts.map((p) => (
-                <Link key={p.id} to={`/product/${p.id}`} style={s.alsoCard}>
-                  <div style={s.alsoImgWrap}>
-                    {p.image ? (
-                      <img src={p.image} alt={p.name} style={s.alsoImg} onError={(e) => { e.target.style.display = 'none'; }} />
-                    ) : (
-                      <div style={{ ...s.alsoImg, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', color: '#9ca3af' }}>
-                        <Package size={32} />
-                      </div>
-                    )}
-                  </div>
-                  <div style={s.alsoBody}>
-                    <span style={s.alsoBrand}>{p.brand}</span>
-                    <h3 style={s.alsoName}>{p.name}</h3>
-                    <div style={s.alsoRatingRow}>
-                      <StarRow rating={p.rating} size={12} />
-                      <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>{p.rating.toFixed(1)}</span>
-                    </div>
-                    <div style={s.alsoPriceRow}>
-                      <span style={s.alsoPrice}>{formatPrice(p.price)}</span>
-                      {p.stock > 0 ? (
-                        <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 600 }}>In Stock</span>
+            <div style={{ position: 'relative' }}>
+              {alsoCanLeft && (
+                <button onClick={() => scrollAlso(-1)} style={s.alsoArrowLeft}>
+                  <ChevronLeft size={20} />
+                </button>
+              )}
+              <div style={s.alsoLikeGrid} className="also-grid" ref={alsoRef} onScroll={onAlsoScroll}>
+                {relatedProducts.map((p) => (
+                  <Link key={p.id} to={`/product/${p.id}`} style={s.alsoCard}>
+                    <div style={s.alsoImgWrap}>
+                      {p.image ? (
+                        <img src={p.image} alt={p.name} style={s.alsoImg} onError={(e) => { e.target.style.display = 'none'; }} />
                       ) : (
-                        <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>Out of Stock</span>
+                        <div style={{ ...s.alsoImg, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', color: '#9ca3af' }}>
+                          <Package size={32} />
+                        </div>
                       )}
                     </div>
-                  </div>
-                </Link>
-              ))}
+                    <div style={s.alsoBody}>
+                      <span style={s.alsoBrand}>{p.brand}</span>
+                      <h3 style={s.alsoName}>{p.name}</h3>
+                      <div style={s.alsoRatingRow}>
+                        <StarRow rating={p.rating} size={12} />
+                        <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>{p.rating.toFixed(1)}</span>
+                      </div>
+                      <div style={s.alsoPriceRow}>
+                        <span style={s.alsoPrice}>{formatPrice(p.price)}</span>
+                        {p.stock > 0 ? (
+                          <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 600 }}>In Stock</span>
+                        ) : (
+                          <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>Out of Stock</span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {alsoCanRight && (
+                <button onClick={() => scrollAlso(1)} style={s.alsoArrowRight}>
+                  <ChevronRight size={20} />
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -837,16 +866,37 @@ const s = {
   reviewsCard: { marginTop: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
   reviewRow: { border: '1px solid #f1f5f9', borderRadius: 12, padding: '12px 14px', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 8 },
   /* "You May Also Like" styles */
-  alsoLikeSection: { marginTop: 28, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  alsoLikeSection: { marginTop: 28, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '28px 36px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
   alsoLikeTitle: { fontSize: 18, fontWeight: 700, color: '#1e293b', margin: '0 0 4px' },
   alsoLikeSub: { fontSize: 13, color: '#94a3b8', margin: '0 0 20px', fontWeight: 400 },
-  alsoLikeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 },
+  alsoLikeGrid: { display: 'flex', gap: 14, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 6, scrollSnapType: 'x mandatory' },
   alsoCard: {
     textDecoration: 'none', color: 'inherit',
     background: '#fff', border: '1.5px solid #f1f5f9', borderRadius: 14,
     overflow: 'hidden', transition: 'all .2s ease',
     boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     cursor: 'pointer', display: 'flex', flexDirection: 'column',
+    flex: '0 0 195px', scrollSnapAlign: 'start',
+  },
+  alsoArrow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 34, height: 34, borderRadius: '50%',
+    border: '1.5px solid #e2e8f0', background: '#fff',
+    color: '#374151', transition: 'all .15s', flexShrink: 0,
+  },
+  alsoArrowLeft: {
+    position: 'absolute', left: -17, top: '50%', transform: 'translateY(-50%)',
+    zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 34, height: 34, borderRadius: '50%',
+    border: '1.5px solid #e2e8f0', background: '#fff',
+    color: '#374151', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+  },
+  alsoArrowRight: {
+    position: 'absolute', right: -17, top: '50%', transform: 'translateY(-50%)',
+    zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 34, height: 34, borderRadius: '50%',
+    border: '1.5px solid #e2e8f0', background: '#fff',
+    color: '#374151', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
   },
   alsoImgWrap: { width: '100%', height: 160, overflow: 'hidden', background: '#f8fafc', position: 'relative' },
   alsoImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .3s ease' },
@@ -865,6 +915,7 @@ const spinnerCSS = `
   @keyframes pd-spin { to { transform: rotate(360deg); } }
   a[style]:has(> div):hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.10) !important; border-color: #F97316 !important; }
   a[style]:has(> div):hover img { transform: scale(1.06); }
+  .also-grid::-webkit-scrollbar { display: none; }
   .reviews-scroll::-webkit-scrollbar { width: 5px; }
   .reviews-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
   .reviews-scroll::-webkit-scrollbar-thumb { background: #fed7aa; border-radius: 4px; }
