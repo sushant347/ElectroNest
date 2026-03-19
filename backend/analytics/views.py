@@ -122,6 +122,8 @@ class RevenueTrendView(APIView):
         from_date = timezone.now() - timedelta(days=days)
 
         store = get_owner_store_name(request.user)
+        if not store:
+            store = request.query_params.get('owner_name', '').strip() or None
         trunc = TruncDay if period == 'daily' else TruncMonth
 
         # Compute both revenue and profit from OrderDetails (per-product accurate)
@@ -169,18 +171,20 @@ class TopProductsView(APIView):
             .exclude(order__order_status__name='Cancelled')
         )
         store = get_owner_store_name(request.user)
+        if not store:
+            store = request.query_params.get('owner_name', '').strip() or None
         if store:
             top_qs = top_qs.filter(product__owner_name__icontains=store)
 
         data = (
             top_qs
             .values('product__id', 'product__name', 'product__brand', 'product__category__name',
-                    'product__description', 'product__image_url')
+                    'product__description', 'product__image_url', 'product__owner_name')
             .annotate(
                 total_quantity_sold=Sum('quantity'),
                 total_revenue=Sum(F('quantity') * F('unit_price'))
             )
-            .order_by('-total_revenue')[:10]
+            .order_by('-total_revenue')[:50]
         )
 
         return Response([{
@@ -189,6 +193,7 @@ class TopProductsView(APIView):
             'name':                item['product__name'],
             'brand':               item['product__brand'],
             'category':            item['product__category__name'],
+            'owner_name':          item.get('product__owner_name', ''),
             'description':         item.get('product__description', ''),
             'image_url':           item.get('product__image_url', ''),
             'total_quantity_sold': item['total_quantity_sold'],
