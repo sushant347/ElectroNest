@@ -301,6 +301,7 @@ export const adminAPI = {
 
   // ML / BI Features
   getCustomerSegmentation: (params) => api.get('/analytics/segmentation/', { params }),
+  getChurnPrediction: (params) => api.get('/analytics/churn-prediction/', { params }),
   getDemandForecast: (productId, params) => api.get(`/analytics/forecast/${productId}/`, { params }),
   getProductRecommendations: (productId, params) => api.get(`/analytics/recommendations/${productId}/`, { params }),
   getPaymentMethodStats: (params) => api.get('/analytics/payment-methods/', { params }),
