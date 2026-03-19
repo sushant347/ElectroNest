@@ -3,7 +3,6 @@ import {
   Heart,
   ShoppingCart,
   X,
-  Zap,
   Star,
   SlidersHorizontal,
   ArrowUpDown,
@@ -390,6 +389,7 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
   const [activeCategory, setActiveCategory] = useState("All");
   const [sortBy, setSortBy] = useState("date");
   const [moveAllProgress, setMoveAllProgress] = useState(null);
+  const [clearingProgress, setClearingProgress] = useState(null);
   const [hoveredCard, setHoveredCard] = useState(null);
 
   const filtered = useMemo(() => {
@@ -428,9 +428,22 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
   }, []);
 
   const handleClearAll = useCallback(() => {
-    clearWishlist();
-    toast({ title: "Wishlist cleared", description: "All items removed." });
-  }, []);
+    setClearingProgress(0);
+    const total = items.length || 1;
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      setClearingProgress(Math.round((step / total) * 100));
+      if (step >= total) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setClearingProgress(null);
+          clearWishlist();
+          toast({ title: "Wishlist cleared", description: "All items removed." });
+        }, 400);
+      }
+    }, 150);
+  }, [items.length, clearWishlist]);
 
   const handleMoveAll = useCallback(() => {
     setMoveAllProgress(0);
@@ -617,7 +630,7 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
                           onMouseEnter={(e) => { e.currentTarget.style.background = "#fff7ed"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                         >
-                          <Zap size={14} /> Buy Now
+                          Buy Now
                         </button>
                       </div>
                     </div>
@@ -639,7 +652,7 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
               </div>
             )}
 
-            {/* progress bar */}
+            {/* move-all progress bar (orange) */}
             {moveAllProgress !== null && (
               <div style={styles.progressOuter}>
                 <span style={{ fontSize: 13, color: "#F97316", fontWeight: 600 }}>
@@ -647,6 +660,18 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
                 </span>
                 <div style={styles.progressTrack}>
                   <div style={styles.progressFill(moveAllProgress)} />
+                </div>
+              </div>
+            )}
+
+            {/* clear progress bar (red) */}
+            {clearingProgress !== null && (
+              <div style={{ ...styles.progressOuter, background: "#fef2f2", border: "1px solid #fecaca" }}>
+                <span style={{ fontSize: 13, color: "#ef4444", fontWeight: 600 }}>
+                  Clearing wishlist… {clearingProgress}%
+                </span>
+                <div style={{ ...styles.progressTrack, background: "#fecaca" }}>
+                  <div style={{ ...styles.progressFill(clearingProgress), background: "#ef4444" }} />
                 </div>
               </div>
             )}
@@ -674,9 +699,7 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
                 <button
                   type="button"
                   style={styles.clearBtn}
-                  onClick={() => {
-                    if (window.confirm(`Clear all ${items.length} wishlist items?`)) handleClearAll();
-                  }}
+                  onClick={handleClearAll}
                   onMouseEnter={(e) => { e.currentTarget.style.background = "#fef2f2"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                 >

@@ -196,23 +196,28 @@ export default function StoreManagement() {
   return (
     <div className="sm-page">
       <style>{`
-        .sm-page { padding: 28px 32px 48px; max-width: 1440px; margin: 0 auto; }
+        .sm-page { padding: 28px 32px 48px; max-width: 1440px; margin: 0 auto; box-sizing: border-box; width: 100%; overflow-x: hidden; }
         .sm-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
         .sm-table-detail { display: grid; grid-template-columns: 1fr 380px; gap: 20px; align-items: start; }
         .sm-table-detail-single { display: grid; grid-template-columns: 1fr; gap: 20px; }
-        .sm-period-btns { display: flex; background: #f3f4f6; border-radius: 9px; padding: 3px; gap: 2px; }
+        .sm-period-btns { display: flex; background: #f3f4f6; border-radius: 9px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+        .sm-chart-box { min-width: 0; width: 100%; overflow: hidden; }
+        .sm-tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+        .sm-tbl-scroll table { min-width: 520px; }
+        .sm-detail-panel { min-width: 0; width: 100%; box-sizing: border-box; }
         @media (max-width: 900px) {
           .sm-stats-grid { grid-template-columns: repeat(2, 1fr); }
-          .sm-table-detail { grid-template-columns: 1fr; }
+          .sm-table-detail { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 600px) {
-          .sm-page { padding: 12px 12px 32px; }
-          .sm-stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-          .sm-period-btns { flex-wrap: wrap; }
+          .sm-page { padding: 10px 10px 28px; }
+          .sm-stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+          .sm-header-row { flex-direction: column; align-items: flex-start !important; }
+          .sm-header-actions { width: 100%; justify-content: space-between; }
         }
       `}</style>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+      <div className="sm-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#111827', display: 'flex', alignItems: 'center', gap: 10 }}>
             <Store size={24} color="#F97316" /> Store Management
@@ -221,7 +226,7 @@ export default function StoreManagement() {
             Monitor all stores, track performance, and analyze revenue trends
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="sm-header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="sm-period-btns">
             {PERIODS.map(p => (
               <button key={p.value} onClick={() => setPeriod(p.value)} style={{
@@ -279,23 +284,24 @@ export default function StoreManagement() {
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : displayTrend.length > 0 ? (
+          <div className="sm-chart-box">
           <ResponsiveContainer width="100%" height={240}>
-            <ComposedChart data={displayTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <ComposedChart data={displayTrend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-              <YAxis yAxisId="rev" tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
-                tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-              <YAxis yAxisId="ord" orientation="right" tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
+                tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={48} />
               <Tooltip
                 formatter={(v, n) => [n === 'Orders' ? fmtNum(v) : fmt(v), n]}
                 contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
               />
               <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
-              <Bar yAxisId="ord" dataKey="Orders" fill="#2563EB" fillOpacity={0.18} stroke="#2563EB" strokeWidth={1} radius={[3, 3, 0, 0]} />
-              <Line yAxisId="rev" type="monotone" dataKey="Revenue" stroke="#F97316" strokeWidth={2.5} dot={false} />
-              <Line yAxisId="rev" type="monotone" dataKey="Profit" stroke="#16A34A" strokeWidth={1.8} dot={false} strokeDasharray="4 2" />
+              <Bar dataKey="Orders" fill="#2563EB" fillOpacity={0.18} stroke="#2563EB" strokeWidth={1} radius={[3, 3, 0, 0]} />
+              <Line type="monotone" dataKey="Revenue" stroke="#F97316" strokeWidth={2.5} dot={false} />
+              <Line type="monotone" dataKey="Profit" stroke="#16A34A" strokeWidth={1.8} dot={false} strokeDasharray="4 2" />
             </ComposedChart>
           </ResponsiveContainer>
+          </div>
         ) : loading ? (
           <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', fontSize: '0.85rem' }}>Loading data...</div>
         ) : (
@@ -337,7 +343,7 @@ export default function StoreManagement() {
               <div>No stores found</div>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="sm-tbl-scroll">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
@@ -435,7 +441,7 @@ export default function StoreManagement() {
 
         {/* Store Detail Panel */}
         {selectedStore && (
-          <div style={{ background: '#fff', borderRadius: 14, border: '2px solid #F97316', overflow: 'hidden' }}>
+          <div className="sm-detail-panel" style={{ background: '#fff', borderRadius: 14, border: '2px solid #F97316', overflow: 'hidden' }}>
             {/* Header */}
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -503,18 +509,19 @@ export default function StoreManagement() {
                   <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading...
                 </div>
               ) : storeTrend.length > 0 ? (
+                <div className="sm-chart-box">
                 <ResponsiveContainer width="100%" height={140}>
-                  <ComposedChart data={storeTrend} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                  <ComposedChart data={storeTrend} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                    <YAxis yAxisId="rev" tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
-                      tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-                    <YAxis yAxisId="ord" orientation="right" tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false}
+                      tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={36} />
                     <Tooltip formatter={(v, n) => [n === 'Orders' ? fmtNum(v) : fmt(v), n]} contentStyle={{ borderRadius: 6, fontSize: 11 }} />
-                    <Bar yAxisId="ord" dataKey="Orders" fill="#2563EB" fillOpacity={0.18} stroke="#2563EB" strokeWidth={1} radius={[3, 3, 0, 0]} />
-                    <Line yAxisId="rev" type="monotone" dataKey="Revenue" stroke="#F97316" strokeWidth={2} dot={false} />
+                    <Bar dataKey="Orders" fill="#2563EB" fillOpacity={0.18} stroke="#2563EB" strokeWidth={1} radius={[3, 3, 0, 0]} />
+                    <Line type="monotone" dataKey="Revenue" stroke="#F97316" strokeWidth={2} dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
+                </div>
               ) : (
                 <div style={{ height: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', gap: 6 }}>
                   <TrendingUp size={22} color="#e5e7eb" />
@@ -552,6 +559,7 @@ export default function StoreManagement() {
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '20px 24px', marginTop: 24 }}>
           <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Store Revenue Comparison</div>
           <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Top 10 stores by revenue · Based on top product sales</div>
+          <div className="sm-chart-box">
           <ResponsiveContainer width="100%" height={200}>
             <BarChart
               data={[...stores].sort((a, b) => b.revenue - a.revenue).slice(0, 10).map(s => ({
@@ -576,6 +584,7 @@ export default function StoreManagement() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
       )}
     </div>

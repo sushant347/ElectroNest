@@ -64,26 +64,59 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
 
   const fetchSugg = useCallback((query) => {
     if (debouncRef.current) clearTimeout(debouncRef.current)
-    if (!query.trim() || query.trim().length < 2) { setSuggestions([]); setShowSugg(false); return }
+    const trimmed = query.trim()
+    if (!trimmed || trimmed.length < 2) { setSuggestions([]); setShowSugg(false); return }
     debouncRef.current = setTimeout(async () => {
       try {
-        const res = await customerAPI.getProducts({ search: query.trim(), page_size: 8 })
-        const items = (res.data?.results || res.data || []).slice(0, 8).map(p => ({
-          id: p.id, name: p.name || p.ProductName, brand: p.brand || p.Brand || '',
-          category: p.category_name || '', image: p.image_url || p.ProductImageURL || '',
+        const res = await customerAPI.getProducts({ search: trimmed, page_size: 10 })
+        const all = res.data?.results || res.data || []
+        // sort: exact name starts-with first, then contains, then rest
+        const q = trimmed.toLowerCase()
+        const sorted = [...all].sort((a, b) => {
+          const na = (a.name || a.ProductName || '').toLowerCase()
+          const nb = (b.name || b.ProductName || '').toLowerCase()
+          const aStarts = na.startsWith(q)
+          const bStarts = nb.startsWith(q)
+          if (aStarts && !bStarts) return -1
+          if (!aStarts && bStarts) return 1
+          return 0
+        })
+        const items = sorted.slice(0, 8).map(p => ({
+          id: p.id,
+          name: p.name || p.ProductName,
+          brand: p.brand || p.Brand || '',
+          category: p.category_name || '',
+          image: p.image_url || p.ProductImageURL || '',
           price: parseFloat(p.selling_price || p.SellingPrice || 0),
         }))
         setSuggestions(items); setShowSugg(items.length > 0); setActiveSugg(-1)
       } catch { setSuggestions([]); setShowSugg(false) }
-    }, 300)
+    }, 220)
   }, [])
 
   const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
+
+  // Highlight matching text in suggestions
+  const highlight = (text, query) => {
+    if (!text || !query) return text
+    const idx = text.toLowerCase().indexOf(query.toLowerCase())
+    if (idx === -1) return text
+    return (
+      <>
+        {text.slice(0, idx)}
+        <mark style={{ background: '#FFF7ED', color: '#F97316', fontWeight: 700, padding: 0 }}>
+          {text.slice(idx, idx + query.length)}
+        </mark>
+        {text.slice(idx + query.length)}
+      </>
+    )
+  }
 
   const isActive = (item) => {
     if (item.path === '/') return location.pathname === '/' && !new URLSearchParams(location.search).get('cat')
     if (item.path === '/about') return location.pathname === '/about'
     if (item.path === '/support/contact') return location.pathname === '/support/contact'
+    if (item.path === '/compare') return location.pathname === '/compare'
     return false
   }
 
@@ -118,14 +151,21 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
             </div>
           </Link>
 
-          {/* Search */}
+          {/* Search — full row on mobile via CSS order */}
           <div className="nb-srch-wrap" ref={searchRef}>
             <form className={`nb-srch${searchFocused ? ' focused' : ''}`} onSubmit={handleSearch}>
-              <input type="text" value={searchVal} onChange={e => { setSearchVal(e.target.value); fetchSugg(e.target.value) }}
-                onKeyDown={onKey} placeholder="Search products, brands and more..."
+              <input
+                type="text"
+                value={searchVal}
+                onChange={e => { setSearchVal(e.target.value); fetchSugg(e.target.value) }}
+                onKeyDown={onKey}
+                placeholder="Search products, brands and more..."
                 onFocus={() => { setSearchFocused(true); if (suggestions.length > 0) setShowSugg(true) }}
-                onBlur={() => setSearchFocused(false)} />
-              {searchVal && <button type="button" className="nb-srch-clr" onClick={() => { setSearchVal(''); setSuggestions([]); setShowSugg(false) }}>✕</button>}
+                onBlur={() => setSearchFocused(false)}
+              />
+              {searchVal && (
+                <button type="button" className="nb-srch-clr" onClick={() => { setSearchVal(''); setSuggestions([]); setShowSugg(false) }}>✕</button>
+              )}
               <button type="submit" className="nb-srch-btn"><FiSearch size={18} /></button>
             </form>
             {showSugg && suggestions.length > 0 && (
@@ -134,8 +174,12 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
                   <div key={p.id} className={`nb-sugg${i === activeSugg ? ' hi' : ''}`} onMouseDown={() => onSuggClick(p)} onMouseEnter={() => setActiveSugg(i)}>
                     <div className="nb-sugg-img">{p.image ? <img src={p.image} alt={p.name} /> : <FiSearch size={13} />}</div>
                     <div className="nb-sugg-info">
-                      <span className="nb-sugg-nm">{p.name}</span>
-                      <span className="nb-sugg-meta">{p.brand}{p.category && ` · ${p.category}`}</span>
+                      <span className="nb-sugg-nm">{highlight(p.name, searchVal)}</span>
+                      <span className="nb-sugg-meta">
+                        {p.brand && highlight(p.brand, searchVal)}
+                        {p.brand && p.category && ' · '}
+                        {p.category}
+                      </span>
                     </div>
                     <span className="nb-sugg-price">{fmt(p.price)}</span>
                   </div>
@@ -149,11 +193,19 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
 
           {/* Actions */}
           <div className="nb-acts">
-            <Link to="/compare" className={`nb-act${compareCount > 0 ? ' on' : ''}`}>
+            {/* Compare icon — mobile: always visible left of wishlist */}
+            <Link to="/compare" className={`nb-act nb-cmp-mobile${compareCount > 0 ? ' on' : ''}`}>
               <FiBarChart2 size={20} />
-              <span className="nb-act-lbl">Compare</span>
               {compareCount > 0 && <span className="nb-bdg">{compareCount}</span>}
             </Link>
+            {/* Compare — desktop only, logged-in only */}
+            {user && (
+              <Link to="/compare" className={`nb-act nb-cmp-desktop${compareCount > 0 ? ' on' : ''}`}>
+                <FiBarChart2 size={20} />
+                <span className="nb-act-lbl">Compare</span>
+                {compareCount > 0 && <span className="nb-bdg">{compareCount}</span>}
+              </Link>
+            )}
             <Link to="/wishlist" className={`nb-act${wishlistCount > 0 ? ' on' : ''}`}>
               <FiHeart size={20} style={wishlistCount > 0 ? { fill: '#fff', stroke: '#fff' } : {}} />
               <span className="nb-act-lbl">Wishlist</span>
@@ -191,7 +243,9 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
               </>
             ) : (
               <Link to="/login" className="nb-sign-btn">
-                <FiUser size={17} /><span>Sign In</span><FiChevronDown size={13} />
+                <FiUser size={17} />
+                <span className="nb-sign-txt">Sign In</span>
+                <span className="nb-sign-chev"><FiChevronDown size={13} /></span>
               </Link>
             )}
           </div>
@@ -200,7 +254,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
         {/* STRIP */}
         <div className="nb-strip">
 
-          {/* Categories Mega Dropdown — outside overflow container so dropdown is never clipped */}
+          {/* Categories Mega Dropdown */}
           <div className="nb-cat-wrap" ref={catRef} onMouseEnter={() => setCatOpen(true)} onMouseLeave={() => setCatOpen(false)}>
             <button className={`nb-cat-btn${catOpen ? ' open' : ''}`} onClick={() => setCatOpen(p => !p)}>
               <FiMenu size={16} />
@@ -246,10 +300,11 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
             )}
           </div>
 
-          {/* Nav links — in scrollable strip */}
+          {/* Nav links — Compare link shown only on mobile via CSS */}
           <div className="nb-strip-in">
             {NAV_LINKS.map(item => (
-              <Link key={item.label} to={item.path} className={`nb-link${isActive(item) ? ' act' : ''}`}>
+              <Link key={item.label} to={item.path}
+                className={`nb-link${isActive(item) ? ' act' : ''}${item.mobileOnly ? ' nb-mobile-only' : ''}`}>
                 {item.label}
               </Link>
             ))}
@@ -355,7 +410,66 @@ const NB_CSS = `
 .nb-link:hover{color:#fff;}
 .nb-link.act{color:#fff;font-weight:600;background:rgba(249,115,22,.25);border-radius:4px;}
 .nb-link.act::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:75%;height:2.5px;background:#F97316;border-radius:2px 2px 0 0;}
-/* Responsive */
-@media(max-width:900px){.nb-top{padding:.5rem 1rem;gap:.65rem;}.nb-act-lbl{display:none;}.nb-act{padding:.4rem;}.nb-logo-text{display:none;}.nb-mega{width:380px;}.nb-mega-pgrid{grid-template-columns:repeat(2,1fr);}}
-@media(max-width:640px){.nb-top{padding:.45rem .75rem;gap:.4rem;}.nb-strip-in{padding:0 .5rem;}.nb-mega{width:calc(100vw - 16px);max-height:340px;}.nb-mega-left{width:140px;min-width:140px;}.nb-mega-pgrid{grid-template-columns:repeat(2,1fr);}.nb-srch input{font-size:16px;}.nb-acts{gap:0;}}
+/* Compare: mobile icon hidden on desktop, desktop version always visible when rendered */
+.nb-cmp-mobile{display:none!important;}
+.nb-cmp-desktop{display:flex;}
+/* Responsive ≤900px */
+@media(max-width:900px){
+  .nb-top{padding:.5rem 1rem;gap:.65rem;}
+  .nb-act-lbl{display:none;}
+  .nb-act{padding:.4rem;}
+  .nb-logo-tag{display:none;}
+  .nb-mega{width:380px;}
+  .nb-mega-pgrid{grid-template-columns:repeat(2,1fr);}
+}
+/* Responsive ≤640px — mobile layout */
+@media(max-width:640px){
+  /* Flex wrap: logo + actions on row 1, search full-width on row 2 */
+  .nb-top{
+    flex-wrap:wrap;
+    padding:.45rem .75rem .4rem;
+    gap:.4rem;
+    align-items:center;
+  }
+  .nb-logo{order:1;flex-shrink:0;}
+  .nb-acts{order:2;flex:1;justify-content:flex-end;gap:0;}
+  .nb-srch-wrap{
+    order:3;
+    width:100%;
+    flex:1 1 100%;
+    min-width:0;
+    box-sizing:border-box;
+  }
+  /* Search bar full width, no overflow */
+  .nb-srch{height:38px;}
+  .nb-srch input{font-size:16px;}
+  /* Suggestions dropdown: full width, correct z-index */
+  .nb-suggs{
+    position:absolute;
+    top:calc(100% + 4px);
+    left:0;
+    right:0;
+    width:100%;
+    max-height:60vh;
+    z-index:9999;
+    box-sizing:border-box;
+  }
+  /* Strip */
+  .nb-strip-in{padding:0 .5rem;}
+  /* Mega dropdown */
+  .nb-mega{width:calc(100vw - 16px);max-height:340px;}
+  .nb-mega-left{width:140px;min-width:140px;}
+  .nb-mega-pgrid{grid-template-columns:repeat(2,1fr);}
+  /* Hide desktop compare label version, show mobile icon */
+  .nb-cmp-desktop{display:none!important;}
+  .nb-cmp-mobile{display:flex!important;}
+  /* Sign in: hide text, show only icon */
+  .nb-sign-txt,.nb-sign-chev{display:none;}
+  .nb-sign-btn{padding:.42rem .55rem;}
+  /* Logo name smaller on mobile */
+  .nb-logo-name{font-size:.88rem;}
+  .nb-logo-img{height:30px;}
+  /* Categories button smaller on mobile */
+  .nb-cat-btn{padding:.42rem .7rem;font-size:.75rem;gap:.35rem;}
+}
 `

@@ -2,26 +2,18 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FiMonitor, FiHeart, FiBarChart2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { customerAPI } from '../services/api'
-import imgHeadphone from '../components/images/headphone.png'
-import imgLaptop from '../components/images/laptop.png'
-import imgMobile from '../components/images/mobile.png'
 import imgWatch from '../components/images/smart watches.png'
 import imgCamera from '../components/images/camera.png'
 import imgDrone from '../components/images/drone.png'
-import imgTablet from '../components/images/ipad.png'
 import imgGaming from '../components/images/Gaming Console.png'
 
 const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
 
 const HERO_SLIDES = [
-  { badge: '🎵 Sale 35% Off', title: 'Enhance Your Music Experience', sub: 'Premium headphones & speakers at unbeatable prices', cat: 'Headphones', bg: 'linear-gradient(135deg,#fdf4ff,#fce4ec)', img: imgHeadphone },
-  { badge: '💻 New Arrival', title: 'Power Up Your Productivity', sub: 'Latest laptops from top brands, fastest chips', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', img: imgLaptop },
-  { badge: '📱 Best Seller', title: 'Stay Connected Smarter', sub: 'Top smartphones, crisp displays, best cameras', cat: 'Smartphones', bg: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', img: imgMobile },
   { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'Gaming', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: imgGaming },
   { badge: '⌚ Most Popular', title: 'Wear the Future on Your Wrist', sub: 'Smart watches for fitness, work and everyday style', cat: 'Smart Watches', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', img: imgWatch },
   { badge: '📷 New Arrival', title: 'Capture Every Moment', sub: 'Professional cameras & lenses for every photographer', cat: 'Cameras', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', img: imgCamera },
   { badge: '🚁 Trending Now', title: 'Take Flight With Drones', sub: 'Aerial photography & racing drones at best prices', cat: 'Drones', bg: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', img: imgDrone },
-  { badge: '📟 Just Arrived', title: 'Your Digital Life, Upgraded', sub: 'Tablets for work, play and creativity', cat: 'Tablets', bg: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', img: imgTablet },
 ]
 
 const SIDE = [
@@ -262,8 +254,8 @@ const STYLES = `
 /* HERO */
 .hm-hero-sec{background:#F3F4F6;padding:1.25rem 1.5rem;}
 .hm-layout{display:grid;grid-template-columns:1fr 370px;gap:1rem;width:100%;}
-.hm-hero{border-radius:14px;position:relative;overflow:hidden;min-height:340px;display:block;transition:background .5s;}
-.hm-banner-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;display:block;z-index:0;}
+.hm-hero{border-radius:14px;position:relative;overflow:hidden;display:block;transition:background .5s;}
+.hm-banner-img{position:relative;width:100%;height:auto;display:block;z-index:0;}
 .hm-hero:hover .hm-banner-img{transform:scale(1.03);transition:transform .5s ease;}
 .hm-emoji-fall{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12rem;opacity:.15;z-index:0;}
 .hm-banner-cta{position:absolute;bottom:2rem;left:2rem;z-index:2;}
@@ -348,5 +340,5 @@ const STYLES = `
 .hm-abtn:disabled{background:#d1d5db;cursor:not-allowed;}
 @media(max-width:1024px){.hm-layout{grid-template-columns:1fr 300px;}}
 @media(max-width:768px){.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:row;}.hm-side-lg{flex:2;}.hm-side-row{flex:1;flex-direction:column;gap:.85rem;}.hm-side-sm{min-height:0;flex:1;}}
-@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-hero{min-height:220px;}.hm-controls{display:none;}.hm-banner-cta{bottom:1rem;left:1rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1.25rem .85rem;}.hm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;width:100%;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}}
+@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-controls{display:none;}.hm-banner-cta{bottom:.6rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1.25rem .85rem;}.hm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;width:100%;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}}
 `
