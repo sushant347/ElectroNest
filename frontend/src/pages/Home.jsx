@@ -17,17 +17,35 @@ const HERO_SLIDES = [
 ]
 
 const SIDE = [
-  { eyebrow: 'Trend Devices', title: 'Latest Laptops', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', emoji: '💻' },
+  { eyebrow: 'Trend Devices', title: 'Latest Laptops', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', emoji: '💻', img: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=600&auto=format' },
   { eyebrow: 'Best', title: 'Gaming Console', cat: 'Gaming', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', ec: '#16a34a', emoji: '🎮' },
   { eyebrow: 'Most Popular', title: 'Popular Watches', cat: 'Smart Watches', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', ec: '#F97316', emoji: '⌚' },
 ]
 
 function getCatEmoji(n) { return { Smartphones: '📱', Laptops: '💻', Gaming: '🎮', Tablets: '📟', 'Smart Home': '🏠', Headphones: '🎧', Display: '🖥️', Cameras: '📷', Drones: '🚁', 'Smart Watches': '⌚', Speakers: '🔊', Accessories: '🔌' }[n] || '📦' }
 
+function shouldUseContainInCard(categoryName = '') {
+  return /smartphones|headphones/i.test(categoryName)
+}
+
+const CAT_IMGS = {
+  Smartphones:    'https://applefun.com.ua/upload/2025-09/0-apple-iphone-17-pro-max-256gb-cosmic-orange-11757497912.webp',
+  Laptops:        'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=600&auto=format',
+  Gaming:         'https://images.unsplash.com/photo-1606318801954-d46d46d3360a?w=600&auto=format',
+  Tablets:        'https://static1.anpoimages.com/wordpress/wp-content/uploads/2023/08/samsung-galaxy-tab-s9-ultra-plants.jpg',
+  'Smart Home':   'https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/leap-petite-global/products/ec/527e/variants/sco/gallery-images/HP09-variant-gallery-02.jpg?&cropPathE=desktop&fit=stretch,1&fmt=pjpeg&wid=1920',
+  Headphones:     'https://i0.wp.com/boingboing.net/wp-content/uploads/2025/08/AirPodMax-e1767030905267.jpg?fit=600%2C340&quality=60&ssl=1',
+  Display:        'https://media.us.lg.com/transform/ecomm-PDPGallery-1100x730/e64bb88d-49a1-4f54-a9dc-de6dd1b33714/md08003935-DZ-07-jpg',
+  Cameras:        'https://images.unsplash.com/photo-1617005082133-548c4dd27f35?w=600&auto=format',
+  Drones:         'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTuLYKV8ecGw76FaI258F0yz1VSIe2e4b_H2w&s',
+  'Smart Watches':'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQmhDiLgjN7ncyoUlQlnhYuS2BLjDl72u_xVQ&s',
+  Speakers:       'https://www.apple.com/newsroom/images/2024/07/apple-introduces-homepod-mini-in-midnight/article/Apple-HomePod-mini-midnight_inline.jpg.large_2x.jpg',
+  Accessories:    'https://www.macworld.com/wp-content/uploads/2023/09/Twelve-South-HiRise-3-Deluxe-charger-3.jpg?quality=50&strip=all&w=1024',
+}
+
 export default function Home({ addToCart, toggleWishlist, wishlistItems = [], toggleCompare, compareItems = [] }) {
   const [cats, setCats] = useState([])
   const [prods, setProds] = useState([])
-  const [allProds, setAllProds] = useState([])
   const [sideImgs, setSideImgs] = useState({})
   const [loading, setLoading] = useState(true)
   const [selCat, setSelCat] = useState(null)
@@ -55,9 +73,6 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         const catData = catRes.data?.results || catRes.data || []
         const allData = allRes.data?.results || allRes.data || []
         setCats(catData)
-        // Always store the full product list for category circle images & side banners
-        setAllProds(allData)
-
         let filtered = [...allData]
         if (catParam) { filtered = allData.filter(p => (p.category_name || '') === catParam) }
         if (searchQ) { const q = searchQ.toLowerCase(); filtered = filtered.filter(p => (p.name || p.ProductName || '').toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q)) }
@@ -96,22 +111,20 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     if (selCat) f = f.filter(p => norm(p).category === selCat)
     if (selCat || searchQ) return f.map(norm)
     const n = f.map(norm)
-    const by = {}
-    n.forEach(p => { if (!by[p.category]) by[p.category] = []; by[p.category].push(p) })
-    const out = []
-    Object.values(by).forEach(g => {
-      // Group by brand within this category
-      const byBrand = {}
-      g.forEach(p => {
-        const brand = (p.brand || 'Other').toLowerCase()
-        if (!byBrand[brand]) byBrand[brand] = []
-        byBrand[brand].push(p)
-      })
-      // Pick the best-selling product from each brand (one per brand, no repeats)
-      const perBrand = Object.values(byBrand).map(bg => [...bg].sort((a, b) => b.sold - a.sold)[0])
-      out.push(...perBrand)
+    const byStore = {}
+    n.forEach(p => {
+      const store = (p.ownerName || '').trim() || 'Unknown Store'
+      if (!byStore[store]) byStore[store] = []
+      byStore[store].push(p)
     })
-    return out
+    const out = []
+    Object.values(byStore).forEach(g => {
+      const topPerStore = [...g]
+        .sort((a, b) => (b.sold - a.sold) || (b.price - a.price))
+        .slice(0, 4)
+      out.push(...topPerStore)
+    })
+    return out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price))
   })()
 
   const handleCat = (name) => { if (selCat === name) { setSelCat(null); nav('/') } else { setSelCat(name); nav(`/?cat=${encodeURIComponent(name)}`) } }
@@ -148,7 +161,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
                 <span className="hm-s-ttl">{SIDE[0].title}</span>
                 <button className="hm-s-btn" onClick={e => { e.stopPropagation(); nav(`/?cat=${encodeURIComponent(SIDE[0].cat)}`) }}>View More</button>
               </div>
-              <div className="hm-s-imgbox lg">{sideImgs[SIDE[0].cat] ? <img src={sideImgs[SIDE[0].cat]} alt={SIDE[0].title} className="hm-s-img" /> : <span className="hm-s-em">{SIDE[0].emoji}</span>}</div>
+              <div className="hm-s-imgbox lg">{(SIDE[0].img || sideImgs[SIDE[0].cat]) ? <img src={SIDE[0].img || sideImgs[SIDE[0].cat]} alt={SIDE[0].title} className="hm-s-img" /> : <span className="hm-s-em">{SIDE[0].emoji}</span>}</div>
             </div>
             <div className="hm-side-row">
               {SIDE.slice(1).map((b, i) => (
@@ -175,11 +188,13 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         <div className="hm-cats-strip">
           {cats.map(cat => {
             const active = selCat === cat.name
-            const p = allProds.find(x => (x.category_name || '') === cat.name && (x.image_url || x.ProductImageURL))
             return (
               <div key={cat.id || cat.name} className={`hm-cat${active ? ' act' : ''}`} onClick={() => handleCat(cat.name)}>
                 <div className="hm-cat-circle">
-                  {p ? <img src={p.image_url || p.ProductImageURL} alt={cat.name} className="hm-cat-img" /> : <span className="hm-cat-em">{getCatEmoji(cat.name)}</span>}
+                  {CAT_IMGS[cat.name]
+                    ? <img src={CAT_IMGS[cat.name]} alt={cat.name} className="hm-cat-img" onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+                    : null}
+                  <span className="hm-cat-em" style={{ display: CAT_IMGS[cat.name] ? 'none' : 'flex' }}>{getCatEmoji(cat.name)}</span>
                 </div>
                 <span className="hm-cat-nm">{cat.name}</span>
               </div>
@@ -207,15 +222,31 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
                 <div key={product.id} className="hm-card">
                   <div className="hm-card-img">
                     <Link to={`/product/${product.id}`} style={{ display: 'block', height: '100%' }}>
-                      {product.image && <img src={product.image} alt={product.name} className="hm-pimg" onError={e => e.target.style.display = 'none'} />}
-                      <div className="hm-piph" style={{ display: product.image ? 'none' : 'flex' }}><FiMonitor size={30} /></div>
+                      <img
+                        src={product.image || product.fallbackImage}
+                        alt={product.name}
+                        className="hm-pimg"
+                        style={{ objectFit: shouldUseContainInCard(product.category) ? 'contain' : 'fill' }}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={e => {
+                          if (e.currentTarget.dataset.fb === '1') {
+                            e.currentTarget.style.display = 'none'
+                            e.currentTarget.nextSibling.style.display = 'flex'
+                            return
+                          }
+                          e.currentTarget.dataset.fb = '1'
+                          e.currentTarget.src = product.fallbackImage
+                        }}
+                      />
+                      <div className="hm-piph" style={{ display: 'none' }}><FiMonitor size={30} /></div>
                     </Link>
                     <div className="hm-pacts">
                       <button className={`hm-pact${inW ? ' wact' : ''}`} onClick={() => toggleWishlist(product)}>
-                        <FiHeart size={16} style={inW ? { fill: '#ef4444', stroke: '#ef4444' } : {}} />
+                        <FiHeart size={20} style={inW ? { fill: '#ef4444', stroke: '#ef4444' } : {}} />
                       </button>
                       <button className={`hm-pact${inC ? ' cact' : ''}`} onClick={() => toggleCompare(product)}>
-                        <FiBarChart2 size={16} />
+                        <FiBarChart2 size={20} />
                       </button>
                     </div>
                     {product.stock <= 0 && <span className="hm-oos">Out of Stock</span>}
@@ -310,35 +341,35 @@ const STYLES = `
 .hm-ld{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:160px;gap:10px;color:#64748b;}
 .hm-spin{width:32px;height:32px;border:4px solid #e2e8f0;border-top:4px solid #F97316;border-radius:50%;animation:hmSpin .8s linear infinite;}
 @keyframes hmSpin{to{transform:rotate(360deg);}}
-.hm-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1.1rem;width:100%;}
-.hm-card{background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;transition:box-shadow .2s,transform .2s;}
-.hm-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.09);}
-.hm-card-img{position:relative;height:152px;background:#f9fafb;overflow:hidden;}
-.hm-pimg{width:100%;height:100%;object-fit:cover;transition:transform .3s;}
+.hm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;width:100%;}
+.hm-card{background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;transition:box-shadow .22s,transform .22s;display:flex;flex-direction:column;box-shadow:0 1px 4px rgba(0,0,0,.05);}
+.hm-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,.11);}
+.hm-card-img{position:relative;height:210px;width:calc(100% - 18px);margin:10px auto 0;background:#f8fafc;overflow:hidden;flex-shrink:0;border-radius:10px;}
+.hm-pimg{width:100%;height:100%;object-fit:contain;background:#fff;transition:transform .35s ease;}
 .hm-card:hover .hm-pimg{transform:scale(1.05);}
 .hm-piph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9ca3af;background:#f3f4f6;}
-.hm-pacts{position:absolute;top:9px;right:9px;display:flex;flex-direction:column;gap:7px;z-index:2;}
-.hm-pact{background:white;border:none;border-radius:50%;width:33px;height:33px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transform:translateX(8px);transition:all .25s;color:#64748b;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+.hm-pacts{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:7px;z-index:2;}
+.hm-pact{background:white;border:none;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transform:translateX(10px);transition:all .22s;color:#64748b;box-shadow:0 2px 8px rgba(0,0,0,.13);}
 .hm-card:hover .hm-pact{opacity:1;transform:translateX(0);}
 .hm-pact:hover{background:#F97316;color:#fff;}
 .hm-pact.wact{color:#ef4444;opacity:1;transform:translateX(0);}
 .hm-pact.wact svg{fill:#ef4444;stroke:#ef4444;}
 .hm-pact.wact:hover{background:#ef4444;color:#fff;}
 .hm-pact.cact{background:#F97316;color:#fff;opacity:1;transform:translateX(0);}
-.hm-oos{position:absolute;top:8px;left:8px;background:#ef4444;color:#fff;font-size:.65rem;font-weight:700;padding:3px 8px;border-radius:4px;z-index:2;}
-.hm-pinfo{padding:.8rem .9rem .9rem;}
-.hm-pcat{font-size:.67rem;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600;}
-.hm-pnm{font-size:.9rem;font-weight:600;color:#1e293b;margin:.28rem 0 .32rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.hm-pmeta{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px;}
-.hm-pbrand{font-size:.65rem;padding:2px 6px;border-radius:4px;font-weight:500;background:#EFF6FF;color:#2563EB;}
-.hm-pown{font-size:.65rem;padding:2px 6px;border-radius:4px;font-weight:500;background:#FFF7ED;color:#EA580C;}
-.hm-pprice{display:flex;align-items:center;gap:.45rem;}
+.hm-oos{position:absolute;top:9px;left:9px;background:#ef4444;color:#fff;font-size:.62rem;font-weight:700;padding:3px 8px;border-radius:5px;z-index:2;letter-spacing:.03em;}
+.hm-pinfo{padding:.95rem 1rem 1rem;display:flex;flex-direction:column;flex:1;}
+.hm-pcat{font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:#F97316;font-weight:700;}
+.hm-pnm{font-size:.88rem;font-weight:600;color:#1e293b;margin:.3rem 0 .5rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45;flex:1;}
+.hm-pmeta{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;}
+.hm-pbrand{font-size:.63rem;padding:2px 7px;border-radius:4px;font-weight:600;background:#EFF6FF;color:#2563EB;}
+.hm-pown{font-size:.63rem;padding:2px 7px;border-radius:4px;font-weight:500;background:#FFF7ED;color:#EA580C;}
+.hm-pprice{display:flex;align-items:center;gap:.45rem;margin-top:auto;padding-top:4px;}
 .hm-price{font-size:1rem;font-weight:700;color:#16A34A;}
-.hm-old{font-size:.77rem;color:#9ca3af;text-decoration:line-through;}
-.hm-abtn{width:100%;margin-top:.55rem;padding:.42rem 0;background:#F97316;color:#fff;border:none;border-radius:6px;font-size:.79rem;font-weight:600;font-family:inherit;cursor:pointer;transition:background .15s;}
-.hm-abtn:hover{background:#ea580c;}
-.hm-abtn:disabled{background:#d1d5db;cursor:not-allowed;}
+.hm-old{font-size:.75rem;color:#9ca3af;text-decoration:line-through;}
+.hm-abtn{width:100%;margin-top:.6rem;padding:.5rem 0;background:#F97316;color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:600;font-family:inherit;cursor:pointer;transition:background .15s,transform .1s;letter-spacing:.01em;}
+.hm-abtn:hover{background:#ea580c;transform:translateY(-1px);}
+.hm-abtn:disabled{background:#d1d5db;cursor:not-allowed;transform:none;}
 @media(max-width:1024px){.hm-layout{grid-template-columns:1fr 300px;}.hm-grid{grid-template-columns:repeat(4,1fr);}}
 @media(max-width:768px){.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:row;}.hm-side-lg{flex:2;}.hm-side-row{flex:1;flex-direction:column;gap:.85rem;}.hm-side-sm{min-height:0;flex:1;}.hm-grid{grid-template-columns:repeat(3,1fr);}}
-@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-controls{display:none;}.hm-banner-cta{bottom:.6rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1.25rem .85rem;}.hm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;width:100%;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}}
+@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-controls{display:none;}.hm-banner-cta{bottom:.6rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1.25rem .85rem;}.hm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;width:100%;}.hm-card-img{width:calc(100% - 12px);margin:8px auto 0;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}}
 `

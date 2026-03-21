@@ -65,6 +65,8 @@ const normalize = (p) => ({
   unitsSold: p.units_sold || 0,
 });
 
+const shouldFillContainerImage = (categoryName = '') => /laptop|camera|display|tablet/i.test(categoryName);
+
 /* ── Coupon Carousel ─────────────────────────────────────────────── */
 const PALETTE = [
   { left: '#F97316', right: '#ea580c', tag: '#fff7ed', tagText: '#c2410c' },
@@ -362,22 +364,21 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   const [coupons, setCoupons] = useState([]);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const alsoRef = useRef(null);
-  const [alsoCanLeft, setAlsoCanLeft] = useState(false);
-  const [alsoCanRight, setAlsoCanRight] = useState(true);
+  const [alsoIndex, setAlsoIndex] = useState(0);
 
-  const scrollAlso = (dir) => alsoRef.current?.scrollBy({ left: dir * 260, behavior: 'smooth' });
-  const onAlsoScroll = () => {
+  const scrollAlso = (dir) => {
     const el = alsoRef.current;
-    if (!el) return;
-    setAlsoCanLeft(el.scrollLeft > 4);
-    setAlsoCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    if (!el || relatedProducts.length === 0) return;
+    const n = relatedProducts.length;
+    const newIdx = (alsoIndex + dir + n) % n;
+    setAlsoIndex(newIdx);
+    // Use actual rendered card width + gap for pixel-perfect positioning
+    const firstCard = el.firstElementChild;
+    const step = firstCard ? firstCard.offsetWidth + 16 : el.clientWidth / 4;
+    el.scrollTo({ left: newIdx * step, behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    const el = alsoRef.current;
-    if (!el) return;
-    setAlsoCanRight(el.scrollWidth > el.clientWidth + 4);
-  }, [relatedProducts]);
+  useEffect(() => { setAlsoIndex(0); }, [relatedProducts]);
 
   useEffect(() => {
     const load = async () => {
@@ -421,7 +422,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
         const filtered = all
           .filter((p) => p.id !== product.id)
           .sort((a, b) => a.unitsSold - b.unitsSold)
-          .slice(0, 6);
+          .slice(0, 8);
         setRelatedProducts(filtered);
       })
       .catch(() => setRelatedProducts([]));
@@ -449,6 +450,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   }
 
   const isInWishlist = wishlistItems.some(i => i.id === product.id);
+  const fillMainImage = shouldFillContainerImage(product.category);
 
   // Parse specifications — supports JSON objects or pipe-delimited plain text
   let specEntries = [];
@@ -490,12 +492,22 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
           {/* Image */}
           <div style={s.imageCard} className="pd-image-card">
             {product.image ? (
-              <img src={product.image} alt={product.name} style={s.img} onError={(e) => { e.target.style.display = 'none' }} />
-            ) : (
-              <div style={{ ...s.img, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F3F4F6', color: '#9CA3AF' }}>
-                <Package size={64} />
-              </div>
-            )}
+              <img
+                src={product.image}
+                alt={product.name}
+                style={{ ...s.img, objectFit: fillMainImage ? 'cover' : 'contain' }}
+                loading="eager"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div style={{ ...s.img, display: product.image ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', background: '#F3F4F6', color: '#9CA3AF' }}>
+              <Package size={64} />
+            </div>
           </div>
 
           {/* Info */}
@@ -626,22 +638,30 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
             <h2 style={s.alsoLikeTitle}>You May Also Like</h2>
             <p style={s.alsoLikeSub}>Discover more from <strong>{product.category}</strong></p>
             <div style={{ position: 'relative' }}>
-              {alsoCanLeft && (
-                <button onClick={() => scrollAlso(-1)} style={s.alsoArrowLeft}>
-                  <ChevronLeft size={20} />
-                </button>
-              )}
-              <div style={s.alsoLikeGrid} className="also-grid" ref={alsoRef} onScroll={onAlsoScroll}>
+              <button onClick={() => scrollAlso(-1)} style={s.alsoArrowLeft}>
+                <ChevronLeft size={20} />
+              </button>
+              <div style={s.alsoLikeGrid} className="also-grid" ref={alsoRef}>
                 {relatedProducts.map((p) => (
                   <Link key={p.id} to={`/product/${p.id}`} style={s.alsoCard}>
                     <div style={s.alsoImgWrap}>
                       {p.image ? (
-                        <img src={p.image} alt={p.name} style={s.alsoImg} onError={(e) => { e.target.style.display = 'none'; }} />
-                      ) : (
-                        <div style={{ ...s.alsoImg, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', color: '#9ca3af' }}>
-                          <Package size={32} />
-                        </div>
-                      )}
+                        <img
+                          src={p.image}
+                          alt={p.name}
+                          style={{ ...s.alsoImg, objectFit: shouldFillContainerImage(p.category) ? 'cover' : 'contain' }}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div style={{ ...s.alsoImg, display: p.image ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', color: '#9ca3af' }}>
+                        <Package size={32} />
+                      </div>
                     </div>
                     <div style={s.alsoBody}>
                       <span style={s.alsoBrand}>{p.brand}</span>
@@ -662,11 +682,9 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
                   </Link>
                 ))}
               </div>
-              {alsoCanRight && (
-                <button onClick={() => scrollAlso(1)} style={s.alsoArrowRight}>
-                  <ChevronRight size={20} />
-                </button>
-              )}
+              <button onClick={() => scrollAlso(1)} style={s.alsoArrowRight}>
+                <ChevronRight size={20} />
+              </button>
             </div>
           </div>
         )}
@@ -842,7 +860,7 @@ const s = {
   container: { maxWidth: 1100, margin: '0 auto', width: '100%' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'start' },
   imageCard: { position: 'relative', background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' },
-  img: { width: '100%', height: 420, objectFit: 'cover', display: 'block' },
+  img: { width: '100%', height: 420, objectFit: 'contain', display: 'block', background: '#fff' },
   infoCol: { display: 'flex', flexDirection: 'column', gap: 16 },
   category: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94a3b8' },
   title: { fontSize: 28, fontWeight: 800, color: '#1e293b', lineHeight: 1.2, margin: 0 },
@@ -866,17 +884,17 @@ const s = {
   reviewsCard: { marginTop: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
   reviewRow: { border: '1px solid #f1f5f9', borderRadius: 12, padding: '12px 14px', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 8 },
   /* "You May Also Like" styles */
-  alsoLikeSection: { marginTop: 28, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '28px 36px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
-  alsoLikeTitle: { fontSize: 18, fontWeight: 700, color: '#1e293b', margin: '0 0 4px' },
-  alsoLikeSub: { fontSize: 13, color: '#94a3b8', margin: '0 0 20px', fontWeight: 400 },
-  alsoLikeGrid: { display: 'flex', gap: 14, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 6, scrollSnapType: 'x mandatory' },
+  alsoLikeSection: { marginTop: 28, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '28px 40px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  alsoLikeTitle: { fontSize: 20, fontWeight: 700, color: '#1e293b', margin: '0 0 4px' },
+  alsoLikeSub: { fontSize: 13, color: '#94a3b8', margin: '0 0 22px', fontWeight: 400 },
+  alsoLikeGrid: { display: 'flex', gap: 16, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 6, scrollSnapType: 'x mandatory' },
   alsoCard: {
     textDecoration: 'none', color: 'inherit',
     background: '#fff', border: '1.5px solid #f1f5f9', borderRadius: 14,
     overflow: 'hidden', transition: 'all .2s ease',
     boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     cursor: 'pointer', display: 'flex', flexDirection: 'column',
-    flex: '0 0 195px', scrollSnapAlign: 'start',
+    flex: '0 0 calc(25% - 12px)', scrollSnapAlign: 'start',
   },
   alsoArrow: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -898,14 +916,14 @@ const s = {
     border: '1.5px solid #e2e8f0', background: '#fff',
     color: '#374151', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
   },
-  alsoImgWrap: { width: '100%', height: 160, overflow: 'hidden', background: '#f8fafc', position: 'relative' },
-  alsoImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform .3s ease' },
-  alsoBody: { padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
-  alsoBrand: { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#F97316' },
-  alsoName: { fontSize: 14, fontWeight: 600, color: '#1e293b', margin: 0, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+  alsoImgWrap: { width: '100%', height: 200, overflow: 'hidden', background: '#f8fafc', position: 'relative' },
+  alsoImg: { width: '100%', height: '100%', objectFit: 'contain', display: 'block', transition: 'transform .3s ease', background: '#fff' },
+  alsoBody: { padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 5, flex: 1 },
+  alsoBrand: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#F97316' },
+  alsoName: { fontSize: 15, fontWeight: 600, color: '#1e293b', margin: 0, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   alsoRatingRow: { display: 'flex', alignItems: 'center', gap: 2 },
-  alsoPriceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 6 },
-  alsoPrice: { fontSize: 15, fontWeight: 800, color: '#16a34a' },
+  alsoPriceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 8 },
+  alsoPrice: { fontSize: 16, fontWeight: 800, color: '#16a34a' },
   loaderWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' },
   spinner: { width: 40, height: 40, border: '4px solid #e2e8f0', borderTop: '4px solid #F97316', borderRadius: '50%', animation: 'pd-spin 0.8s linear infinite' },
   backBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, color: '#F97316', fontWeight: 600, textDecoration: 'none', fontSize: 14 },
