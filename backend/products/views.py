@@ -49,10 +49,7 @@ class SupplierViewSet(AuditMixin, viewsets.ModelViewSet):
 
 
 class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
-    queryset         = Product.objects.select_related('category', 'supplier').annotate(
-        average_rating=Avg('reviews__rating'),
-        review_count=Count('reviews')
-    )
+    queryset         = Product.objects.select_related('category', 'supplier')
     serializer_class = ProductSerializer
     filter_backends  = [filters.SearchFilter, filters.OrderingFilter]
     search_fields    = ['name', 'sku', 'brand']
@@ -99,6 +96,13 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
                 and self.request.user.role == 'owner'):
             store_name = f"{self.request.user.first_name} {self.request.user.last_name}"
             qs = qs.filter(owner_name__icontains=store_name.strip())
+        # Always annotate ratings; defer heavy text fields on list to reduce payload
+        qs = qs.annotate(
+            average_rating=Avg('reviews__rating'),
+            review_count=Count('reviews')
+        )
+        if self.action == 'list':
+            qs = qs.defer('description', 'specifications')
         return qs
 
 

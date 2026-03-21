@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from django.db import transaction
 from django.db.models import Avg, Count, Prefetch
@@ -811,6 +811,8 @@ class CouponViewSet(viewsets.ModelViewSet):
     serializer_class = CouponSerializer
 
     def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [AllowAny()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
