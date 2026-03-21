@@ -1,7 +1,0 @@
-myenv/
-venv/
-.venv/
-__pycache__/
-*.pyc
-media/
-.env
