@@ -122,3 +122,45 @@ class LoginLogMixin:
 
     def log_logout(self, user):
         AuditLog.log_action(action='LOGOUT', table_name='auth_logout', user=user)
+
+
+class UserQuery(models.Model):
+    STATUS_NEW = 'NEW'
+    STATUS_IN_PROGRESS = 'IN_PROGRESS'
+    STATUS_RESOLVED = 'RESOLVED'
+    STATUS_CLOSED = 'CLOSED'
+
+    STATUS_CHOICES = [
+        (STATUS_NEW, 'New'),
+        (STATUS_IN_PROGRESS, 'In Progress'),
+        (STATUS_RESOLVED, 'Resolved'),
+        (STATUS_CLOSED, 'Closed'),
+    ]
+
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100, blank=True, default='')
+    email = models.EmailField(max_length=255)
+    phone = models.CharField(max_length=30, blank=True, default='')
+    subject = models.CharField(max_length=150)
+    message = models.TextField()
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_NEW)
+    is_read = models.BooleanField(default=False)
+
+    source_page = models.CharField(max_length=255, blank=True, default='')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default='')
+    submitted_by_user_id = models.IntegerField(null=True, blank=True)
+
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by_user_id = models.IntegerField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'UserQueries'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.subject} ({self.email})"

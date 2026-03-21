@@ -2,14 +2,16 @@ from rest_framework import viewsets, filters, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from django.db.models import Sum, Count, F, Q
 from django.db.models.functions import TruncDay
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import AuditLog, AuditMixin, LoginLogMixin
+from .models import AuditLog, AuditMixin, LoginLogMixin, UserQuery, get_client_ip
 from .serializers import (AuditLogSerializer, AdminUserSerializer,
-                          AdminUserCreateSerializer, AdminSupplierSerializer)
+                          AdminUserCreateSerializer, AdminSupplierSerializer,
+                          UserQuerySubmitSerializer, AdminUserQuerySerializer)
 from .permissions import IsAdminRole
 from accounts.models import CustomUser
 from products.models import Supplier, Customer
@@ -317,6 +319,108 @@ class CustomerDetailView(APIView):
         except Customer.DoesNotExist:
             return Response({'detail': 'Customer not found.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(CustomerSerializer(customer).data)
+
+
+class UserQuerySubmitView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UserQuerySubmitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_id = None
+        if request.user and request.user.is_authenticated:
+            user_id = request.user.id
+
+        query = serializer.save(
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:1000],
+            submitted_by_user_id=user_id,
+        )
+
+        AuditLog.log_action(
+            action='CREATE',
+            table_name='UserQueries',
+            record_id=query.id,
+            user=request.user if request.user and request.user.is_authenticated else None,
+            new_values={
+                'id': query.id,
+                'email': query.email,
+                'subject': query.subject,
+                'status': query.status,
+            }
+        )
+
+        return Response({'detail': 'Message sent successfully.'}, status=status.HTTP_201_CREATED)
+
+
+class UserQueryViewSet(viewsets.ModelViewSet):
+    queryset = UserQuery.objects.all().order_by('-created_at')
+    serializer_class = AdminUserQuerySerializer
+    permission_classes = [IsAdminRole]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['first_name', 'last_name', 'email', 'subject', 'message', 'phone']
+    ordering_fields = ['created_at', 'updated_at', 'status']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        status_filter = self.request.query_params.get('status')
+        is_read = self.request.query_params.get('is_read')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if is_read in ('true', 'false'):
+            qs = qs.filter(is_read=(is_read == 'true'))
+        return qs
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        old_values = {
+            'status': instance.status,
+            'is_read': instance.is_read,
+            'resolved_at': instance.resolved_at.isoformat() if instance.resolved_at else None,
+            'resolved_by_user_id': instance.resolved_by_user_id,
+        }
+
+        response = super().partial_update(request, *args, **kwargs)
+        instance.refresh_from_db()
+
+        if 'status' in request.data and request.data.get('status') in [UserQuery.STATUS_RESOLVED, UserQuery.STATUS_CLOSED]:
+            if not instance.resolved_at:
+                instance.resolved_at = timezone.now()
+            instance.resolved_by_user_id = request.user.id
+            instance.save(update_fields=['resolved_at', 'resolved_by_user_id'])
+
+        AuditLog.log_action(
+            action='UPDATE',
+            table_name='UserQueries',
+            record_id=instance.id,
+            user=request.user,
+            old_values=old_values,
+            new_values={
+                'status': instance.status,
+                'is_read': instance.is_read,
+                'resolved_at': instance.resolved_at.isoformat() if instance.resolved_at else None,
+                'resolved_by_user_id': instance.resolved_by_user_id,
+            },
+        )
+
+        return response
+
+    @action(detail=True, methods=['patch'], url_path='mark-read')
+    def mark_read(self, request, pk=None):
+        query = self.get_object()
+        if not query.is_read:
+            query.is_read = True
+            query.save(update_fields=['is_read'])
+            AuditLog.log_action(
+                action='UPDATE',
+                table_name='UserQueries',
+                record_id=query.id,
+                user=request.user,
+                old_values={'is_read': False},
+                new_values={'is_read': True},
+            )
+        return Response(self.get_serializer(query).data)
 
     def delete(self, request, pk):
         try:
