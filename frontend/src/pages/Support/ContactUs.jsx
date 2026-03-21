@@ -1,6 +1,45 @@
+import { useState } from 'react'
 import { FiMail, FiPhone, FiMapPin, FiMessageSquare, FiClock } from 'react-icons/fi'
+import { customerAPI } from '../../services/api'
 
 export default function ContactUs() {
+  const [form, setForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    subject: '',
+    phone: '',
+    message: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [status, setStatus] = useState({ type: '', text: '' })
+
+  const handleChange = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+    if (status.text) setStatus({ type: '', text: '' })
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSubmitting(true)
+    setStatus({ type: '', text: '' })
+
+    try {
+      await customerAPI.submitContactQuery({
+        ...form,
+        source_page: window.location.pathname,
+      })
+
+      setStatus({ type: 'success', text: 'Your message was sent successfully. Our team will contact you soon.' })
+      setForm({ first_name: '', last_name: '', email: '', subject: '', phone: '', message: '' })
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      setStatus({ type: 'error', text: detail || 'Failed to send your message. Please try again.' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="sup-page">
       <div className="sup-hero">
@@ -56,39 +95,81 @@ export default function ContactUs() {
           {/* Contact Form */}
           <div className="contact-form-col">
             <h2 className="sup-section-title">Send a Message</h2>
-            <form className="contact-form" onSubmit={e => e.preventDefault()}>
+            <form className="contact-form" onSubmit={handleSubmit}>
+              {status.text && (
+                <div className={`contact-form-status ${status.type}`}>
+                  {status.text}
+                </div>
+              )}
               <div className="form-row">
                 <div className="form-group">
                   <label>First Name</label>
-                  <input type="text" placeholder="John" />
+                  <input
+                    type="text"
+                    placeholder="John"
+                    value={form.first_name}
+                    onChange={e => handleChange('first_name', e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="form-group">
                   <label>Last Name</label>
-                  <input type="text" placeholder="Doe" />
+                  <input
+                    type="text"
+                    placeholder="Doe"
+                    value={form.last_name}
+                    onChange={e => handleChange('last_name', e.target.value)}
+                  />
                 </div>
               </div>
               <div className="form-group">
                 <label>Email Address</label>
-                <input type="email" placeholder="john@example.com" />
+                <input
+                  type="email"
+                  placeholder="john@example.com"
+                  value={form.email}
+                  onChange={e => handleChange('email', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Phone Number</label>
+                <input
+                  type="text"
+                  placeholder="+977 98XXXXXXXX"
+                  value={form.phone}
+                  onChange={e => handleChange('phone', e.target.value)}
+                />
               </div>
               <div className="form-group">
                 <label>Subject</label>
-                <select>
+                <select
+                  value={form.subject}
+                  onChange={e => handleChange('subject', e.target.value)}
+                  required
+                >
                   <option value="">Select a topic</option>
-                  <option>Order Issue</option>
-                  <option>Product Question</option>
-                  <option>Return / Exchange</option>
-                  <option>Warranty Claim</option>
-                  <option>Shipping Inquiry</option>
-                  <option>Other</option>
+                  <option value="Order Issue">Order Issue</option>
+                  <option value="Product Question">Product Question</option>
+                  <option value="Return / Exchange">Return / Exchange</option>
+                  <option value="Warranty Claim">Warranty Claim</option>
+                  <option value="Shipping Inquiry">Shipping Inquiry</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
               <div className="form-group">
                 <label>Message</label>
-                <textarea rows={5} placeholder="Describe your issue or question in detail..." />
+                <textarea
+                  rows={5}
+                  placeholder="Describe your issue or question in detail..."
+                  value={form.message}
+                  onChange={e => handleChange('message', e.target.value)}
+                  required
+                  minLength={10}
+                />
               </div>
-              <button type="submit" className="contact-submit-btn">
-                <FiMessageSquare size={16} /> Send Message
+              <button type="submit" className="contact-submit-btn" disabled={submitting}>
+                <FiMessageSquare size={16} /> {submitting ? 'Sending...' : 'Send Message'}
               </button>
             </form>
           </div>
@@ -127,6 +208,15 @@ export default function ContactUs() {
         .contact-card-note { font-size: 0.78rem; color: #94a3b8; margin-top: 0.15rem; }
 
         .contact-form { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 2rem; }
+        .contact-form-status {
+          border-radius: 8px;
+          padding: 0.7rem 0.85rem;
+          font-size: 0.82rem;
+          font-weight: 600;
+          margin-bottom: 1rem;
+        }
+        .contact-form-status.success { background: #ecfdf5; border: 1px solid #bbf7d0; color: #166534; }
+        .contact-form-status.error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .form-group { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
         .form-group label { font-size: 0.82rem; font-weight: 600; color: #475569; }
@@ -146,6 +236,7 @@ export default function ContactUs() {
           font-family: inherit; cursor: pointer; transition: background 0.15s;
         }
         .contact-submit-btn:hover { background: #ea580c; }
+        .contact-submit-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
 
         @media (max-width: 768px) {
           .contact-grid { grid-template-columns: 1fr; gap: 2rem; }

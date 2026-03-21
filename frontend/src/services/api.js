@@ -259,6 +259,9 @@ export const customerAPI = {
 
   // Payments
   getPayments: () => api.get('/payments/'),
+
+  // Support / Contact
+  submitContactQuery: (data) => api.post('/admin/user-queries/submit/', data),
 };
 
 // ── Admin API Endpoints ──
@@ -291,6 +294,12 @@ export const adminAPI = {
   getCustomer: (id) => api.get(`/admin/customers/${id}/`),
   deleteCustomer: (id) => api.delete(`/admin/customers/${id}/`),
   toggleCustomerStatus: (id, isActive) => api.patch(`/admin/customers/${id}/`, { is_active: isActive }),
+
+  // User Queries
+  getUserQueries: (params) => api.get('/admin/user-queries/', { params }),
+  getUserQuery: (id) => api.get(`/admin/user-queries/${id}/`),
+  updateUserQuery: (id, data) => api.patch(`/admin/user-queries/${id}/`, data),
+  markUserQueryRead: (id) => api.patch(`/admin/user-queries/${id}/mark-read/`),
 
   // Analytics (reuse owner analytics endpoints)
   getSalesOverview: (params) => api.get('/analytics/sales-overview/', { params }),

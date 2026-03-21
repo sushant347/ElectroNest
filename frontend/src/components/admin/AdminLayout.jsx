@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useState } from 'react';
 import {
   LayoutDashboard, Users, Store, ScrollText, BarChart3, LogOut,
-  Shield, Menu, X, ChevronRight, Tag
+  Shield, Menu, X, ChevronRight, Tag, MessageSquare
 } from 'lucide-react';
 
 const navLinks = [
@@ -11,6 +11,7 @@ const navLinks = [
   { label: 'User Management', path: '/admin/users',      icon: Users,           color: '#DC2626' },
   { label: 'Stores',          path: '/admin/stores',     icon: Store,           color: '#F97316' },
   { label: 'Global Coupons',  path: '/admin/coupons',    icon: Tag,             color: '#7C3AED' },
+  { label: 'User Query',      path: '/admin/queries',    icon: MessageSquare,   color: '#EA580C' },
   { label: 'System Logs',     path: '/admin/logs',       icon: ScrollText,      color: '#2563EB' },
   { label: 'Analytics',       path: '/admin/analytics',  icon: BarChart3,       color: '#16A34A' },
 ];

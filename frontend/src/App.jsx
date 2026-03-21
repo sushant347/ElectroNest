@@ -41,6 +41,7 @@ import StoreManagement from './pages/Admin/StoreManagement'
 import AdminCoupons from './pages/Admin/AdminCoupons'
 import SystemLogs from './pages/Admin/SystemLogs'
 import AnalyticsSummary from './pages/Admin/AnalyticsSummary'
+import UserQueries from './pages/Admin/UserQueries'
 import AdminLayout from './components/admin/AdminLayout'
 
 // Support Pages
@@ -495,6 +496,7 @@ export default function App() {
             <Route path="stores" element={<StoreManagement />} />
             <Route path="coupons" element={<AdminCoupons />} />
             <Route path="logs" element={<SystemLogs />} />
+            <Route path="queries" element={<UserQueries />} />
             <Route path="analytics" element={<AnalyticsSummary />} />
           </Route>
 
