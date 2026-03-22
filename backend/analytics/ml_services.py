@@ -44,7 +44,7 @@ def get_customer_rfm(days=90):
         return []
 
     df['OrderDate'] = pd.to_datetime(df['OrderDate'])
-    df['days_since'] = (pd.Timestamp(now) - df['OrderDate']).dt.days
+    df['days_since'] = (pd.Timestamp(now).replace(tzinfo=None) - df['OrderDate']).dt.days
 
     rfm = df.groupby(['CustomerID', 'Email', 'FirstName', 'LastName']).agg(
         recency=('days_since', 'min'),
@@ -125,7 +125,7 @@ def get_customer_rfm(days=90):
     # CLV estimation: avg_order_value * frequency * (days / recency ratio)
     rfm['monetary'] = rfm['monetary'].astype(float)
     rfm['avg_order_value'] = rfm['avg_order_value'].astype(float)
-    customer_lifespan_days = (pd.Timestamp(now) - rfm['first_order']).dt.days.clip(lower=1)
+    customer_lifespan_days = (pd.Timestamp(now).replace(tzinfo=None) - rfm['first_order']).dt.days.clip(lower=1)
     purchase_rate = rfm['frequency'] / (customer_lifespan_days / 30)  # purchases per month
     rfm['clv_estimate'] = (rfm['avg_order_value'] * purchase_rate * 12).round(2)  # annual CLV
 
@@ -188,7 +188,7 @@ def get_churn_prediction(days=90, churn_threshold_days=30):
         return {'error': 'Not enough order data for churn prediction', 'customers': [], 'summary': {}, 'model_info': {}}
 
     df['OrderDate'] = pd.to_datetime(df['OrderDate'])
-    df['days_since'] = (pd.Timestamp(now) - df['OrderDate']).dt.days
+    df['days_since'] = (pd.Timestamp(now).replace(tzinfo=None) - df['OrderDate']).dt.days
 
     # Build enriched features per customer
     rfm = df.groupby(['CustomerID', 'FirstName', 'LastName', 'Email']).agg(
@@ -230,7 +230,7 @@ def get_churn_prediction(days=90, churn_threshold_days=30):
     rfm['order_trend'] = rfm['CustomerID'].apply(calc_order_trend)
 
     # Customer tenure in days
-    rfm['tenure_days'] = (pd.Timestamp(now) - rfm['first_order']).dt.days.clip(lower=1)
+    rfm['tenure_days'] = (pd.Timestamp(now).replace(tzinfo=None) - rfm['first_order']).dt.days.clip(lower=1)
 
     # Label: churned if recency > threshold
     rfm['churned'] = (rfm['recency'] > churn_threshold_days).astype(int)
