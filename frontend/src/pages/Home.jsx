@@ -116,13 +116,31 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     load()
   }, [catParam, searchQ])
 
-  /* Per-product image variants — randomly picks one each render */
-  const PRODUCT_IMG_VARIANTS = {
-    'Bose SoundLink Max': [
-      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRKnOXmp6zjsiVUFiIBhoIyCGVEqM9KXgWibQ&s',
-      'https://cdn.mos.cms.futurecdn.net/v2/t:0,l:240,cw:1440,ch:1080,q:80,w:1440/PRQ4anjB2jE5oRS9asn4H5.jpg',
-    ],
-  }
+  /* Per-product image variants — alternates by position: 1,3,5 → urls[0]  2,4,6 → urls[1]
+     test: substring checked against product name (case-insensitive) */
+  const PRODUCT_IMG_VARIANTS = [
+    {
+      test: 'Bose SoundLink Max',
+      urls: [
+        'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRKnOXmp6zjsiVUFiIBhoIyCGVEqM9KXgWibQ&s',
+        'https://cdn.mos.cms.futurecdn.net/v2/t:0,l:240,cw:1440,ch:1080,q:80,w:1440/PRQ4anjB2jE5oRS9asn4H5.jpg',
+      ],
+    },
+    {
+      test: 'Peak Design Mobile Wallet',
+      urls: [
+        'https://cdn.shopify.com/s/files/1/2986/1172/files/standwallet-eclipse-phone2_9f553493-c030-496e-bb4f-208e741ddba1.jpg?v=1762276031',
+        'https://suburban.com.hk/cdn/shop/files/colorblocking_1024x1024_9a0527a8-de3e-434b-9bbc-8bf45a2299f4.gif?v=1709797512',
+      ],
+    },
+    {
+      test: 'Huawei Watch GT 5 Pro',
+      urls: [
+        'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSWA8DSzeBOkzmtfR5dkDSX0HKBf8_lGGGv1g&s',
+        'https://cdn.hukut.com/huawei-watch-gt-5-pro-2.png1736148189875',
+      ],
+    },
+  ]
 
   /* norm: discount_price set by owner → product is on sale.
      price    = what the customer pays  (discount_price if set, else selling_price)
@@ -132,9 +150,6 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     const disc    = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null
     const onSale  = disc !== null && disc > 0 && disc < selling
     const pname   = p.name || p.ProductName || ''
-    const variants = PRODUCT_IMG_VARIANTS[pname]
-    const dbImg    = p.image_url || p.ProductImageURL || ''
-    const image    = variants ? variants[Math.floor(Math.random() * variants.length)] : dbImg
     return {
       id:            p.id,
       name:          pname,
@@ -144,8 +159,8 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
       savings:       onSale ? Math.round(selling - disc) : null,
       discPct:       onSale ? Math.round((1 - disc / selling) * 100) : null,
       onSale,
-      image,
-      fallbackImage: variants ? variants.find(u => u !== image) || dbImg : dbImg,
+      image:         p.image_url || p.ProductImageURL || '',
+      fallbackImage: p.image_url || p.ProductImageURL || '',
       brand:         p.brand || p.Brand || '',
       ownerName:     p.owner_name || p.OwnerName || '',
       stock:         p.stock || p.Stock || 0,
@@ -155,11 +170,24 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     }
   }
 
+  /* Apply image variants after list is finalised so position index is stable */
+  const applyImgVariants = (list) => {
+    const counters = {}
+    return list.map(p => {
+      const entry = PRODUCT_IMG_VARIANTS.find(v => p.name.toLowerCase().includes(v.test.toLowerCase()))
+      if (!entry) return p
+      const key = entry.test
+      const idx = counters[key] ?? 0
+      counters[key] = idx + 1
+      return { ...p, image: entry.urls[idx % entry.urls.length], fallbackImage: entry.urls[(idx + 1) % entry.urls.length] }
+    })
+  }
+
   const displayProds = (() => {
     let f = prods
     if (searchQ) { const q = searchQ.toLowerCase(); f = f.filter(p => norm(p).name.toLowerCase().includes(q) || norm(p).brand.toLowerCase().includes(q) || norm(p).category.toLowerCase().includes(q)) }
     if (selCat) f = f.filter(p => norm(p).category === selCat)
-    if (selCat || searchQ) return f.map(norm)
+    if (selCat || searchQ) return applyImgVariants(f.map(norm))
     const n = f.map(norm)
     const byStore = {}
     n.forEach(p => {
@@ -174,7 +202,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         .slice(0, 4)
       out.push(...topPerStore)
     })
-    return out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price))
+    return applyImgVariants(out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price)))
   })()
 
   const handleCat = (name) => { if (selCat === name) { setSelCat(null); nav('/') } else { setSelCat(name); nav(`/?cat=${encodeURIComponent(name)}`) } }
