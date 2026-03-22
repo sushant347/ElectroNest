@@ -74,9 +74,9 @@ import dj_database_url
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if DATABASE_URL:
-    # Cloud: Neon PostgreSQL (set via Render environment variable)
+    # Cloud: Neon PostgreSQL — conn_max_age=0 required for Neon's pgBouncer pooling
     DATABASES = {
-        'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600, ssl_require=True)
+        'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=0, ssl_require=True)
     }
 else:
     # Local: SQL Server Express (unchanged)

@@ -96,13 +96,18 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
                 and self.request.user.role == 'owner'):
             store_name = f"{self.request.user.first_name} {self.request.user.last_name}"
             qs = qs.filter(owner_name__icontains=store_name.strip())
-        # Always annotate ratings; defer heavy text fields on list to reduce payload
-        qs = qs.annotate(
-            average_rating=Avg('reviews__rating'),
-            review_count=Count('reviews')
-        )
         if self.action == 'list':
-            qs = qs.defer('description', 'specifications')
+            # Skip expensive JOIN/GROUP BY on list — ratings only needed on detail page
+            # Defer heavy text columns to cut payload size
+            qs = qs.annotate(
+                average_rating=Avg('reviews__rating'),
+                review_count=Count('reviews', distinct=True)
+            ).defer('description', 'specifications')
+        else:
+            qs = qs.annotate(
+                average_rating=Avg('reviews__rating'),
+                review_count=Count('reviews', distinct=True)
+            )
         return qs
 
 

@@ -6,6 +6,7 @@ Run: python manage.py seed_products
 import json
 import os
 from django.core.management.base import BaseCommand
+from django.db import connection
 from products.models import Category, Supplier, Product
 
 
@@ -20,92 +21,85 @@ class Command(BaseCommand):
             data = json.load(f)
 
         # ── Categories ──
-        cat_created = 0
-        cat_map = {}
-        for c in data['categories']:
-            obj, created = Category.objects.get_or_create(
-                id=c['id'],
-                defaults={'name': c['name']}
-            )
-            cat_map[c['id']] = obj
-            if created:
-                cat_created += 1
-        self.stdout.write(self.style.SUCCESS(f'Categories: {cat_created} created, {len(data["categories"]) - cat_created} skipped'))
+        existing_cat_ids = set(Category.objects.values_list('id', flat=True))
+        new_cats = [
+            Category(id=c['id'], name=c['name'])
+            for c in data['categories']
+            if c['id'] not in existing_cat_ids
+        ]
+        Category.objects.bulk_create(new_cats, ignore_conflicts=True)
+        cat_map = {c.id: c for c in Category.objects.all()}
+        self.stdout.write(self.style.SUCCESS(
+            f'Categories: {len(new_cats)} created, {len(existing_cat_ids)} skipped'
+        ))
 
         # ── Suppliers ──
-        sup_created = 0
-        sup_map = {}
-        for s in data['suppliers']:
-            obj, created = Supplier.objects.get_or_create(
-                id=s['id'],
-                defaults={
-                    'name': s['name'],
-                    'contact_person_name': s['contact_person_name'],
-                    'contact_email': s['contact_email'],
-                    'phone': s['phone'],
-                    'city': s['city'],
-                    'country': s['country'],
-                    'is_active': s['is_active'],
-                }
+        existing_sup_ids = set(Supplier.objects.values_list('id', flat=True))
+        new_sups = [
+            Supplier(
+                id=s['id'], name=s['name'],
+                contact_person_name=s['contact_person_name'],
+                contact_email=s['contact_email'],
+                phone=s['phone'], city=s['city'],
+                country=s['country'], is_active=s['is_active'],
             )
-            sup_map[s['id']] = obj
-            if created:
-                sup_created += 1
-        self.stdout.write(self.style.SUCCESS(f'Suppliers: {sup_created} created, {len(data["suppliers"]) - sup_created} skipped'))
+            for s in data['suppliers']
+            if s['id'] not in existing_sup_ids
+        ]
+        Supplier.objects.bulk_create(new_sups, ignore_conflicts=True)
+        sup_map = {s.id: s for s in Supplier.objects.all()}
+        self.stdout.write(self.style.SUCCESS(
+            f'Suppliers: {len(new_sups)} created, {len(existing_sup_ids)} skipped'
+        ))
 
-        # ── Products ──
-        prod_created = 0
-        prod_skipped = 0
-        for p in data['products']:
-            if Product.objects.filter(sku=p['sku']).exists():
-                prod_skipped += 1
-                continue
-            Product.objects.create(
-                id=p['id'],
-                sku=p['sku'],
-                name=p['name'],
+        # ── Products — bulk insert, skip existing SKUs ──
+        existing_skus = set(Product.objects.values_list('sku', flat=True))
+        new_products = [
+            Product(
+                id=p['id'], sku=p['sku'], name=p['name'],
                 category=cat_map.get(p['category_id']),
-                brand=p['brand'],
-                owner_name=p['owner_name'],
+                brand=p['brand'], owner_name=p['owner_name'],
                 supplier=sup_map.get(p['supplier_id']),
-                selling_price=p['selling_price'],
-                cost_price=p['cost_price'],
-                stock=p['stock'],
-                reorder_level=p['reorder_level'],
-                description=p['description'],
-                image_url=p['image_url'],
-                specifications=p['specifications'],
-                units_sold=p['units_sold'],
+                selling_price=p['selling_price'], cost_price=p['cost_price'],
+                stock=p['stock'], reorder_level=p['reorder_level'],
+                description=p['description'], image_url=p['image_url'],
+                specifications=p['specifications'], units_sold=p['units_sold'],
             )
-            prod_created += 1
-        self.stdout.write(self.style.SUCCESS(f'Products: {prod_created} created, {prod_skipped} skipped'))
+            for p in data['products']
+            if p['sku'] not in existing_skus
+        ]
+        Product.objects.bulk_create(new_products, ignore_conflicts=True)
+        self.stdout.write(self.style.SUCCESS(
+            f'Products: {len(new_products)} created, {len(existing_skus)} skipped'
+        ))
 
         # ── OrderStatus ──
         from orders.models import OrderStatus
-        order_statuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned', 'Refunded']
-        status_created = 0
-        for name in order_statuses:
-            _, created = OrderStatus.objects.get_or_create(name=name)
-            if created:
-                status_created += 1
-        self.stdout.write(self.style.SUCCESS(f'OrderStatus: {status_created} created, {len(order_statuses) - status_created} skipped'))
+        for name in ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned', 'Refunded']:
+            OrderStatus.objects.get_or_create(name=name)
+        self.stdout.write(self.style.SUCCESS('OrderStatus: seeded'))
 
         # ── PaymentMethods ──
         from orders.models import PaymentMethod
-        payment_methods = ['Cash on Delivery', 'eSewa', 'Khalti', 'Bank Transfer', 'Credit Card', 'Debit Card']
-        method_created = 0
-        for name in payment_methods:
-            _, created = PaymentMethod.objects.get_or_create(name=name)
-            if created:
-                method_created += 1
-        self.stdout.write(self.style.SUCCESS(f'PaymentMethods: {method_created} created, {len(payment_methods) - method_created} skipped'))
+        for name in ['Cash on Delivery', 'eSewa', 'Khalti', 'Bank Transfer', 'Credit Card', 'Debit Card']:
+            PaymentMethod.objects.get_or_create(name=name)
+        self.stdout.write(self.style.SUCCESS('PaymentMethods: seeded'))
 
-        # Reset PostgreSQL sequences so future auto-increment IDs don't conflict
-        from django.db import connection
+        # ── Reset PostgreSQL sequences ──
         with connection.cursor() as cursor:
-            cursor.execute("SELECT setval(pg_get_serial_sequence('\"Categories\"', 'CategoryID'), MAX(\"CategoryID\")) FROM \"Categories\";")
-            cursor.execute("SELECT setval(pg_get_serial_sequence('\"Suppliers\"', 'SupplierID'), MAX(\"SupplierID\")) FROM \"Suppliers\";")
-            cursor.execute("SELECT setval(pg_get_serial_sequence('\"Products\"', 'ProductID'), MAX(\"ProductID\")) FROM \"Products\";")
-            cursor.execute("SELECT setval(pg_get_serial_sequence('\"Customers\"', 'CustomerID'), COALESCE(MAX(\"CustomerID\"), 1)) FROM \"Customers\";")
-        self.stdout.write(self.style.SUCCESS('Sequences reset.'))
+            for table, col in [
+                ('"Categories"', '"CategoryID"'),
+                ('"Suppliers"',  '"SupplierID"'),
+                ('"Products"',   '"ProductID"'),
+                ('"Customers"',  '"CustomerID"'),
+            ]:
+                try:
+                    cursor.execute(
+                        f'SELECT setval(pg_get_serial_sequence(%s, %s), '
+                        f'COALESCE(MAX({col}), 1)) FROM {table}',
+                        [table.strip('"'), col.strip('"')]
+                    )
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(f'Sequence reset skipped for {table}: {e}'))
+
         self.stdout.write(self.style.SUCCESS('Done — database seeded successfully.'))
