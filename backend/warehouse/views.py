@@ -284,13 +284,21 @@ class StockMovementsView(APIView):
             for o in orders:
                 items = []
                 for d in o.details.all():
+                    try:
+                        product = d.product
+                    except Product.DoesNotExist:
+                        product = None
+
+                    product_id = product.id if product else d.product_id
+                    product_name = product.name if product else f'Product #{d.product_id}'
+                    store_name = ((product.owner_name or '').strip() if product else '') or 'Unknown Store'
                     items.append({
-                        'product_name': d.product.name,
+                        'product_name': product_name,
                         'quantity': d.quantity,
                         'unit_price': float(d.unit_price),
                         'total_price': float(d.quantity * d.unit_price),
-                        'product_id': d.product.id,
-                        'store_name': (d.product.owner_name or 'Unknown Store').strip(),
+                        'product_id': product_id,
+                        'store_name': store_name,
                     })
                 payment = Payment.objects.filter(order_id=o.id).select_related('method').first()
                 # Derive store name from the products in this order

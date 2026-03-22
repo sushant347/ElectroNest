@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: "./build.sh"
-    startCommand: "gunicorn page.wsgi:application"
+    startCommand: "gunicorn page.wsgi:application --timeout 120 --workers 2 --keep-alive 5"
     envVars:
       - key: DATABASE_URL
         sync: false
