@@ -9,9 +9,29 @@ def health(request):
     return JsonResponse({'status': 'ok'})
 
 
+def diagnostics(request):
+    """Temporary endpoint to debug deployment DB issues."""
+    from django.db import connection
+    info = {'db_engine': settings.DATABASES['default']['ENGINE']}
+    try:
+        with connection.cursor() as cur:
+            cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name")
+            info['tables'] = [r[0] for r in cur.fetchall()]
+            for tbl in ['Categories', 'Products', 'Customers', 'Orders']:
+                try:
+                    cur.execute(f'SELECT COUNT(*) FROM "{tbl}"')
+                    info[f'{tbl}_count'] = cur.fetchone()[0]
+                except Exception as e:
+                    info[f'{tbl}_count'] = str(e)
+    except Exception as e:
+        info['error'] = str(e)
+    return JsonResponse(info)
+
+
 urlpatterns = [
     path('', health),
     path('ping/', health),
+    path('debug/db/', diagnostics),
     path('admin/', admin.site.urls),
 
     path('api/auth/', include('accounts.urls')),
