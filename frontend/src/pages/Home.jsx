@@ -66,7 +66,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   useEffect(() => { setSelCat(catParam || null) }, [catParam])
 
   useEffect(() => {
-    const load = async () => {
+    const load = async (attempt = 1) => {
       setLoading(true)
       try {
         const [catRes, allRes] = await Promise.all([customerAPI.getCategories(), customerAPI.getProducts({ page_size: 500 })])
@@ -88,7 +88,11 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
           })
           return imgs
         })
-      } catch (e) { console.error(e) } finally { setLoading(false) }
+      } catch (e) {
+        console.error(e)
+        // Retry once — covers Render cold-start timeouts on first request
+        if (attempt === 1) { setTimeout(() => load(2), 3000) ; return }
+      } finally { setLoading(false) }
     }
     load()
   }, [catParam, searchQ])
