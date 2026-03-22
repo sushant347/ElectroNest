@@ -215,7 +215,7 @@ export default function WarehouseNavbar() {
         @keyframes wh-pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
         .wh-navbar { background: #232F3E; border-bottom: 3px solid #F97316; position: sticky; top: 0; z-index: 100; width: 100%; max-width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,0.15); box-sizing: border-box; }
-        .wh-navbar-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; padding: 0 2rem; height: 58px; gap: 1.5rem; width: 100%; box-sizing: border-box; }
+        .wh-navbar-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; padding: 0 2rem; height: 58px; gap: 1.5rem; width: 100%; box-sizing: border-box; min-width: 0; }
 
         .wh-nav-logo { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; flex-shrink: 0; }
         .wh-nav-logo-img { height: 32px; width: auto; object-fit: contain; display: block; flex-shrink: 0; }
@@ -232,7 +232,7 @@ export default function WarehouseNavbar() {
         .wh-nav-link.active { background: rgba(249,115,22,0.12); color: #F97316; font-weight: 600; }
         .wh-nav-underline { position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); width: 60%; height: 3px; background: #F97316; border-radius: 3px 3px 0 0; }
 
-        .wh-nav-right { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+        .wh-nav-right { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; min-width: 0; }
         .wh-nav-icon-btn { position: relative; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; background: transparent; color: rgba(255,255,255,0.65); border: none; cursor: pointer; transition: all 0.15s; }
         .wh-nav-icon-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
         .wh-notif-badge { position: absolute; top: 4px; right: 3px; min-width: 16px; height: 16px; border-radius: 8px; background: #ef4444; color: #fff; font-size: 0.6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #232F3E; padding: 0 3px; animation: wh-badge-pulse 2s infinite; }
@@ -345,7 +345,7 @@ export default function WarehouseNavbar() {
           .wh-nav-logo-tag { display: block; font-size: 0.52rem; }
           .wh-topbar-left span { display: none; }
           /* Keep notification dropdown in-viewport on tablets */
-          .wh-notif-dropdown { right: 0; width: 340px; }
+          .wh-notif-dropdown { right: 0; width: min(340px, calc(100vw - 16px)); }
         }
 
         /* iPad + tablet + mobile: collapse nav links into drawer */
@@ -369,7 +369,7 @@ export default function WarehouseNavbar() {
           .wh-navbar-inner { padding: 0 0.75rem; gap: 0.5rem; }
           .wh-nav-logo { flex: 0 0 auto !important; min-width: 0; max-width: fit-content; }
           .wh-nav-logo-img { height: 28px !important; flex-shrink: 0; }
-          .wh-notif-dropdown { position: fixed; top: 100px; left: 8px; right: 8px; width: auto; }
+          .wh-notif-dropdown { position: fixed; top: 100px; left: 8px; right: 8px; width: auto; max-width: none; }
         }
       `}</style>
     </>

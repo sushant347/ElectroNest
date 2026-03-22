@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, Download, ChevronLeft, ChevronRight, Eye, ShoppingBag, RefreshCw, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Search, Download, ChevronLeft, ChevronRight, Eye, ShoppingBag, RefreshCw, AlertCircle, CalendarDays } from 'lucide-react';
 import { ownerAPI } from '../../services/api';
 import OrderDetailsModal from '../../components/Owner/OrderDetailsModal';
 
@@ -22,14 +22,24 @@ export default function OrderManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(null);
+  /** 30 / 90 / 0 (lifetime). Sent as API `days` so filtering happens in the database. */
+  const [orderDays, setOrderDays] = useState(90);
+
+  const orderPeriodSubtitle = useMemo(() => {
+    if (orderDays === 0) return 'all time';
+    return `last ${orderDays} days`;
+  }, [orderDays]);
 
   const fetchOrders = useCallback(async () => {
     try {
       setPageLoading(true);
       setPageError(null);
-      const res = await ownerAPI.getAllOrders({ page_size: 1000, ordering: '-order_date' });
+      const res = await ownerAPI.getAllOrders({
+        page_size: 1000,
+        ordering: '-order_date',
+        days: orderDays,
+      });
       const list = res.data.results || res.data;
-      // Ensure newest first (backend ordering may not always apply)
       list.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
       setOrders(list);
     } catch (err) {
@@ -37,7 +47,7 @@ export default function OrderManagement() {
     } finally {
       setPageLoading(false);
     }
-  }, []);
+  }, [orderDays]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -92,7 +102,9 @@ export default function OrderManagement() {
       <div className="owner-om-header">
         <div>
           <h1 className="owner-om-title">Order Management</h1>
-          <p className="owner-om-sub">{orders.length} total orders</p>
+          <p className="owner-om-sub">
+            {pageLoading ? 'Loading orders…' : `${orders.length} orders (${orderPeriodSubtitle})`}
+          </p>
         </div>
         <button className="owner-om-export-btn" onClick={exportCSV}><Download size={16} /> Export CSV</button>
         <button className="owner-om-refresh-btn" onClick={fetchOrders} disabled={pageLoading}><RefreshCw size={16} className={pageLoading ? 'spin' : ''} /></button>
@@ -124,8 +136,26 @@ export default function OrderManagement() {
         })}
       </div>
 
-      {/* Search */}
-      <div className="owner-om-search-row">
+      {/* Period + search */}
+      <div className="owner-om-toolbar">
+        <div className="owner-om-period" title="Orders are loaded from the server for the range you select">
+          <CalendarDays size={15} className="om-period-icon" />
+          <span className="om-period-label">Period</span>
+          <select
+            className="om-period-select"
+            value={orderDays}
+            disabled={pageLoading}
+            onChange={(e) => {
+              setOrderDays(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+          >
+            <option value={30}>Last 30 days</option>
+            <option value={90}>Last 90 days</option>
+            <option value={0}>Lifetime (all orders)</option>
+          </select>
+          {pageLoading && <RefreshCw size={14} className="om-period-spin spin" aria-hidden />}
+        </div>
         <div className="owner-om-search">
           <Search size={16} className="om-search-icon" />
           <input placeholder="Search by Order ID, customer name or email..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }} />
@@ -148,8 +178,31 @@ export default function OrderManagement() {
             </tr>
           </thead>
           <tbody>
-            {paged.length === 0 ? (
-              <tr><td colSpan={8} className="owner-om-empty"><ShoppingBag size={32} /><span>No orders found</span></td></tr>
+            {pageLoading ? (
+              [...Array(10)].map((_, i) => (
+                <tr key={`sk-${i}`} className="om-row om-row-skeleton">
+                  <td><div className="om-shim" style={{ width: 48, height: 14 }} /></td>
+                  <td>
+                    <div className="om-customer">
+                      <div className="om-shim" style={{ width: '70%', maxWidth: 160, height: 14, marginBottom: 6 }} />
+                      <div className="om-shim" style={{ width: '55%', maxWidth: 200, height: 11 }} />
+                    </div>
+                  </td>
+                  <td><div className="om-shim" style={{ width: 88, height: 14 }} /></td>
+                  <td><div className="om-shim" style={{ width: 28, height: 14, margin: '0 auto' }} /></td>
+                  <td><div className="om-shim" style={{ width: 72, height: 14 }} /></td>
+                  <td><div className="om-shim" style={{ width: 76, height: 24, borderRadius: 20 }} /></td>
+                  <td>
+                    <div className="om-payment">
+                      <div className="om-shim" style={{ width: 72, height: 13, marginBottom: 4 }} />
+                      <div className="om-shim" style={{ width: 56, height: 11 }} />
+                    </div>
+                  </td>
+                  <td><div className="om-shim" style={{ width: 34, height: 32, borderRadius: 6 }} /></td>
+                </tr>
+              ))
+            ) : paged.length === 0 ? (
+              <tr><td colSpan={8} className="owner-om-empty"><ShoppingBag size={32} /><span>{orderDays === 0 ? 'No orders in your history' : `No orders in the ${orderPeriodSubtitle}`}</span></td></tr>
             ) : (
               paged.map((o) => {
                 const sc = statusColors[o.status] || statusColors.Pending;
@@ -184,7 +237,7 @@ export default function OrderManagement() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {!pageLoading && totalPages > 1 && (
         <div className="owner-om-pagination">
           <span className="om-page-info">Showing {(currentPage - 1) * perPage + 1}–{Math.min(currentPage * perPage, filtered.length)} of {filtered.length}</span>
           <div className="om-page-btns">
@@ -250,8 +303,24 @@ export default function OrderManagement() {
         .om-pill-count { background: rgba(0,0,0,0.06); padding: 0.1rem 0.4rem; border-radius: 10px; font-size: 0.7rem; }
 
         /* Search */
-        .owner-om-search-row { max-width: 1280px; margin: 0 auto 1rem; }
-        .owner-om-search { position: relative; max-width: 420px; }
+        .owner-om-toolbar {
+          max-width: 1280px; margin: 0 auto 1rem;
+          display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+        }
+        .owner-om-period {
+          display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+        }
+        .om-period-icon { color: #F97316; flex-shrink: 0; }
+        .om-period-label { font-size: 0.72rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+        .om-period-select {
+          padding: 0.5rem 0.75rem; border-radius: 8px; border: 1.5px solid #d1d5db;
+          font-size: 0.82rem; font-weight: 600; font-family: inherit; color: #1e293b; background: #fff;
+          cursor: pointer; min-width: 170px;
+        }
+        .om-period-select:focus { outline: none; border-color: #F97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.12); }
+        .om-period-select:disabled { opacity: 0.65; cursor: wait; }
+        .om-period-spin { color: #F97316; flex-shrink: 0; }
+        .owner-om-search { position: relative; flex: 1; min-width: 220px; max-width: 420px; }
         .om-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9ca3af; }
         .owner-om-search input { width: 100%; padding: 0.55rem 0.75rem 0.55rem 2.25rem; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 0.85rem; font-family: inherit; color: #1e293b; }
         .owner-om-search input:focus { outline: none; border-color: #F97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.1); }
@@ -292,7 +361,75 @@ export default function OrderManagement() {
         .om-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .om-page-ellipsis { color: #9ca3af; font-size: 0.82rem; font-weight: 600; padding: 0 4px; }
 
+        @keyframes om-shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+        .om-shim {
+          border-radius: 6px;
+          background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+          background-size: 800px 100%;
+          animation: om-shimmer 1.35s infinite linear;
+        }
+        .om-row-skeleton { cursor: default; pointer-events: none; }
+        .om-row-skeleton:hover { background: transparent; }
+
         @media (max-width: 900px) { .owner-om { padding: 1.25rem; } }
+
+        @media (max-width: 768px) {
+          .owner-om-header {
+            align-items: stretch;
+          }
+          .owner-om-header > div:first-child {
+            flex: 1 1 100%;
+          }
+          .owner-om-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.75rem;
+          }
+          .owner-om-period {
+            width: 100%;
+            flex-wrap: wrap;
+          }
+          .om-period-select {
+            flex: 1;
+            min-width: 0;
+          }
+          .owner-om-search {
+            max-width: none;
+            min-width: 0;
+            width: 100%;
+          }
+          .owner-om-table {
+            min-width: 760px;
+          }
+          .owner-om-pagination {
+            justify-content: center;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .owner-om {
+            padding: 0.85rem;
+          }
+          .owner-om-title {
+            font-size: 1.35rem;
+          }
+          .owner-om-export-btn,
+          .owner-om-refresh-btn {
+            width: 100%;
+            justify-content: center;
+          }
+          .owner-om-refresh-btn {
+            height: 40px;
+          }
+          .owner-om-pagination {
+            flex-direction: column;
+            align-items: center;
+          }
+          .om-page-btns {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+        }
       `}</style>
     </div>
   );
