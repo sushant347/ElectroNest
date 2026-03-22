@@ -485,7 +485,15 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
                       <Link to={`/product/${item.id}`} style={styles.itemName}>
                         {item.name}
                       </Link>
-                      <div style={styles.itemPrice}>{formatPrice(item.price)}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={styles.itemPrice}>{formatPrice(item.price)}</span>
+                        {item.onSale && item.origPrice && (
+                          <span style={{ fontSize: 13, color: '#9ca3af', textDecoration: 'line-through', fontWeight: 500 }}>{formatPrice(item.origPrice)}</span>
+                        )}
+                        {item.onSale && (
+                          <span style={{ fontSize: 11, fontWeight: 700, background: '#fff7ed', color: '#F97316', border: '1px solid #fed7aa', borderRadius: 4, padding: '1px 6px' }}>SALE</span>
+                        )}
+                      </div>
                     </div>
                     <div style={styles.itemActions}>
                       <div style={styles.qtyWrap}>

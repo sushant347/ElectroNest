@@ -109,12 +109,17 @@ export default function App() {
   /* ── Normalize backend cart item to frontend format ── */
   const normalizeCartItem = (item) => {
     const p = item.product_detail || item.product || {}
+    const selling = parseFloat(p.selling_price || 0)
+    const disc = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null
+    const onSale = disc !== null && disc > 0 && disc < selling
     return {
       id: p.id || item.product,
       cartItemId: item.id,
       name: p.name || p.ProductName || '',
       category: p.category_name || '',
-      price: parseFloat(p.selling_price || 0),
+      price: onSale ? disc : selling,
+      origPrice: onSale ? selling : null,
+      onSale,
       image: p.image_url || '',
       brand: p.brand || '',
       stock: p.stock || 0,
@@ -126,12 +131,17 @@ export default function App() {
   /* ── Normalize backend wishlist item to frontend format ── */
   const normalizeWishlistItem = (item) => {
     const p = item.product_detail || item.product || {}
+    const selling = parseFloat(p.selling_price || 0)
+    const disc = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null
+    const onSale = disc !== null && disc > 0 && disc < selling
     return {
       id: p.id || item.product,
       wishlistItemId: item.id,
       name: p.name || p.ProductName || '',
       category: p.category_name || '',
-      price: parseFloat(p.selling_price || 0),
+      price: onSale ? disc : selling,
+      origPrice: onSale ? selling : null,
+      onSale,
       image: p.image_url || '',
       brand: p.brand || '',
       stock: p.stock || 0,

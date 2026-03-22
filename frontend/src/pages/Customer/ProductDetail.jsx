@@ -46,24 +46,31 @@ function StarRow({ rating, size = 16, color = '#FBBF24' }) {
   );
 }
 
-const normalize = (p) => ({
-  id: p.id,
-  name: p.name || p.ProductName || '',
-  category: p.category_name || '',
-  categoryId: p.category || p.CategoryID || null,
-  price: parseFloat(p.selling_price || 0),
-  image: p.image_url || '',
-  rating: Number(p.average_rating ?? p.rating ?? 0),
-  reviewCount: Number(p.review_count ?? 0),
-  brand: p.brand || '',
-  ownerName: p.owner_name || '',
-  stock: p.stock || 0,
-  description: p.description || '',
-  specifications: p.specifications || '',
-  sku: p.sku || '',
-  reorderLevel: p.reorder_level || 10,
-  unitsSold: p.units_sold || 0,
-});
+const normalize = (p) => {
+  const selling = parseFloat(p.selling_price || 0);
+  const disc = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null;
+  const onSale = disc !== null && disc > 0 && disc < selling;
+  return {
+    id: p.id,
+    name: p.name || p.ProductName || '',
+    category: p.category_name || '',
+    categoryId: p.category || p.CategoryID || null,
+    price: onSale ? disc : selling,
+    origPrice: onSale ? selling : null,
+    onSale,
+    image: p.image_url || '',
+    rating: Number(p.average_rating ?? p.rating ?? 0),
+    reviewCount: Number(p.review_count ?? 0),
+    brand: p.brand || '',
+    ownerName: p.owner_name || '',
+    stock: p.stock || 0,
+    description: p.description || '',
+    specifications: p.specifications || '',
+    sku: p.sku || '',
+    reorderLevel: p.reorder_level || 10,
+    unitsSold: p.units_sold || 0,
+  };
+};
 
 const shouldFillContainerImage = (categoryName = '') => /laptop|camera|display|tablet/i.test(categoryName);
 
@@ -534,6 +541,16 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
             {/* Price */}
             <div style={s.priceRow}>
               <span style={s.price}>{formatPrice(product.price)}</span>
+              {product.onSale && product.origPrice && (
+                <span style={{ fontSize: 16, color: '#9ca3af', textDecoration: 'line-through', fontWeight: 500 }}>
+                  {formatPrice(product.origPrice)}
+                </span>
+              )}
+              {product.onSale && product.origPrice && (
+                <span style={{ fontSize: 13, fontWeight: 700, background: '#fff7ed', color: '#F97316', border: '1px solid #fed7aa', borderRadius: 6, padding: '2px 8px' }}>
+                  Save {formatPrice(product.origPrice - product.price)}
+                </span>
+              )}
             </div>
 
             {/* Stock */}
@@ -953,6 +970,11 @@ const spinnerCSS = `
   @media (max-width: 480px) {
     .pd-image-card img {
       height: 220px !important;
+    }
+  }
+  @media (max-width: 640px) {
+    .also-grid > a {
+      flex: 0 0 calc(50% - 8px) !important;
     }
   }
 `;

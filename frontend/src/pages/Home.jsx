@@ -44,21 +44,37 @@ const CAT_IMGS = {
   Accessories:    'https://www.macworld.com/wp-content/uploads/2023/09/Twelve-South-HiRise-3-Deluxe-charger-3.jpg?quality=50&strip=all&w=1024',
 }
 
-/* Star rating — renders filled / half / empty stars */
+/* Star rating — SVG-based filled / half / empty stars */
+const STAR_PTS = "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+let _hmStarId = 0
+function HmStar({ fill = 0, size = 14, color = '#F97316' }) {
+  const uid = `hmst${++_hmStarId}`
+  if (fill >= 1) return (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'block', flexShrink: 0 }}>
+      <polygon points={STAR_PTS} fill={color} stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+  if (fill <= 0) return (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'block', flexShrink: 0 }}>
+      <polygon points={STAR_PTS} fill="none" stroke="#d1d5db" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'block', flexShrink: 0 }}>
+      <defs><clipPath id={uid}><rect x="0" y="0" width="12" height="24" /></clipPath></defs>
+      <polygon points={STAR_PTS} fill="none" stroke="#d1d5db" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polygon points={STAR_PTS} fill={color} stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" clipPath={`url(#${uid})`} />
+    </svg>
+  )
+}
 function Stars({ rating, count }) {
   if (!rating || rating <= 0) return null
-  const stars = Array.from({ length: 5 }, (_, i) => {
-    if (rating >= i + 1) return 'full'
-    if (rating >= i + 0.5) return 'half'
-    return 'empty'
-  })
   return (
     <div className="hm-stars">
-      {stars.map((t, i) => (
-        <span key={i} className={`hm-star hm-star-${t}`}>
-          {t === 'full' ? '★' : t === 'half' ? '⯨' : '☆'}
-        </span>
-      ))}
+      {[1,2,3,4,5].map(n => {
+        const fill = rating >= n ? 1 : rating >= n - 0.5 ? 0.5 : 0
+        return <HmStar key={n} fill={fill} size={14} />
+      })}
       {count > 0 && <span className="hm-star-ct">{rating.toFixed(1)} ({count})</span>}
     </div>
   )
@@ -83,7 +99,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     timerRef.current = setInterval(() => setSlide(s => (s + 1) % HERO_SLIDES.length), 2000)
   }
   useEffect(() => { resetTimer(); return () => clearInterval(timerRef.current) }, [])
-  useEffect(() => { if ((catParam || searchQ) && prodRef.current) prodRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, [catParam, searchQ])
+  useEffect(() => { if (searchQ && prodRef.current) prodRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, [searchQ])
   useEffect(() => { setSelCat(catParam || null) }, [catParam])
 
   useEffect(() => {
