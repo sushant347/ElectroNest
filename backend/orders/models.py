@@ -10,6 +10,7 @@ class OrderStatus(models.Model):
     class Meta:
         db_table = 'OrderStatus'
         managed = False
+        ordering = ['id']
 
     def __str__(self):
         return self.name
@@ -32,6 +33,7 @@ class Order(models.Model):
     class Meta:
         db_table = 'Orders'
         managed = False
+        ordering = ['-id']
 
     def __str__(self):
         return f"Order {self.order_number}"
@@ -47,6 +49,7 @@ class OrderDetail(models.Model):
     class Meta:
         db_table = 'OrderDetails'
         managed = False
+        ordering = ['id']
 
     @property
     def total_price(self):
@@ -66,6 +69,7 @@ class Cart(models.Model):
     class Meta:
         db_table = 'Cart'
         managed = False
+        ordering = ['-id']
 
     def __str__(self):
         return f"{self.customer.email} — {self.product.name}"
@@ -80,6 +84,7 @@ class Wishlist(models.Model):
     class Meta:
         db_table = 'Whishlist'
         managed = False
+        ordering = ['-id']
 
     def __str__(self):
         return f"{self.customer.email} — {self.product.name}"
@@ -96,6 +101,7 @@ class Review(models.Model):
     class Meta:
         db_table = 'Reviews'
         managed = False
+        ordering = ['-id']
 
     def __str__(self):
         return f"{self.customer.email} — {self.product.name} ({self.rating}★)"
@@ -108,6 +114,7 @@ class PaymentMethod(models.Model):
     class Meta:
         db_table = 'PaymentMethods'
         managed = False
+        ordering = ['id']
 
     def __str__(self):
         return self.name
@@ -124,6 +131,7 @@ class Payment(models.Model):
     class Meta:
         db_table = 'Payments'
         managed = False
+        ordering = ['-id']
 
     def __str__(self):
         return f"Payment #{self.id} — Order #{self.order_id}"

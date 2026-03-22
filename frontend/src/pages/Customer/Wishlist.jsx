@@ -149,11 +149,11 @@ const styles = {
   },
   imgWrap: {
     position: "relative",
-    height: 210,
     overflow: "hidden",
     background: "#f1f5f9",
   },
   img: {
+    display: "block",
     width: "100%",
     height: "100%",
     objectFit: "cover",
@@ -466,6 +466,10 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
   /* ── render ──────────────────────────────────────────── */
   return (
     <section style={styles.page}>
+      <style>{`
+        .wl-img-wrap { height: 210px; }
+        @media (max-width: 640px) { .wl-img-wrap { height: 200px; } }
+      `}</style>
       <div style={styles.container}>
         {/* ── Header ─────────────────────────────────────── */}
         <div style={styles.headerWrap}>
@@ -559,7 +563,7 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
                     onMouseLeave={() => setHoveredCard(null)}
                   >
                     {/* image */}
-                    <div style={styles.imgWrap}>
+                    <div className="wl-img-wrap" style={styles.imgWrap}>
                       <img
                         src={item.image}
                         alt={item.name}

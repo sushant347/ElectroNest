@@ -8,6 +8,7 @@ class Category(models.Model):
     class Meta:
         db_table = 'Categories'
         managed = False
+        ordering = ['id']
         verbose_name_plural = 'Categories'
 
     def __str__(self):
@@ -28,6 +29,7 @@ class Supplier(models.Model):
     class Meta:
         db_table = 'Suppliers'
         managed = False
+        ordering = ['id']
 
     def __str__(self):
         return self.name
@@ -55,6 +57,7 @@ class Product(models.Model):
     class Meta:
         db_table = 'Products'
         managed = False
+        ordering = ['-id']
 
     def __str__(self):
         return self.name
@@ -76,6 +79,7 @@ class Customer(models.Model):
     class Meta:
         db_table = 'Customers'
         managed = False
+        ordering = ['id']
 
     # Required by DRF's IsAuthenticated permission when used as request.user
     @property
@@ -97,6 +101,7 @@ class Review(models.Model):
     class Meta:
         db_table = 'Reviews'
         managed  = False       # table already exists in SQL Server
+        ordering = ['-id']
         unique_together = [('product', 'customer')]
 
     def __str__(self):

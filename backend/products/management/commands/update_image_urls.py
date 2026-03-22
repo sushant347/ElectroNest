@@ -161,7 +161,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('No products found.'))
             return
 
-        updated = 0
+        to_update = []
         skipped = 0
         for p in products:
             base = _base_name(p.name)
@@ -173,8 +173,11 @@ class Command(BaseCommand):
                 continue
 
             if url != p.image_url:
-                Product.objects.filter(id=p.id).update(image_url=url)
-                updated += 1
+                p.image_url = url
+                to_update.append(p)
+
+        if to_update:
+            Product.objects.bulk_update(to_update, ['image_url'], batch_size=100)
 
         self.stdout.write(self.style.SUCCESS(
-            f'Done. Updated {updated} products, skipped {skipped}.'))
+            f'Done. Updated {len(to_update)} products, skipped {skipped}.'))

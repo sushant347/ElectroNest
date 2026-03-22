@@ -15,6 +15,7 @@ class PurchaseOrder(models.Model):
     class Meta:
         db_table = 'PurchaseOrders'
         managed = False
+        ordering = ['-id']
 
     def __str__(self):
         return f"PO #{self.id} — {self.supplier.name}"
@@ -30,6 +31,7 @@ class PurchaseOrderDetail(models.Model):
     class Meta:
         db_table = 'PurchaseOrderDetails'
         managed = False
+        ordering = ['id']
 
     @property
     def total_cost(self):

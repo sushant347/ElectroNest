@@ -5,12 +5,13 @@ from django.conf.urls.static import static
 from django.http import JsonResponse
 
 
-def ping(request):
+def health(request):
     return JsonResponse({'status': 'ok'})
 
 
 urlpatterns = [
-    path('ping/', ping),
+    path('', health),
+    path('ping/', health),
     path('admin/', admin.site.urls),
 
     path('api/auth/', include('accounts.urls')),
