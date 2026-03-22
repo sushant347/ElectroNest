@@ -21,4 +21,5 @@ Thumbs.db
 # IDE
 .cursor/
 .vscode/
- dataset/
+dataset/
+Database.sql
