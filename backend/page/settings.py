@@ -138,11 +138,15 @@ STORAGES = {
 }
 
 # ── CORS ──
+# CORS_ORIGINS env var on Render must include the exact Vercel frontend URL,
+# e.g. "https://your-app.vercel.app" (no trailing slash).
+# If not set, all origins are allowed (safe for development / demo deployments).
+# WARNING: If CORS_ORIGINS is set but missing the Vercel URL, the frontend
+# will be blocked by CORS and products / API calls will silently fail.
 _cors_env = os.environ.get('CORS_ORIGINS', '')
 if _cors_env:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_env.split(',') if o.strip()]
 else:
-    # Development fallback — allow all origins so the deployed Vercel URL works too
     CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 

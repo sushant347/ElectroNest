@@ -310,23 +310,27 @@ class Command(BaseCommand):
 
     # ── Reset sequences ───────────────────────────────────────────────────────
     def _reset_sequences(self):
+        # pg_get_serial_sequence needs the table name WITH inner double-quotes
+        # (e.g. '"Customers"') so PostgreSQL does a case-sensitive catalog lookup.
+        # Passing 'Customers' (unquoted) lowercases it to 'customers' and fails
+        # to find the case-sensitive table names created by migrations.
         tables = [
-            ('"Customers"',            'Customers',            'CustomerID'),
-            ('"Customer_Address"',     'Customer_Address',     'AddressID'),
-            ('"Orders"',               'Orders',               'OrderID'),
-            ('"OrderDetails"',         'OrderDetails',         'OrderDetailID'),
-            ('"Payments"',             'Payments',             'PaymentID'),
-            ('"Reviews"',              'Reviews',              'ReviewID'),
-            ('"PurchaseOrders"',       'PurchaseOrders',       'PurchaseOrderID'),
-            ('"PurchaseOrderDetails"', 'PurchaseOrderDetails', 'PurchaseOrderDetailID'),
+            ('"Customers"',            'CustomerID'),
+            ('"Customer_Address"',     'AddressID'),
+            ('"Orders"',               'OrderID'),
+            ('"OrderDetails"',         'OrderDetailID'),
+            ('"Payments"',             'PaymentID'),
+            ('"Reviews"',              'ReviewID'),
+            ('"PurchaseOrders"',       'PurchaseOrderID'),
+            ('"PurchaseOrderDetails"', 'PurchaseOrderDetailID'),
         ]
         with connection.cursor() as cur:
-            for quoted_table, plain_table, col in tables:
+            for quoted_table, col in tables:
                 try:
                     cur.execute(
                         f'SELECT setval(pg_get_serial_sequence(%s, %s), '
                         f'COALESCE(MAX("{col}"), 1)) FROM {quoted_table}',
-                        [plain_table, col]
+                        [quoted_table, col]
                     )
                 except Exception as e:
                     self.stdout.write(self.style.WARNING(

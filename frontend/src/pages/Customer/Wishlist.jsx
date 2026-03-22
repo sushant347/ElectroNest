@@ -151,6 +151,7 @@ const styles = {
     position: "relative",
     overflow: "hidden",
     background: "#f1f5f9",
+    height: 210,
   },
   img: {
     display: "block",

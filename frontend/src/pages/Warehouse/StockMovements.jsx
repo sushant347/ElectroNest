@@ -288,7 +288,10 @@ export default function StockMovements() {
     try {
       const [poRes, movRes] = await Promise.all([
         warehouseAPI.getPurchaseOrders(),
-        warehouseAPI.getStockMovements().catch(() => ({ data: {} })),
+        warehouseAPI.getStockMovements().catch((err) => {
+        console.error('getStockMovements failed:', err?.response?.data || err?.message);
+        return { data: {} };
+      }),
       ]);
       setPurchaseOrders(poRes.data?.results || poRes.data || []);
       setMovements(movRes.data || {});

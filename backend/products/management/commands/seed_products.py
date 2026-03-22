@@ -86,18 +86,23 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('PaymentMethods: seeded'))
 
         # ── Reset PostgreSQL sequences ──
+        # pg_get_serial_sequence needs the table name as a quoted identifier
+        # (e.g. '"Categories"') so PostgreSQL does a case-sensitive lookup.
+        # Passing 'Categories' (unquoted) would lowercase it to 'categories'
+        # and fail to find the case-sensitive table created by migrations.
         with connection.cursor() as cursor:
             for table, col in [
-                ('"Categories"', '"CategoryID"'),
-                ('"Suppliers"',  '"SupplierID"'),
-                ('"Products"',   '"ProductID"'),
-                ('"Customers"',  '"CustomerID"'),
+                ('"Categories"', 'CategoryID'),
+                ('"Suppliers"',  'SupplierID'),
+                ('"Products"',   'ProductID'),
+                ('"OrderStatus"', 'OrderStatusID'),
+                ('"PaymentMethods"', 'MethodID'),
             ]:
                 try:
                     cursor.execute(
                         f'SELECT setval(pg_get_serial_sequence(%s, %s), '
-                        f'COALESCE(MAX({col}), 1)) FROM {table}',
-                        [table.strip('"'), col.strip('"')]
+                        f'COALESCE(MAX("{col}"), 1)) FROM {table}',
+                        [table, col]
                     )
                 except Exception as e:
                     self.stdout.write(self.style.WARNING(f'Sequence reset skipped for {table}: {e}'))

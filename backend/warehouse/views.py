@@ -281,7 +281,7 @@ class StockMovementsView(APIView):
                 .order_by('-updated_at')[:20]
             )
             from orders.models import Payment
-        for o in orders:
+            for o in orders:
                 items = []
                 for d in o.details.all():
                     items.append({
