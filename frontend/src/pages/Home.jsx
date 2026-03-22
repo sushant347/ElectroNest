@@ -26,7 +26,7 @@ function getCatEmoji(n) { return { Smartphones: '📱', Laptops: '💻', Gaming:
 
 function shouldUseContainInCard(categoryName = '', productName = '') {
   return /smartphones|headphones/i.test(categoryName)
-    || /headphone|headset|earbud|earphone|arctis|airpod|buds/i.test(productName)
+    || /headphone|headset|earbud|earphone|arctis|airpod|buds|apple watch ultra|fenix 7x|amazfit active edge/i.test(productName)
 }
 
 const CAT_IMGS = {
@@ -116,6 +116,14 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     load()
   }, [catParam, searchQ])
 
+  /* Per-product image variants — randomly picks one each render */
+  const PRODUCT_IMG_VARIANTS = {
+    'Bose SoundLink Max': [
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRKnOXmp6zjsiVUFiIBhoIyCGVEqM9KXgWibQ&s',
+      'https://cdn.mos.cms.futurecdn.net/v2/t:0,l:240,cw:1440,ch:1080,q:80,w:1440/PRQ4anjB2jE5oRS9asn4H5.jpg',
+    ],
+  }
+
   /* norm: discount_price set by owner → product is on sale.
      price    = what the customer pays  (discount_price if set, else selling_price)
      origPrice= the original ticket price (selling_price), only present when on sale */
@@ -123,22 +131,27 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     const selling = parseFloat(p.selling_price || p.SellingPrice || 0)
     const disc    = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null
     const onSale  = disc !== null && disc > 0 && disc < selling
+    const pname   = p.name || p.ProductName || ''
+    const variants = PRODUCT_IMG_VARIANTS[pname]
+    const dbImg    = p.image_url || p.ProductImageURL || ''
+    const image    = variants ? variants[Math.floor(Math.random() * variants.length)] : dbImg
     return {
-      id:        p.id,
-      name:      p.name || p.ProductName,
-      category:  p.category_name || '',
-      price:     onSale ? disc : selling,
-      origPrice: onSale ? selling : null,       // ticket / MRP — only when on sale
-      savings:   onSale ? Math.round(selling - disc) : null,
-      discPct:   onSale ? Math.round((1 - disc / selling) * 100) : null,
+      id:            p.id,
+      name:          pname,
+      category:      p.category_name || '',
+      price:         onSale ? disc : selling,
+      origPrice:     onSale ? selling : null,
+      savings:       onSale ? Math.round(selling - disc) : null,
+      discPct:       onSale ? Math.round((1 - disc / selling) * 100) : null,
       onSale,
-      image:     p.image_url || p.ProductImageURL || '',
-      brand:     p.brand || p.Brand || '',
-      ownerName: p.owner_name || p.OwnerName || '',
-      stock:     p.stock || p.Stock || 0,
-      sold:      parseInt(p.units_sold || p.UnitsSold || 0),
-      rating:    parseFloat(p.average_rating || 0),
-      reviews:   parseInt(p.review_count || 0),
+      image,
+      fallbackImage: variants ? variants.find(u => u !== image) || dbImg : dbImg,
+      brand:         p.brand || p.Brand || '',
+      ownerName:     p.owner_name || p.OwnerName || '',
+      stock:         p.stock || p.Stock || 0,
+      sold:          parseInt(p.units_sold || p.UnitsSold || 0),
+      rating:        parseFloat(p.average_rating || 0),
+      reviews:       parseInt(p.review_count || 0),
     }
   }
 
