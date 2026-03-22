@@ -8,6 +8,113 @@ import Plot from 'react-plotly.js';
 import { adminAPI } from '../../services/api';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const ADM_COLORS = ['#DC2626', '#EA580C', '#2563EB', '#16A34A', '#7C3AED', '#EC4899', '#D97706', '#0891B2', '#6366F1', '#059669'];
+
+/* ── SVG Donut helpers ── */
+function _admPtc(cx, cy, r, a) { const rad = ((a - 90) * Math.PI) / 180; return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }; }
+function _admArc(cx, cy, oR, iR, s, e) {
+  const se = e - s >= 359.99 ? s + 359.99 : e;
+  const o1 = _admPtc(cx, cy, oR, s), o2 = _admPtc(cx, cy, oR, se), i1 = _admPtc(cx, cy, iR, se), i2 = _admPtc(cx, cy, iR, s);
+  const lg = se - s > 180 ? 1 : 0;
+  return [`M ${o1.x} ${o1.y}`, `A ${oR} ${oR} 0 ${lg} 1 ${o2.x} ${o2.y}`, `L ${i1.x} ${i1.y}`, `A ${iR} ${iR} 0 ${lg} 0 ${i2.x} ${i2.y}`, 'Z'].join(' ');
+}
+function SvgAdminDonut({ items, id = 'adm-sd', centerLabel = null }) {
+  const [hovered, setHovered] = useState(null);
+  const [tooltip, setTooltip] = useState({ x: 0, y: 0 });
+  const total = items.reduce((s, d) => s + (Number(d.value) || 0), 0);
+  if (!items.length || total === 0) return <div className="chart-empty">No data available</div>;
+  const CX = 110, CY = 110, OR = 100, IR = 56;
+  let cumDeg = 0;
+  const segments = items.map((d, i) => {
+    const sv = Number(d.value) || 0;
+    const startDeg = cumDeg;
+    const sweep = (sv / total) * 360;
+    cumDeg += sweep;
+    return { label: d.label, value: sv, startDeg, endDeg: cumDeg, pct: (sv / total) * 100, color: d.color || ADM_COLORS[i % ADM_COLORS.length], path: _admArc(CX, CY, OR, IR, startDeg, cumDeg), midDeg: startDeg + sweep / 2 };
+  });
+  const active = hovered !== null ? segments[hovered] : null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setHovered(null)}>
+        <svg width={220} height={220} viewBox="0 0 220 220" style={{ display: 'block', overflow: 'visible' }}>
+          <defs>
+            <filter id={`${id}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#00000030" />
+            </filter>
+          </defs>
+          {segments.map((s, i) => {
+            const isActive = hovered === i;
+            const midRad = ((s.midDeg - 90) * Math.PI) / 180;
+            const offset = isActive ? 8 : 0;
+            return (
+              <path key={i} d={s.path} fill={s.color}
+                transform={`translate(${offset * Math.cos(midRad)}, ${offset * Math.sin(midRad)})`}
+                filter={isActive ? `url(#${id}-shadow)` : undefined}
+                stroke="#fff" strokeWidth={isActive ? 2.5 : 1.5}
+                style={{ cursor: 'pointer', transition: 'transform 0.18s ease' }}
+                onMouseMove={e => { setHovered(i); setTooltip({ x: e.clientX, y: e.clientY }); }}
+                onMouseEnter={e => { setHovered(i); setTooltip({ x: e.clientX, y: e.clientY }); }}
+              />
+            );
+          })}
+          <circle cx={CX} cy={CY} r={IR - 2} fill="#fff" />
+          {active ? (
+            <>
+              <text x={CX} y={CY - 10} textAnchor="middle" style={{ fontSize: 9, fill: active.color, fontWeight: 700, fontFamily: 'inherit' }}>
+                {active.label.length > 14 ? active.label.slice(0, 13) + '…' : active.label}
+              </text>
+              <text x={CX} y={CY + 8} textAnchor="middle" style={{ fontSize: 12, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>
+                {active.value}
+              </text>
+              <text x={CX} y={CY + 24} textAnchor="middle" style={{ fontSize: 10, fill: active.color, fontWeight: 600, fontFamily: 'inherit' }}>
+                {active.pct.toFixed(1)}%
+              </text>
+            </>
+          ) : (
+            <>
+              <text x={CX} y={CY - 4} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'inherit', fontWeight: 600 }}>
+                {centerLabel || 'Total'}
+              </text>
+              <text x={CX} y={CY + 12} textAnchor="middle" style={{ fontSize: 13, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>
+                {total}
+              </text>
+            </>
+          )}
+        </svg>
+        {active && (
+          <div style={{
+            position: 'fixed',
+            left: tooltip.x > (typeof window !== 'undefined' ? window.innerWidth / 2 : 400) ? 'auto' : tooltip.x + 14,
+            right: tooltip.x > (typeof window !== 'undefined' ? window.innerWidth / 2 : 400) ? window.innerWidth - tooltip.x + 14 : 'auto',
+            top: Math.min(tooltip.y - 10, typeof window !== 'undefined' ? window.innerHeight - 110 : tooltip.y),
+            zIndex: 9999, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+            padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 140, pointerEvents: 'none',
+          }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', borderLeft: `3px solid ${active.color}`, paddingLeft: 8, marginBottom: 8 }}>{active.label}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: '0.78rem', color: '#6B7280', marginBottom: 3 }}>
+              <span>Count</span><strong style={{ color: active.color }}>{active.value}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: '0.78rem', color: '#6B7280' }}>
+              <span>Share</span><strong>{active.pct.toFixed(1)}%</strong>
+            </div>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: 110, maxHeight: 200, overflowY: 'auto' }}>
+        {segments.map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '3px 0' }}
+            onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
+            <div style={{ width: 9, height: 9, borderRadius: '50%', background: s.color, flexShrink: 0, transform: hovered === i ? 'scale(1.3)' : 'scale(1)', transition: 'transform 0.15s' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: hovered === i ? 700 : 600, color: hovered === i ? s.color : '#374151' }}>{s.label}</span>
+              <span style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>{s.value} ({s.pct.toFixed(1)}%)</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /* ── KPI Card ── */
 function KPICard({ title, value, icon: Icon, color, sub, trend, info }) {
@@ -282,27 +389,11 @@ export default function Dashboard() {
             <h3><Users size={16} /> Users by Role</h3>
             <button className="chart-act" onClick={() => exportChart('role_distribution')} title="Export"><Download size={14} /></button>
           </div>
-          {roleDist.length > 0 ? (
-            <Plot
-              data={[{
-                type: 'pie',
-                labels: roleDist.map(r => r.role.charAt(0).toUpperCase() + r.role.slice(1)),
-                values: roleDist.map(r => r.count),
-                marker: { colors: roleDist.map(r => roleColors[r.role] || '#94a3b8'), line: { color: '#fff', width: 2 } },
-                hole: 0.4, textinfo: 'label+percent+value', textfont: { size: 12, family: 'Inter, system-ui' },
-                hovertemplate: '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>',
-                rotation: 90,
-              }]}
-              layout={{
-                height: 300, margin: { t: 20, b: 20, l: 10, r: 10 },
-                showlegend: true, legend: { orientation: 'h', y: -0.1, x: 0.5, xanchor: 'center', font: { size: 11 } },
-                paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-                annotations: [{ text: `${roleDist.reduce((s, r) => s + r.count, 0)}<br><span style="font-size:11px;color:#64748b">Total</span>`, showarrow: false, font: { size: 16, color: '#1e293b' }, x: 0.5, y: 0.5 }],
-              }}
-              config={{ displayModeBar: false, responsive: true }}
-              style={{ width: '100%' }}
-            />
-          ) : <div className="chart-empty">No user data available</div>}
+          <SvgAdminDonut
+            items={roleDist.map(r => ({ label: r.role.charAt(0).toUpperCase() + r.role.slice(1), value: r.count, color: roleColors[r.role] || '#94a3b8' }))}
+            id="role-donut"
+            centerLabel="Users"
+          />
         </div>
 
         {/* Category Revenue */}
@@ -338,25 +429,11 @@ export default function Dashboard() {
         {/* Gender Demographics */}
         <div className="chart-card">
           <h3 className="chart-title-s">Customer Demographics (Gender)</h3>
-          {genderDist.length > 0 ? (
-            <Plot
-              data={[{
-                type: 'pie',
-                labels: genderDist.map(g => g.gender || 'Unknown'), values: genderDist.map(g => g.count),
-                marker: { colors: genderColors }, hole: 0.45,
-                textinfo: 'label+percent', textfont: { size: 12 },
-                hovertemplate: '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>',
-              }]}
-              layout={{
-                height: 280, margin: { t: 10, b: 20, l: 10, r: 10 },
-                showlegend: true, legend: { orientation: 'h', y: -0.1, font: { size: 11 } },
-                paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-                annotations: [{ text: `${data?.total_customers || 0}<br>Total`, showarrow: false, font: { size: 12, color: '#1e293b' }, x: 0.5, y: 0.5 }],
-              }}
-              config={{ displayModeBar: false, responsive: true }}
-              style={{ width: '100%' }}
-            />
-          ) : <div className="chart-empty">No customer data</div>}
+          <SvgAdminDonut
+            items={genderDist.map((g, i) => ({ label: g.gender || 'Unknown', value: g.count, color: genderColors[i % genderColors.length] }))}
+            id="gender-donut"
+            centerLabel="Customers"
+          />
         </div>
 
         {/* Registration Trend */}
@@ -408,127 +485,6 @@ export default function Dashboard() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* ─── Recent Activity ─── */}
-      <div className="chart-card">
-        <h3 className="chart-title-s"><Activity size={15} style={{ marginRight: 6 }} />Recent System Activity</h3>
-        <div className="activity-feed">
-          {recentActivity.length === 0 ? (
-            <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '32px 0', fontSize: '0.85rem' }}>No recent activity</p>
-          ) : recentActivity.map((act, i) => {
-            const isDel = act.action?.toLowerCase().includes('delete');
-            const isCre = act.action?.toLowerCase().includes('create');
-            const dotClr = isDel ? '#DC2626' : isCre ? '#16A34A' : '#2563EB';
-            return (
-              <div key={i} className="act-item">
-                <div className="act-dot" style={{ background: dotClr }} />
-                <div className="act-body">
-                  <span className="act-text">
-                    <strong>{act.action}</strong> on {act.table_name}
-                    {act.record_id ? <span style={{ color: '#9CA3AF' }}> #{act.record_id}</span> : ''}
-                  </span>
-                  <span className="act-time">
-                    {act.timestamp ? new Date(act.timestamp).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
-                    {act.changed_by && ` · ${act.changed_by.split('(')[0].trim()}`}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ─── Customer Database ─── */}
-      <div className="chart-card cust-section">
-        <div className="cust-hdr">
-          <div>
-            <h3 className="chart-title-s" style={{ marginBottom: 2 }}><Users size={16} style={{ marginRight: 6 }} />Customer Database</h3>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: '#6B7280' }}>
-              {customers.length > 0
-                ? `Showing ${(custPage - 1) * custPerPage + 1}–${Math.min(custPage * custPerPage, customers.length)} of ${customers.length}`
-                : 'No customers found'}
-            </p>
-          </div>
-          <div className="cust-filters">
-            <div className="cust-search">
-              <Search size={13} className="cust-search-ico" />
-              <input placeholder="Search name, email, phone…" value={custSearch} onChange={e => setCustSearch(e.target.value)} />
-              {custSearch && <button className="cust-clear" onClick={() => setCustSearch('')}><X size={12} /></button>}
-            </div>
-            <select className="cust-sel" value={custGender} onChange={e => setCustGender(e.target.value)}>
-              <option value="">All Genders</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
-            <select className="cust-sel" value={custStatus} onChange={e => setCustStatus(e.target.value)}>
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            {(custSearch || custGender || custStatus) && (
-              <button className="cust-clear-all" onClick={() => { setCustSearch(''); setCustGender(''); setCustStatus(''); }}>
-                <X size={12} /> Clear
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="table-wrap">
-          <table className="dash-table cust-table">
-            <thead>
-              <tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>Date of Birth</th><th>Registered</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              {custLoading ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 32 }}>
-                  <RefreshCw size={20} className="spin" style={{ margin: '0 auto', display: 'block', color: '#DC2626' }} />
-                </td></tr>
-              ) : pagedCustomers.length === 0 ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 32, color: '#9CA3AF' }}>
-                  {custSearch || custGender || custStatus ? 'No customers match your filters' : 'No customers found'}
-                </td></tr>
-              ) : pagedCustomers.map((c, idx) => (
-                <tr key={c.id}>
-                  <td style={{ color: '#9CA3AF', fontWeight: 600, fontSize: '0.78rem' }}>{(custPage - 1) * custPerPage + idx + 1}</td>
-                  <td style={{ fontWeight: 600, color: '#111827' }}>{c.full_name || `${c.first_name} ${c.last_name}`}</td>
-                  <td style={{ color: '#6B7280', fontSize: '0.82rem' }}>{c.email}</td>
-                  <td>{c.phone || <span style={{ color: '#D1D5DB' }}>—</span>}</td>
-                  <td><span className={`gender-badge ${(c.gender || '').toLowerCase()}`}>{c.gender || '—'}</span></td>
-                  <td>{c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : <span style={{ color: '#D1D5DB' }}>—</span>}</td>
-                  <td>{c.registration_date ? new Date(c.registration_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : <span style={{ color: '#D1D5DB' }}>—</span>}</td>
-                  <td><span className={`status-chip ${c.is_active ? 'active' : 'inactive'}`}>{c.is_active ? 'Active' : 'Inactive'}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalCustPages > 1 && (
-          <div className="cust-pager">
-            <span className="pager-info">{(custPage - 1) * custPerPage + 1}–{Math.min(custPage * custPerPage, customers.length)} of {customers.length}</span>
-            <div className="pager-btns">
-              <button className="pg-btn" disabled={custPage === 1} onClick={() => setCustPage(p => p - 1)}><ChevronLeft size={14} /></button>
-              {(() => {
-                const range = [];
-                const start = Math.max(1, custPage - 2);
-                const end = Math.min(totalCustPages, custPage + 2);
-                if (start > 1) range.push('…');
-                for (let p = start; p <= end; p++) range.push(p);
-                if (end < totalCustPages) range.push('…');
-                return range.map((p, i) =>
-                  typeof p === 'string'
-                    ? <span key={`d${i}`} style={{ padding: '0 4px', color: '#9CA3AF', fontSize: '0.8rem' }}>{p}</span>
-                    : <button key={p} className={`pg-btn ${custPage === p ? 'active' : ''}`} onClick={() => setCustPage(p)}>{p}</button>
-                );
-              })()}
-              <button className="pg-btn" disabled={custPage === totalCustPages} onClick={() => setCustPage(p => p + 1)}><ChevronRight size={14} /></button>
-            </div>
-            <span className="pager-info">Page {custPage} of {totalCustPages}</span>
-          </div>
-        )}
       </div>
 
       {/* ═══ STYLES ═══ */}

@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, AlertCircle, Truck, Search, X, Package, User, Eye, CheckCircle2, Printer, BarChart2, ShoppingBag, Store, Filter, PieChart } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, AlertCircle, Truck, Search, X, Package, User, Eye, CheckCircle2, Printer, BarChart2, ShoppingBag, Store, Filter, PieChart, CalendarDays } from 'lucide-react';
 import { warehouseAPI } from '../../services/api';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -279,19 +279,57 @@ export default function StockMovements() {
   const [activeTab, setActiveTab] = useState('purchase_orders');
   const [poStoreFilter, setPoStoreFilter] = useState('all');
   const [poStatusFilter, setPoStatusFilter] = useState('all');
+  const [coStatusFilter, setCoStatusFilter] = useState('all');
+  const [coStoreFilter, setCoStoreFilter] = useState('all');
+  const [coPage, setCoPage] = useState(1);
   const [viewOrder, setViewOrder] = useState(null);
   const [deliveringId, setDeliveringId] = useState(null);
+  /** Customer orders only: passed to API as `days` (30 / 90 / 0 = lifetime). Changing this refetches movements from the DB. */
+  const [coOrderDays, setCoOrderDays] = useState(90);
+  const [coMovementsLoading, setCoMovementsLoading] = useState(false);
+  const coOrderDaysRef = useRef(90);
+  const coPeriodFilterBoot = useRef(false);
+
+  const CO_PER_PAGE = 20;
+  /** Store dropdown shows at most this many names (top by activity); "All Stores" still lists every store in the table. */
+  const STORE_FILTER_LIMIT = 10;
+
+  useEffect(() => {
+    coOrderDaysRef.current = coOrderDays;
+  }, [coOrderDays]);
+
+  const fetchMovementsOnly = useCallback(async () => {
+    const days = coOrderDaysRef.current;
+    setCoMovementsLoading(true);
+    setError('');
+    setMovements((prev) => ({
+      ...prev,
+      shipped_orders: [],
+      store_shipping_summary: {},
+      store_commission: {},
+    }));
+    try {
+      const movRes = await warehouseAPI.getStockMovements({ days });
+      setMovements(movRes.data || {});
+    } catch (err) {
+      console.error('getStockMovements failed:', err?.response?.data || err?.message);
+      setError('Failed to load customer orders for the selected period.');
+    } finally {
+      setCoMovementsLoading(false);
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
+      const days = coOrderDaysRef.current;
       const [poRes, movRes] = await Promise.all([
         warehouseAPI.getPurchaseOrders(),
-        warehouseAPI.getStockMovements().catch((err) => {
-        console.error('getStockMovements failed:', err?.response?.data || err?.message);
-        return { data: {} };
-      }),
+        warehouseAPI.getStockMovements({ days }).catch((err) => {
+          console.error('getStockMovements failed:', err?.response?.data || err?.message);
+          return { data: {} };
+        }),
       ]);
       setPurchaseOrders(poRes.data?.results || poRes.data || []);
       setMovements(movRes.data || {});
@@ -304,6 +342,20 @@ export default function StockMovements() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!coPeriodFilterBoot.current) {
+      coPeriodFilterBoot.current = true;
+      return;
+    }
+    setCoPage(1);
+    fetchMovementsOnly();
+  }, [coOrderDays, fetchMovementsOnly]);
+
+  const coPeriodEmptyLabel = useMemo(() => {
+    if (coOrderDays === 0) return 'No customer orders in the full history';
+    return `No customer orders in the last ${coOrderDays} days`;
+  }, [coOrderDays]);
 
   const handleReceive = async (id) => {
     if (!confirm('Mark this purchase order as received?')) return;
@@ -363,12 +415,26 @@ export default function StockMovements() {
   /* ── Enriched Purchase Orders from stock-movements endpoint ── */
   const enrichedPOs = useMemo(() => movements.enriched_purchase_orders || [], [movements]);
 
-  const poStoreNames = useMemo(() => {
+  const poUniqueStoreCount = useMemo(() => {
     const names = new Set();
     enrichedPOs.forEach(po => {
       (po.items || []).forEach(i => { if (i.product_owner) names.add(i.product_owner); });
     });
-    return Array.from(names).sort();
+    return names.size;
+  }, [enrichedPOs]);
+
+  const poStoreNames = useMemo(() => {
+    const counts = new Map();
+    enrichedPOs.forEach(po => {
+      const ownersInPo = new Set((po.items || []).map(i => i.product_owner).filter(Boolean));
+      ownersInPo.forEach((owner) => {
+        counts.set(owner, (counts.get(owner) || 0) + 1);
+      });
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, STORE_FILTER_LIMIT)
+      .map(([name]) => name);
   }, [enrichedPOs]);
 
   const filteredEnrichedPOs = useMemo(() => {
@@ -396,12 +462,54 @@ export default function StockMovements() {
       .sort((a, b) => b.commission - a.commission);
   }, [movements.store_commission]);
 
+  const coUniqueStoreCount = useMemo(() => {
+    return new Set((movements.shipped_orders || []).map(o => o.store_name).filter(Boolean)).size;
+  }, [movements.shipped_orders]);
+
+  const coStoreNames = useMemo(() => {
+    const counts = new Map();
+    (movements.shipped_orders || []).forEach((o) => {
+      const s = o.store_name;
+      if (!s) return;
+      counts.set(s, (counts.get(s) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, STORE_FILTER_LIMIT)
+      .map(([name]) => name);
+  }, [movements.shipped_orders]);
+
   const filteredShipped = useMemo(() => {
-    const list = movements.shipped_orders || [];
+    // Newest orders first (prefer placed date, then last update)
+    const list = [...(movements.shipped_orders || [])].sort((a, b) => {
+      const tA = new Date(a.order_date || a.date || 0).getTime();
+      const tB = new Date(b.order_date || b.date || 0).getTime();
+      return tB - tA;
+    });
     const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(o => (o.order_number || '').toLowerCase().includes(q) || (o.customer_name || '').toLowerCase().includes(q));
-  }, [movements.shipped_orders, search]);
+    return list.filter(o => {
+      if (coStatusFilter !== 'all' && o.status !== coStatusFilter) return false;
+      if (coStoreFilter !== 'all' && (o.store_name || '') !== coStoreFilter) return false;
+      if (q && !(o.order_number || '').toLowerCase().includes(q) && !(o.customer_name || '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [movements.shipped_orders, search, coStatusFilter, coStoreFilter]);
+
+  const coTotalPages = Math.ceil(filteredShipped.length / CO_PER_PAGE);
+  const pagedShipped = filteredShipped.slice((coPage - 1) * CO_PER_PAGE, coPage * CO_PER_PAGE);
+
+  useEffect(() => {
+    const max = Math.max(1, Math.ceil(filteredShipped.length / CO_PER_PAGE));
+    if (coPage > max) setCoPage(max);
+  }, [filteredShipped.length, coPage]);
+
+  useEffect(() => {
+    if (poStoreFilter !== 'all' && !poStoreNames.includes(poStoreFilter)) setPoStoreFilter('all');
+  }, [poStoreNames, poStoreFilter]);
+
+  useEffect(() => {
+    if (coStoreFilter !== 'all' && !coStoreNames.includes(coStoreFilter)) setCoStoreFilter('all');
+  }, [coStoreNames, coStoreFilter]);
 
   const filteredProducts = useMemo(() => {
     const list = movements.product_updates || [];
@@ -432,7 +540,7 @@ export default function StockMovements() {
           <button
             key={t.key}
             className={`sm-tab ${activeTab === t.key ? 'active' : ''}`}
-            onClick={() => { setActiveTab(t.key); setSearch(''); setPoStoreFilter('all'); setPoStatusFilter('all'); }}
+            onClick={() => { setActiveTab(t.key); setSearch(''); setPoStoreFilter('all'); setPoStatusFilter('all'); setCoStatusFilter('all'); setCoStoreFilter('all'); setCoPage(1); }}
             title={t.desc}
           >
             {t.key === 'purchase_orders' && <ArrowDownLeft size={15} />}
@@ -464,12 +572,63 @@ export default function StockMovements() {
                 </button>
               ))}
             </div>
-            {poStoreNames.length > 1 && (
+            {poUniqueStoreCount > 1 && (
               <div className="sm-store-filter">
                 <Filter size={13} />
-                <select value={poStoreFilter} onChange={e => setPoStoreFilter(e.target.value)} className="sm-store-select">
+                <select
+                  value={poStoreFilter}
+                  onChange={e => setPoStoreFilter(e.target.value)}
+                  className="sm-store-select"
+                  title={`Up to ${STORE_FILTER_LIMIT} stores with the most purchase orders here. All Stores shows every store.`}
+                >
                   <option value="all">All Stores</option>
                   {poStoreNames.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+            )}
+          </>
+        )}
+        {activeTab === 'shipped_orders' && (
+          <>
+            <div className="sm-period-filter" title="Customer orders are loaded from the server for the range you pick">
+              <CalendarDays size={14} className="sm-period-icon" />
+              <span className="sm-period-label">Period</span>
+              <select
+                className="sm-period-select"
+                value={coOrderDays}
+                disabled={coMovementsLoading}
+                onChange={(e) => setCoOrderDays(Number(e.target.value))}
+              >
+                <option value={30}>Last 30 days</option>
+                <option value={90}>Last 90 days</option>
+                <option value={0}>Lifetime (all orders)</option>
+              </select>
+              {coMovementsLoading && <RefreshCw size={14} className="sm-period-loading spin" aria-hidden />}
+            </div>
+            <div className="sm-filter-tabs">
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'Pending', label: 'Pending' },
+                { key: 'Processing', label: 'Processing' },
+                { key: 'Shipped', label: 'Shipped' },
+                { key: 'Delivered', label: 'Delivered' },
+              ].map(f => (
+                <button key={f.key} className={`sm-filter-tab ${coStatusFilter === f.key ? 'active' : ''}`} onClick={() => { setCoStatusFilter(f.key); setCoPage(1); }}>
+                  {f.label} <span className="sm-filter-count">{f.key === 'all' ? (movements.shipped_orders || []).length : (movements.shipped_orders || []).filter(o => o.status === f.key).length}</span>
+                </button>
+              ))}
+            </div>
+            {coUniqueStoreCount > 1 && (
+              <div className="sm-store-filter">
+                <Filter size={13} />
+                <select
+                  value={coStoreFilter}
+                  onChange={e => { setCoStoreFilter(e.target.value); setCoPage(1); }}
+                  className="sm-store-select"
+                  title={`Up to ${STORE_FILTER_LIMIT} stores with the most customer orders here. All Stores shows every store.`}
+                >
+                  <option value="all">All Stores</option>
+                  {coStoreNames.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
             )}
@@ -480,7 +639,83 @@ export default function StockMovements() {
       {error && <div className="sm-error"><AlertCircle size={16} /> {error} <button onClick={fetchData} className="sm-retry">Retry</button></div>}
 
       {loading ? (
-        <div className="sm-loading"><RefreshCw size={24} className="spin" /><p>Loading...</p></div>
+        activeTab === 'shipped_orders' ? (
+          <div className="sm-table-wrap sm-shimmer-table-wrap">
+            <table className="sm-table">
+              <thead>
+                <tr><th>#</th><th>Order</th><th>Customer</th><th>Status</th><th>Items</th><th>Amount</th><th>Store</th><th>Date</th><th>Action</th></tr>
+              </thead>
+              <tbody>
+                {[...Array(10)].map((_, i) => (
+                  <tr key={i} className="sm-shimmer-tr">
+                    <td><div className="sm-shimmer-block" style={{ width: 22, height: 13 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 100, height: 14 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 120, height: 14 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 72, height: 22, borderRadius: 20 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 36, height: 13 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 72, height: 14 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 88, height: 22, borderRadius: 20 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 56, height: 13 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 34, height: 34, borderRadius: 8 }} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="sm-table-footer"><div className="sm-shimmer-block" style={{ width: 200, height: 12, display: 'inline-block' }} /></div>
+          </div>
+        ) : activeTab === 'product_updates' ? (
+          <div className="sm-table-wrap sm-shimmer-table-wrap">
+            <table className="sm-table">
+              <thead>
+                <tr><th>#</th><th>Product</th><th>Store Owner</th><th>Category</th><th>Current Stock</th><th>Reorder Level</th><th>Updated</th></tr>
+              </thead>
+              <tbody>
+                {[...Array(8)].map((_, i) => (
+                  <tr key={i} className="sm-shimmer-tr">
+                    <td><div className="sm-shimmer-block" style={{ width: 20, height: 13 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: '55%', height: 14 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 90, height: 14 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 70, height: 14 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 36, height: 14 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 28, height: 14 }} /></td>
+                    <td><div className="sm-shimmer-block" style={{ width: 52, height: 13 }} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="sm-shimmer-wrap">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="sm-shimmer-card">
+                <div className="sm-shimmer-row">
+                  <div className="sm-shimmer-block" style={{ width: '80px', height: '16px' }} />
+                  <div className="sm-shimmer-block" style={{ width: '60px', height: '20px', borderRadius: '20px' }} />
+                </div>
+                <div className="sm-shimmer-row" style={{ marginTop: '10px' }}>
+                  <div className="sm-shimmer-block" style={{ width: '120px', height: '14px' }} />
+                  <div className="sm-shimmer-block" style={{ width: '90px', height: '14px' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                  {[...Array(2)].map((_, j) => (
+                    <div key={j} style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '8px', background: '#f9fafb', borderRadius: '8px' }}>
+                      <div className="sm-shimmer-block" style={{ width: '44px', height: '44px', borderRadius: '8px', flexShrink: 0 }} />
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div className="sm-shimmer-block" style={{ width: '70%', height: '13px' }} />
+                        <div className="sm-shimmer-block" style={{ width: '45%', height: '11px' }} />
+                      </div>
+                      <div className="sm-shimmer-block" style={{ width: '50px', height: '13px' }} />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between' }}>
+                  <div className="sm-shimmer-block" style={{ width: '60px', height: '14px' }} />
+                  <div className="sm-shimmer-block" style={{ width: '80px', height: '16px' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       ) : (
         <>
           {/* ══════════════════════════════════════════════════════════════
@@ -584,18 +819,21 @@ export default function StockMovements() {
               CUSTOMER ORDERS TAB
               ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'shipped_orders' && (
-            filteredShipped.length === 0 ? (
-              <div className="sm-loading"><ArrowUpRight size={40} color="#9CA3AF" /><p>No customer orders found in last 30 days</p></div>
+            coMovementsLoading && (movements.shipped_orders || []).length === 0 ? (
+              <div className="sm-loading"><RefreshCw size={36} color="#F97316" className="spin" /><p>Loading orders for selected period…</p></div>
+            ) : filteredShipped.length === 0 ? (
+              <div className="sm-loading"><ArrowUpRight size={40} color="#9CA3AF" /><p>{coPeriodEmptyLabel}</p></div>
             ) : (
-              <div className="sm-table-wrap">
+              <div className={`sm-table-wrap${coMovementsLoading ? ' sm-co-period-loading' : ''}`}>
                 <table className="sm-table">
                   <thead><tr><th>#</th><th>Order</th><th>Customer</th><th>Status</th><th>Items</th><th>Amount</th><th>Store</th><th>Date</th><th>Action</th></tr></thead>
                   <tbody>
-                    {filteredShipped.map((o, idx) => {
+                    {pagedShipped.map((o, idx) => {
                       const osc = ORDER_STATUS_COLORS[o.status] || { color: '#6B7280', bg: '#F3F4F6' };
+                      const globalIdx = (coPage - 1) * CO_PER_PAGE + idx + 1;
                       return (
                         <tr key={o.id}>
-                          <td style={{ color: '#9CA3AF', fontSize: '0.75rem' }}>{idx + 1}</td>
+                          <td style={{ color: '#9CA3AF', fontSize: '0.75rem' }}>{globalIdx}</td>
                           <td><strong>{o.order_number}</strong></td>
                           <td><span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={13} color="#9CA3AF" /> {o.customer_name}</span></td>
                           <td><span className="sm-status" style={{ color: osc.color, background: osc.bg }}>{o.status}</span></td>
@@ -621,14 +859,40 @@ export default function StockMovements() {
                     })}
                   </tbody>
                 </table>
-                <div className="sm-table-footer">{filteredShipped.length} customer orders</div>
+                <div className="sm-table-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span>Showing {(coPage - 1) * CO_PER_PAGE + 1}–{Math.min(coPage * CO_PER_PAGE, filteredShipped.length)} of {filteredShipped.length} orders</span>
+                  {coTotalPages > 1 && (
+                    <div className="sm-co-pag">
+                      <button className="sm-pag-btn" disabled={coPage === 1} onClick={() => setCoPage(p => p - 1)}>‹</button>
+                      {(() => {
+                        const pages = [];
+                        if (coTotalPages <= 7) {
+                          for (let i = 1; i <= coTotalPages; i++) pages.push(i);
+                        } else if (coPage <= 3) {
+                          for (let i = 1; i <= 5; i++) pages.push(i);
+                          pages.push('...');
+                          pages.push(coTotalPages);
+                        } else if (coPage >= coTotalPages - 2) {
+                          pages.push(1); pages.push('...');
+                          for (let i = coTotalPages - 4; i <= coTotalPages; i++) pages.push(i);
+                        } else {
+                          pages.push(1); pages.push('...');
+                          for (let i = coPage - 1; i <= coPage + 1; i++) pages.push(i);
+                          pages.push('...'); pages.push(coTotalPages);
+                        }
+                        return pages.map((p, i) =>
+                          p === '...' ? <span key={`e${i}`} className="sm-pag-ellipsis">…</span> :
+                          <button key={p} className={`sm-pag-btn ${coPage === p ? 'active' : ''}`} onClick={() => setCoPage(p)}>{p}</button>
+                        );
+                      })()}
+                      <button className="sm-pag-btn" disabled={coPage === coTotalPages} onClick={() => setCoPage(p => p + 1)}>›</button>
+                    </div>
+                  )}
+                </div>
               </div>
             )
           )}
 
-          {activeTab === 'shipped_orders' && !loading && (
-            <StoreShippingChart summary={movements.store_shipping_summary || {}} />
-          )}
 
           {/* ══════════ PRODUCT UPDATES TAB ══════════ */}
           {activeTab === 'product_updates' && (
@@ -790,11 +1054,37 @@ export default function StockMovements() {
         .sm-store-select { padding: 7px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.82rem; font-weight: 600; color: #374151; background: #fff; cursor: pointer; font-family: inherit; outline: none; }
         .sm-store-select:focus { border-color: #7C3AED; box-shadow: 0 0 0 3px rgba(124,58,237,0.08); }
 
+        .sm-period-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .sm-period-icon { color: #F97316; flex-shrink: 0; }
+        .sm-period-label { font-size: 0.72rem; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: 0.04em; }
+        .sm-period-select { padding: 7px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.82rem; font-weight: 600; color: #374151; background: #fff; cursor: pointer; font-family: inherit; outline: none; min-width: 168px; }
+        .sm-period-select:focus { border-color: #F97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.12); }
+        .sm-period-select:disabled { opacity: 0.65; cursor: wait; }
+        .sm-period-loading { color: #F97316; flex-shrink: 0; }
+        .sm-co-period-loading { opacity: 0.55; pointer-events: none; transition: opacity 0.2s ease; }
+
         .sm-error { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; color: #DC2626; font-size: 0.85rem; margin-bottom: 16px; }
         .sm-retry { margin-left: auto; padding: 4px 12px; background: #DC2626; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.78rem; }
         .sm-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: #6B7280; gap: 12px; }
         .spin { animation: spinB 1s linear infinite; }
         @keyframes spinB { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+        /* ── Shimmer Loading ── */
+        @keyframes sm-shimmer-anim { 0% { background-position: -600px 0; } 100% { background-position: 600px 0; } }
+        .sm-shimmer-block { background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 1200px 100%; animation: sm-shimmer-anim 1.4s infinite linear; border-radius: 6px; }
+        .sm-shimmer-wrap { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+        .sm-shimmer-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px 18px; }
+        .sm-shimmer-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .sm-shimmer-table-wrap { pointer-events: none; }
+        .sm-shimmer-tr td { vertical-align: middle; }
+
+        /* ── Pagination ── */
+        .sm-co-pag { display: flex; align-items: center; gap: 4px; }
+        .sm-pag-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding: 0 6px; border-radius: 7px; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+        .sm-pag-btn:hover:not(:disabled) { border-color: #F97316; color: #F97316; background: #FFF7ED; }
+        .sm-pag-btn.active { background: #F97316; color: #fff; border-color: #F97316; }
+        .sm-pag-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .sm-pag-ellipsis { color: #9CA3AF; font-size: 0.82rem; padding: 0 3px; }
 
         /* ── Tables ── */
         .sm-table-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow-x: auto; }

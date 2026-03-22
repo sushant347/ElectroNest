@@ -169,7 +169,7 @@ export const warehouseAPI = {
   getDashboard: () => api.get('/warehouse/dashboard/'),
 
   // Stock Movements (detailed: shipped orders, received POs, product updates)
-  getStockMovements: () => api.get('/warehouse/stock-movements/'),
+  getStockMovements: (params) => api.get('/warehouse/stock-movements/', { params }),
 
   // Purchase Orders
   getPurchaseOrders: (params) => api.get('/warehouse/purchase-orders/', { params }),

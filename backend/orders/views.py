@@ -5,6 +5,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from django.db import transaction
 from django.db.models import Avg, Count, Prefetch
+from django.utils import timezone
+from datetime import timedelta
 from decimal import Decimal
 import uuid
 
@@ -174,9 +176,26 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
             address_type = 'Shipping',
         )
 
+    @staticmethod
+    def _order_date_since_from_request(request):
+        """Optional ?days=30|90|… filters order_date in DB; ?days=0|lifetime|all|full = no date filter. Omit param = no filter."""
+        dr = (request.query_params.get('days') or '').strip().lower()
+        if dr in ('0', 'lifetime', 'all', 'full'):
+            return None
+        if not dr:
+            return None
+        try:
+            d = int(dr)
+            if d <= 0:
+                return None
+            return timezone.now() - timedelta(days=min(d, 3660))
+        except ValueError:
+            return None
+
     def get_queryset(self):
         from django.db.models import Prefetch
         user = self.request.user
+        order_since = self._order_date_since_from_request(self.request)
         payments_prefetch = Prefetch('payments', queryset=Payment.objects.select_related('method'))
         # All detail queries use deep select_related to eliminate N+1 for category/supplier
         _detail_qs = (
@@ -197,16 +216,16 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                 )
                 if not owner_product_ids:
                     return Order.objects.none()
-                # Step 2: get order IDs that contain those products (no JOIN on outer query)
-                owner_order_ids = list(
-                    OrderDetail.objects.filter(product_id__in=owner_product_ids)
-                    .values_list('order_id', flat=True).distinct()
-                )
+                # Step 2: order IDs that contain those products (optional date filter on order in DB)
+                od_for_ids = OrderDetail.objects.filter(product_id__in=owner_product_ids)
+                if order_since is not None:
+                    od_for_ids = od_for_ids.filter(order__order_date__gte=order_since)
+                owner_order_ids = list(od_for_ids.values_list('order_id', flat=True).distinct())
                 if not owner_order_ids:
                     return Order.objects.none()
                 own_details = (
                     OrderDetail.objects
-                    .filter(product_id__in=owner_product_ids)
+                    .filter(product_id__in=owner_product_ids, order_id__in=owner_order_ids)
                     .select_related('product__category', 'product__supplier')
                     .order_by('id')
                 )
@@ -218,15 +237,21 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                     .order_by('-order_date')
                 )
             # Admin / warehouse: see all orders
+            qs = Order.objects.all()
+            if order_since is not None:
+                qs = qs.filter(order_date__gte=order_since)
             return (
-                Order.objects
+                qs
                 .select_related('order_status', 'customer', 'address')
                 .prefetch_related(Prefetch('details', queryset=_detail_qs), payments_prefetch)
                 .order_by('-order_date')
             )
         # Customers: see only their own orders
+        qs = Order.objects.filter(customer=user)
+        if order_since is not None:
+            qs = qs.filter(order_date__gte=order_since)
         return (
-            Order.objects.filter(customer=user)
+            qs
             .select_related('order_status', 'address')
             .prefetch_related(Prefetch('details', queryset=_detail_qs), payments_prefetch)
             .order_by('-order_date')

@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from django.db.models import Sum, Count, F
+from django.db.models import Sum, Count, F, Q
 from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
@@ -12,8 +12,29 @@ from datetime import timedelta
 from .models import PurchaseOrder, PurchaseOrderDetail
 from .serializers import PurchaseOrderSerializer, PurchaseOrderDetailSerializer
 from products.models import Product, Supplier
-from orders.models import Order, OrderStatus, OrderDetail
+from orders.models import Order, OrderStatus, OrderDetail, Payment
 from admin_panel.models import AuditLog
+
+
+def _line_item_store_name(product, product_id_fallback=None):
+    """
+    Label for warehouse store column. 'Unknown Store' appeared when Product.owner_name was blank
+    or the product row was missing; we fall back to supplier name then SKU so rows stay identifiable.
+    """
+    if product is None:
+        return f'Removed product #{product_id_fallback}' if product_id_fallback is not None else 'Removed product'
+    owner = (getattr(product, 'owner_name', None) or '').strip()
+    if owner:
+        return owner
+    supplier = getattr(product, 'supplier', None)
+    if supplier is not None:
+        sn = (getattr(supplier, 'name', None) or '').strip()
+        if sn:
+            return sn
+    sku = (getattr(product, 'sku', None) or '').strip()
+    if sku:
+        return f'Store · SKU {sku}'
+    return f'Store · product #{product.id}'
 
 
 class IsWarehouseOrOwner(IsAuthenticated):
@@ -266,21 +287,38 @@ class StockMovementsView(APIView):
 
     def get(self, request):
         since = timezone.now() - timedelta(days=30)
+        # Customer orders: `days=30|90|…` limits by order_date; `days=0` or `lifetime` = no date filter (full history).
+        days_raw = (request.query_params.get('days') or '90').strip().lower()
+        order_since = None
+        if days_raw in ('0', 'lifetime', 'all', 'full'):
+            order_since = None
+        else:
+            try:
+                order_days = int(days_raw)
+            except (TypeError, ValueError):
+                order_days = 90
+            order_days = max(1, min(order_days, 3660))
+            order_since = timezone.now() - timedelta(days=order_days)
 
-        # 1. All customer orders (stock went OUT on creation)
+        # 1. Customer orders (scoped by selected period in DB — not filtered only on the client)
         # Include all statuses except Cancelled — stock is deducted when order is placed
         active_statuses = OrderStatus.objects.exclude(name='Cancelled')
         customer_orders = []
         if active_statuses.exists():
             status_ids = list(active_statuses.values_list('id', flat=True))
+            order_q = Q(order_status_id__in=status_ids)
+            if order_since is not None:
+                order_q &= Q(order_date__gte=order_since)
             orders = (
                 Order.objects
-                .filter(order_status_id__in=status_ids, updated_at__gte=since)
+                .filter(order_q)
                 .select_related('customer', 'order_status', 'address')
-                .prefetch_related('details__product')
-                .order_by('-updated_at')[:20]
+                .prefetch_related(
+                    'details__product__supplier',
+                    'payments__method',
+                )
+                .order_by('-order_date', '-id')
             )
-            from orders.models import Payment
             for o in orders:
                 items = []
                 for d in o.details.all():
@@ -291,7 +329,7 @@ class StockMovementsView(APIView):
 
                     product_id = product.id if product else d.product_id
                     product_name = product.name if product else f'Product #{d.product_id}'
-                    store_name = ((product.owner_name or '').strip() if product else '') or 'Unknown Store'
+                    store_name = _line_item_store_name(product, d.product_id)
                     items.append({
                         'product_name': product_name,
                         'quantity': d.quantity,
@@ -300,12 +338,13 @@ class StockMovementsView(APIView):
                         'product_id': product_id,
                         'store_name': store_name,
                     })
-                payment = Payment.objects.filter(order_id=o.id).select_related('method').first()
+                pay_list = list(o.payments.all())
+                payment = pay_list[0] if pay_list else None
                 # Derive store name from the products in this order
                 store_names = list(dict.fromkeys(
                     i['store_name'] for i in items if i.get('store_name')
                 ))
-                store_label = ', '.join(store_names) if store_names else 'Unknown Store'
+                store_label = ', '.join(store_names) if store_names else 'No store on line items'
 
                 shipping_cost = float(getattr(o, 'shipping_cost', 200))
 
@@ -326,6 +365,7 @@ class StockMovementsView(APIView):
                     'shipping_cost': shipping_cost,
                     'store_name': store_label,
                     'date': o.updated_at.isoformat() if o.updated_at else '',
+                    'order_date': o.order_date.isoformat() if o.order_date else '',
                     'items': items,
                     'items_count': len(items),
                     'payment_method': payment.method.name if payment and payment.method else 'N/A',
@@ -338,7 +378,7 @@ class StockMovementsView(APIView):
             PurchaseOrder.objects
             .filter(created_at__gte=since)
             .select_related('supplier', 'order_status')
-            .prefetch_related('details__product')
+            .prefetch_related('details__product__supplier')
             .order_by('-created_at')[:50]
         )
 
@@ -357,7 +397,7 @@ class StockMovementsView(APIView):
                     'product_id': d.product.id,
                     'product_name': d.product.name,
                     'product_image': d.product.image_url or '',
-                    'product_owner': (d.product.owner_name or '').strip(),
+                    'product_owner': _line_item_store_name(d.product, d.product_id),
                     'product_price': float(d.product.selling_price),
                     'quantity': d.quantity,
                     'unit_cost': float(d.unit_cost),
@@ -400,7 +440,7 @@ class StockMovementsView(APIView):
             store_names_in_po = list(dict.fromkeys(
                 i['product_owner'] for i in po_items if i.get('product_owner')
             ))
-            store_label = ', '.join(store_names_in_po) if store_names_in_po else 'Unknown Store'
+            store_label = ', '.join(store_names_in_po) if store_names_in_po else 'No store on line items'
 
             enriched_pos.append({
                 'id': po.id,
@@ -420,33 +460,34 @@ class StockMovementsView(APIView):
                 'items_count': len(po_items),
             })
 
-            # Commission calculation per store
-            is_free_shipping = shipping_cost == 0
-            for item in po_items:
-                sname = item['product_owner'] or 'Unknown Store'
-                if sname not in store_commission:
-                    store_commission[sname] = {
-                        'product_revenue': 0.0,
-                        'shipping_revenue': 0.0,
-                        'commission': 0.0,
-                        'free_shipping_commission': 0.0,
-                        'orders': 0,
-                    }
-                item_total = item['product_price'] * item['quantity']
-                store_commission[sname]['product_revenue'] += item_total
-                store_commission[sname]['orders'] += 1
+            # Commission calculation per store — only for Shipped or Delivered orders
+            if order_status_name in ('Shipped', 'Delivered'):
+                is_free_shipping = shipping_cost == 0
+                for item in po_items:
+                    sname = item['product_owner'] or 'Unassigned'
+                    if sname not in store_commission:
+                        store_commission[sname] = {
+                            'product_revenue': 0.0,
+                            'shipping_revenue': 0.0,
+                            'commission': 0.0,
+                            'free_shipping_commission': 0.0,
+                            'orders': 0,
+                        }
+                    item_total = item['product_price'] * item['quantity']
+                    store_commission[sname]['product_revenue'] += item_total
+                    store_commission[sname]['orders'] += 1
 
-                if is_free_shipping:
-                    # 12% of product price if free shipping
-                    comm = item_total * 0.12
-                    store_commission[sname]['free_shipping_commission'] += comm
-                    store_commission[sname]['commission'] += comm
-                else:
-                    # 10% of product price + shipping per item
-                    shipping_per_item = shipping_cost / max(len(po_items), 1)
-                    comm = item_total * 0.10 + shipping_per_item
-                    store_commission[sname]['shipping_revenue'] += shipping_per_item
-                    store_commission[sname]['commission'] += comm
+                    if is_free_shipping:
+                        # 12% of product price if free shipping
+                        comm = item_total * 0.12
+                        store_commission[sname]['free_shipping_commission'] += comm
+                        store_commission[sname]['commission'] += comm
+                    else:
+                        # 10% of product price + shipping per item
+                        shipping_per_item = shipping_cost / max(len(po_items), 1)
+                        comm = item_total * 0.10 + shipping_per_item
+                        store_commission[sname]['shipping_revenue'] += shipping_per_item
+                        store_commission[sname]['commission'] += comm
 
         # Round commission values
         for sname in store_commission:
