@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 /* ── Field lives OUTSIDE ProductModal so its identity is stable across re-renders.
    Defining a component inside another component causes React to treat it as a new
    component type on every render, unmounting/remounting it and losing input focus. ── */
-function Field({ label, name, type = 'text', required, rows, form, errors, onChange }) {
+function Field({ label, name, type = 'text', required, rows, form, errors, onChange, hint }) {
   return (
     <div className="pm-field">
       <label className="pm-label">{label}{required && <span className="pm-req">*</span>}</label>
@@ -23,6 +23,7 @@ function Field({ label, name, type = 'text', required, rows, form, errors, onCha
           onChange={(e) => onChange(name, e.target.value)}
         />
       )}
+      {hint && !errors[name] && <span className="pm-hint">{hint}</span>}
       {errors[name] && <span className="pm-error">{errors[name]}</span>}
     </div>
   );
@@ -32,7 +33,7 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
   const isEdit = !!product;
   const blank = {
     name: '', category: '', brand: '', description: '', specifications: '',
-    cost_price: '', selling_price: '', stock: '', reorder_level: '',
+    cost_price: '', selling_price: '', discount_price: '', stock: '', reorder_level: '',
     owner_name: '', image_url: '',
   };
   const [form, setForm] = useState(blank);
@@ -45,12 +46,13 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
         setForm({
           ...blank,
           ...product,
-          category:   product.category   ?? '',
-          owner_name: product.owner_name ?? '',
-          cost_price: product.cost_price ?? '',
-          selling_price: product.selling_price ?? '',
-          stock:      product.stock      ?? '',
-          reorder_level: product.reorder_level ?? '',
+          category:       product.category       ?? '',
+          owner_name:     product.owner_name     ?? '',
+          cost_price:     product.cost_price     ?? '',
+          selling_price:  product.selling_price  ?? '',
+          discount_price: product.discount_price ?? '',
+          stock:          product.stock          ?? '',
+          reorder_level:  product.reorder_level  ?? '',
         });
       } else {
         setForm(blank);
@@ -73,6 +75,12 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
     if (form.selling_price === '' || Number(form.selling_price) < 0) e.selling_price = 'Enter valid price';
     if (form.cost_price !== '' && form.selling_price !== '' && Number(form.selling_price) <= Number(form.cost_price))
       e.selling_price = 'Must be > cost price';
+    if (form.discount_price !== '') {
+      const dp = Number(form.discount_price);
+      const sp = Number(form.selling_price);
+      if (dp <= 0) e.discount_price = 'Must be greater than 0';
+      else if (sp && dp >= sp) e.discount_price = 'Must be less than selling price';
+    }
     if (form.stock === '' || Number(form.stock) < 0) e.stock = 'Enter valid quantity';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -83,18 +91,18 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
     setSaving(true);
     try {
       const payload = {
-        name:         form.name.trim(),
-        category:     Number(form.category),
-        brand:        form.brand.trim(),
-        description:  form.description ?? '',
+        name:          form.name.trim(),
+        category:      Number(form.category),
+        brand:         form.brand.trim(),
+        description:   form.description ?? '',
         specifications: form.specifications ?? '',
-        cost_price:   Number(form.cost_price),
+        cost_price:    Number(form.cost_price),
         selling_price: Number(form.selling_price),
-        stock:        Number(form.stock),
+        discount_price: form.discount_price !== '' ? Number(form.discount_price) : null,
+        stock:         Number(form.stock),
         reorder_level: form.reorder_level !== '' ? Number(form.reorder_level) : 10,
-        image_url:    form.image_url ?? '',
+        image_url:     form.image_url ?? '',
       };
-      // Include owner_name only when explicitly selected
       if (form.owner_name?.trim()) {
         payload.owner_name = form.owner_name.trim();
       }
@@ -105,6 +113,14 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
       setSaving(false);
     }
   };
+
+  const hasSale = form.discount_price !== '' && Number(form.discount_price) > 0;
+  const savings = hasSale && form.selling_price !== ''
+    ? Math.round(Number(form.selling_price) - Number(form.discount_price))
+    : null;
+  const discPct = hasSale && form.selling_price !== '' && Number(form.selling_price) > 0
+    ? Math.round((1 - Number(form.discount_price) / Number(form.selling_price)) * 100)
+    : null;
 
   if (!isOpen) return null;
 
@@ -137,6 +153,31 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
             <Field label="Brand"               name="brand"          required form={form} errors={errors} onChange={set} />
             <Field label="Cost Price (NPR)"    name="cost_price"     required type="number" form={form} errors={errors} onChange={set} />
             <Field label="Selling Price (NPR)" name="selling_price"  required type="number" form={form} errors={errors} onChange={set} />
+
+            {/* Sale / Discount Price */}
+            <div className="pm-field">
+              <label className="pm-label">
+                Sale Price (NPR)
+                <span className="pm-optional"> — optional</span>
+              </label>
+              <input
+                className={`pm-input pm-sale-input ${errors.discount_price ? 'pm-err' : ''} ${hasSale && !errors.discount_price ? 'pm-sale-active' : ''}`}
+                type="number"
+                placeholder="Leave blank = no sale"
+                value={form.discount_price ?? ''}
+                onChange={(e) => set('discount_price', e.target.value)}
+              />
+              {errors.discount_price && <span className="pm-error">{errors.discount_price}</span>}
+              {hasSale && !errors.discount_price && savings !== null && (
+                <span className="pm-sale-preview">
+                  🏷️ ON SALE — {discPct}% off · Customer saves NPR {savings.toLocaleString()}
+                </span>
+              )}
+              {!hasSale && !errors.discount_price && (
+                <span className="pm-hint">Set a lower sale price to mark this product ON SALE</span>
+              )}
+            </div>
+
             <Field label="Stock Quantity"      name="stock"          required type="number" form={form} errors={errors} onChange={set} />
             <Field label="Reorder Level"       name="reorder_level"           type="number" form={form} errors={errors} onChange={set} />
 
@@ -195,10 +236,14 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
         @media (max-width: 540px) { .pm-grid { grid-template-columns: 1fr; } }
         .pm-field { display: flex; flex-direction: column; gap: 0.25rem; }
         .pm-label { font-size: 0.78rem; font-weight: 600; color: #374151; }
+        .pm-optional { font-weight: 400; color: #9ca3af; font-size: 0.72rem; }
         .pm-req { color: #ef4444; margin-left: 2px; }
         .pm-input { padding: 0.5rem 0.75rem; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 0.85rem; font-family: inherit; color: #1e293b; transition: border-color 0.15s; background: #fff; resize: vertical; }
         .pm-input:focus { outline: none; border-color: #F97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.1); }
         .pm-input.pm-err { border-color: #ef4444; }
+        .pm-sale-input.pm-sale-active { border-color: #F97316; background: #fff7ed; }
+        .pm-hint { font-size: 0.7rem; color: #9ca3af; }
+        .pm-sale-preview { font-size: 0.72rem; color: #ea580c; font-weight: 600; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 4px 8px; }
         .pm-error { font-size: 0.72rem; color: #ef4444; font-weight: 500; }
         .pm-preview { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1px solid #e5e7eb; flex-shrink: 0; }
         .pm-footer { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; }
