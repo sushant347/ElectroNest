@@ -269,7 +269,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
                   {categories.map(cat => (
                     <div key={cat.id} className={`nb-mega-cat${hovCat?.id === cat.id ? ' hi' : ''}`}
                       onMouseEnter={() => setHovCat(cat)}
-                      onClick={() => { navigate(`/?cat=${encodeURIComponent(cat.name)}`); setCatOpen(false) }}>
+                      onClick={() => setHovCat(cat)}>
                       <span>{cat.name}</span>
                       <span className="nb-mega-arr">›</span>
                     </div>

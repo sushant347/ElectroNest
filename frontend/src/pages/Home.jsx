@@ -91,6 +91,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   const nav = useNavigate()
   const prodRef = useRef(null)
   const timerRef = useRef(null)
+  const suppressScrollRef = useRef(false)
   const catParam = sp.get('cat') || ''
   const searchQ = sp.get('search') || ''
 
@@ -100,6 +101,12 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   }
   useEffect(() => { resetTimer(); return () => clearInterval(timerRef.current) }, [])
   useEffect(() => { if (searchQ && prodRef.current) prodRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, [searchQ])
+  useEffect(() => {
+    if (catParam && prodRef.current) {
+      if (suppressScrollRef.current) { suppressScrollRef.current = false; return }
+      prodRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [catParam])
   useEffect(() => { setSelCat(catParam || null) }, [catParam])
 
   useEffect(() => {
@@ -221,7 +228,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     return applyImgVariants(out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price)))
   })()
 
-  const handleCat = (name) => { if (selCat === name) { setSelCat(null); nav('/') } else { setSelCat(name); nav(`/?cat=${encodeURIComponent(name)}`) } }
+  const handleCat = (name) => { suppressScrollRef.current = true; if (selCat === name) { setSelCat(null); nav('/') } else { setSelCat(name); nav(`/?cat=${encodeURIComponent(name)}`) } }
   const s = HERO_SLIDES[slide]
 
   return (
