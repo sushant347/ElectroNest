@@ -3,7 +3,8 @@ set -o errexit
 
 pip install -r requirements.txt
 
-python manage.py migrate --noinput
+# Use direct (non-pooled) URL for migrations — pgBouncer blocks Django migration locks
+DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 
 # Seed core data (categories, suppliers, products, order statuses, payment methods)
