@@ -2,7 +2,11 @@ import pandas as pd
 import numpy as np
 from django.db import connection
 from django.utils import timezone
+from django.core.cache import cache
 from datetime import timedelta
+
+# Cache TTL for expensive ML computations (1 hour)
+_ML_CACHE_TTL = 3600
 
 
 def _read_sql(query, params=None):
@@ -26,6 +30,11 @@ def get_customer_rfm(days=90):
     Professional RFM segmentation with 10 segments, CLV estimation,
     and actionable recommendations per segment.
     """
+    cache_key = f'analytics_rfm_{days}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     now = timezone.now()
     from_date = now - timedelta(days=days)
 
@@ -155,6 +164,7 @@ def get_customer_rfm(days=90):
             'last_order': row['last_order'].strftime('%Y-%m-%d') if pd.notna(row['last_order']) else '',
         })
 
+    cache.set(cache_key, records, _ML_CACHE_TTL)
     return records
 
 
@@ -170,6 +180,11 @@ def get_churn_prediction(days=90, churn_threshold_days=30):
     - Feature importance for explainability
     - Model accuracy metrics (precision, recall, F1)
     """
+    cache_key = f'analytics_churn_{days}_{churn_threshold_days}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     now = timezone.now()
     from_date = now - timedelta(days=days)
 
@@ -370,11 +385,13 @@ def get_churn_prediction(days=90, churn_threshold_days=30):
         'revenue_at_risk': revenue_at_risk,
     }
 
-    return {
+    result = {
         'customers': customers,
         'summary': summary,
         'model_info': model_info,
     }
+    cache.set(cache_key, result, _ML_CACHE_TTL)
+    return result
 
 
 # ─────────────────────────────────────────────────────────

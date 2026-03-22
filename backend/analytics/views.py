@@ -96,9 +96,14 @@ class SalesOverviewView(APIView):
                 return 0
             return round(((curr - prev) / prev) * 100, 1)
 
-        # Total customers from legacy Customers table
-        total_db_customers = Customer.objects.count()
-        active_db_customers = Customer.objects.filter(is_active=True).count()
+        # Total customers from legacy Customers table (single query)
+        from django.db.models import Count as _Count
+        cust_agg = Customer.objects.aggregate(
+            total=_Count('id'),
+            active=_Count(Case(When(is_active=True, then=Value(1)), output_field=DecimalField())),
+        )
+        total_db_customers = cust_agg['total']
+        active_db_customers = cust_agg['active']
 
         return Response({
             'total_revenue':    curr_revenue,
@@ -273,7 +278,7 @@ class OrderStatusView(APIView):
         if store:
             status_qs = status_qs.filter(details__product__owner_name__icontains=store).distinct()
 
-        data = status_qs.values('order_status__name').annotate(value=Count('id'))
+        data = status_qs.order_by().values('order_status__name').annotate(value=Count('id')).order_by('-value')
 
         return Response([{
             'name':  item['order_status__name'] or 'Unknown',

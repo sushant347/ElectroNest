@@ -5,6 +5,74 @@ import { adminAPI } from '../../services/api';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
+/* ── SVG 3-D Donut helpers (shared) ── */
+const DONUT_COLORS = ['#F97316', '#2563EB', '#16A34A', '#7C3AED', '#EC4899', '#D97706', '#0891B2', '#6366F1', '#DC2626', '#059669', '#8B5CF6', '#F43F5E'];
+function _ptc(cx, cy, r, deg) { const rad = ((deg - 90) * Math.PI) / 180; return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }; }
+function _arc(cx, cy, oR, iR, s, e) {
+  const se = e - s >= 359.99 ? s + 359.99 : e;
+  const o1 = _ptc(cx, cy, oR, s), o2 = _ptc(cx, cy, oR, se);
+  const i1 = _ptc(cx, cy, iR, se), i2 = _ptc(cx, cy, iR, s);
+  return [`M ${o1.x} ${o1.y}`, `A ${oR} ${oR} 0 ${se - s > 180 ? 1 : 0} 1 ${o2.x} ${o2.y}`, `L ${i1.x} ${i1.y}`, `A ${iR} ${iR} 0 ${se - s > 180 ? 1 : 0} 0 ${i2.x} ${i2.y}`, 'Z'].join(' ');
+}
+
+function SvgCategoryDonut({ data }) {
+  const [hovered, setHovered] = useState(null);
+  const [tt, setTt] = useState({ x: 0, y: 0 });
+  if (!data || !data.length) return <p style={{ color: '#9CA3AF', textAlign: 'center', padding: 40 }}>No category data</p>;
+  const total = data.reduce((s, d) => s + (d.total_revenue || 0), 0);
+  if (total === 0) return <p style={{ color: '#9CA3AF', textAlign: 'center', padding: 40 }}>No category data</p>;
+  const CX = 120, CY = 120, OR = 108, IR = 60;
+  let cum = 0;
+  const segs = data.map((d, i) => {
+    const start = cum, sweep = (d.total_revenue / total) * 360;
+    cum += sweep;
+    return { ...d, start, end: cum, pct: (d.total_revenue / total) * 100, color: DONUT_COLORS[i % DONUT_COLORS.length], path: _arc(CX, CY, OR, IR, start, cum), mid: start + sweep / 2 };
+  });
+  const act = hovered !== null ? segs[hovered] : null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setHovered(null)}>
+        <svg width={240} height={240} viewBox="0 0 240 240" style={{ display: 'block', overflow: 'visible' }}>
+          <defs><filter id="adm-cat-shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#00000030"/></filter></defs>
+          {segs.map((s, i) => {
+            const on = hovered === i, mr = ((s.mid - 90) * Math.PI) / 180, off = on ? 8 : 0;
+            return <path key={i} d={s.path} fill={s.color} transform={`translate(${off * Math.cos(mr)},${off * Math.sin(mr)})`} filter={on ? 'url(#adm-cat-shadow)' : undefined} stroke="#fff" strokeWidth={on ? 2.5 : 1.5} style={{ cursor: 'pointer', transition: 'transform 0.18s ease' }} onMouseMove={e => { setHovered(i); setTt({ x: e.clientX, y: e.clientY }); }} onMouseEnter={e => { setHovered(i); setTt({ x: e.clientX, y: e.clientY }); }} />;
+          })}
+          <circle cx={CX} cy={CY} r={IR - 2} fill="#fff" />
+          {act ? (<>
+            <text x={CX} y={CY - 14} textAnchor="middle" style={{ fontSize: 9, fill: act.color, fontWeight: 700, fontFamily: 'inherit' }}>{act.category_name?.length > 14 ? act.category_name.slice(0, 13) + '…' : act.category_name}</text>
+            <text x={CX} y={CY + 2} textAnchor="middle" style={{ fontSize: 8, fill: '#6B7280', fontFamily: 'inherit' }}>Revenue</text>
+            <text x={CX} y={CY + 17} textAnchor="middle" style={{ fontSize: 10, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>{fmtNPR(act.total_revenue)}</text>
+            <text x={CX} y={CY + 31} textAnchor="middle" style={{ fontSize: 10, fill: act.color, fontWeight: 600, fontFamily: 'inherit' }}>{act.pct.toFixed(1)}%</text>
+          </>) : (<>
+            <text x={CX} y={CY - 8} textAnchor="middle" style={{ fontSize: 10, fill: '#9CA3AF', fontFamily: 'inherit', fontWeight: 600 }}>{data.length} Categories</text>
+            <text x={CX} y={CY + 10} textAnchor="middle" style={{ fontSize: 10, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>{fmtNPR(total)}</text>
+          </>)}
+        </svg>
+        {act && (
+          <div style={{ position: 'fixed', left: tt.x > (window.innerWidth / 2) ? 'auto' : tt.x + 14, right: tt.x > (window.innerWidth / 2) ? window.innerWidth - tt.x + 14 : 'auto', top: Math.min(tt.y - 10, window.innerHeight - 150), zIndex: 9999, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 160, pointerEvents: 'none' }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', borderLeft: `3px solid ${act.color}`, paddingLeft: 8, marginBottom: 8 }}>{act.category_name}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: '0.78rem', color: '#6B7280', marginBottom: 3 }}><span>Revenue</span><strong style={{ color: act.color }}>{fmtNPR(act.total_revenue)}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: '0.78rem', color: '#6B7280', marginBottom: 3 }}><span>Share</span><strong>{act.pct.toFixed(1)}%</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: '0.78rem', color: '#6B7280' }}><span>Orders</span><strong>{act.total_orders || 0}</strong></div>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 130, maxHeight: 240, overflowY: 'auto' }}>
+        {segs.map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '2px 0' }} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0, transform: hovered === i ? 'scale(1.3)' : 'scale(1)', transition: 'transform 0.15s' }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: hovered === i ? s.color : '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 130 }}>{s.category_name}</div>
+              <div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>{fmtNPR(s.total_revenue)} <span style={{ color: '#D1D5DB' }}>·</span> {s.pct.toFixed(1)}%</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Aggregate daily data into weekly buckets when there are too many data points */
 function aggregateToWeekly(data) {
   if (!data || data.length <= 60) return data;
@@ -24,28 +92,28 @@ export default function AnalyticsSummary() {
   const [trend, setTrend] = useState([]);
   const [categories, setCategories] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
-  const [lowStock, setLowStock] = useState([]);
   const [rfmData, setRfmData] = useState([]);
   const [churnData, setChurnData] = useState(null);
   const [orderStatus, setOrderStatus] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [mlLoading, setMlLoading] = useState(true);
   const [error, setError] = useState('');
   const [days, setDays] = useState(3650);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setMlLoading(true);
     setError('');
+
+    // Wave 1: fast core data — renders the page immediately
     try {
       const params = { days };
-      const [salesRes, trendRes, catRes, topRes, lowRes, rfmRes, churnRes, statusRes, payRes] = await Promise.all([
+      const [salesRes, trendRes, catRes, topRes, statusRes, payRes] = await Promise.all([
         adminAPI.getSalesOverview(params),
         adminAPI.getRevenueTrend(params),
         adminAPI.getCategoryPerformance(params),
         adminAPI.getTopProducts(params),
-        adminAPI.getLowStockProducts(params),
-        adminAPI.getCustomerSegmentation({ days: Math.min(days, 365) }).catch(() => ({ data: [] })),
-        adminAPI.getChurnPrediction({ days: Math.min(days, 365) }).catch(() => ({ data: null })),
         adminAPI.getOrderStatusStats(params).catch(() => ({ data: [] })),
         adminAPI.getPaymentMethodStats(params).catch(() => ({ data: [] })),
       ]);
@@ -53,9 +121,6 @@ export default function AnalyticsSummary() {
       setTrend(trendRes.data || []);
       setCategories(catRes.data || []);
       setTopProducts(topRes.data || []);
-      setLowStock(lowRes.data || []);
-      setRfmData(rfmRes.data || []);
-      setChurnData(churnRes.data);
       setOrderStatus(statusRes.data || []);
       setPaymentMethods(payRes.data || []);
     } catch (err) {
@@ -63,6 +128,21 @@ export default function AnalyticsSummary() {
       setError('Failed to load analytics data.');
     } finally {
       setLoading(false);
+    }
+
+    // Wave 2: slow ML data — loads in background, doesn't block page render
+    try {
+      const mlDays = Math.min(days, 365);
+      const [rfmRes, churnRes] = await Promise.all([
+        adminAPI.getCustomerSegmentation({ days: mlDays }).catch(() => ({ data: [] })),
+        adminAPI.getChurnPrediction({ days: mlDays }).catch(() => ({ data: null })),
+      ]);
+      setRfmData(rfmRes.data || []);
+      setChurnData(churnRes.data);
+    } catch (err) {
+      console.error('ML analytics fetch error:', err);
+    } finally {
+      setMlLoading(false);
     }
   }, [days]);
 
@@ -109,7 +189,7 @@ export default function AnalyticsSummary() {
         <div className="an-kpi"><span className="an-kpi-label">Total Revenue</span><span className="an-kpi-value green">{fmtNPR(sales?.total_revenue)}</span><span className="an-kpi-change">{sales?.revenue_change > 0 ? '↑' : '↓'} {Math.abs(sales?.revenue_change || 0)}% vs prev</span></div>
         <div className="an-kpi"><span className="an-kpi-label">Total Orders</span><span className="an-kpi-value blue">{sales?.total_orders || 0}</span><span className="an-kpi-change">{sales?.orders_change > 0 ? '↑' : '↓'} {Math.abs(sales?.orders_change || 0)}% vs prev</span></div>
         <div className="an-kpi"><span className="an-kpi-label">Total Customers</span><span className="an-kpi-value purple">{(sales?.total_customers || 0).toLocaleString('en-IN')}</span><span className="an-kpi-change">{sales?.active_customers || 0} active customers</span></div>
-        <div className="an-kpi"><span className="an-kpi-label">Low Stock Items</span><span className="an-kpi-value amber">{lowStock.length}</span><span className="an-kpi-change">Products below reorder level</span></div>
+        <div className="an-kpi"><span className="an-kpi-label">Avg Order Value</span><span className="an-kpi-value amber">{fmtNPR(sales?.total_revenue && sales?.total_orders ? sales.total_revenue / sales.total_orders : 0)}</span><span className="an-kpi-change">Per completed order</span></div>
       </div>
 
       {/* Charts Row */}
@@ -177,23 +257,7 @@ export default function AnalyticsSummary() {
 
         <div className="an-chart-card">
           <h3 className="an-chart-title">Category Performance</h3>
-          {categories.length > 0 ? (
-            <Plot
-              data={[{
-                type: 'pie',
-                labels: categories.map(c => c.category_name),
-                values: categories.map(c => c.total_revenue),
-                hole: 0.45,
-                marker: { colors: ['#F97316', '#2563EB', '#16A34A', '#7C3AED', '#EC4899', '#D97706', '#0891B2', '#6366F1', '#DC2626', '#059669', '#8B5CF6', '#F43F5E'] },
-                textinfo: 'label+percent',
-                textfont: { size: 11 },
-                hovertemplate: '<b>%{label}</b><br>Revenue: NPR %{value:,.0f}<br>%{percent}<extra></extra>',
-              }]}
-              layout={{ height: 280, margin: { t: 10, b: 20, l: 10, r: 10 }, showlegend: false, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' }}
-              config={{ displayModeBar: false, responsive: true }}
-              style={{ width: '100%' }}
-            />
-          ) : <p style={{ color: '#9CA3AF', textAlign: 'center', padding: 40 }}>No category data</p>}
+          <SvgCategoryDonut data={categories} />
         </div>
       </div>
 
@@ -248,7 +312,11 @@ export default function AnalyticsSummary() {
       </div>
 
       {/* ── Churn Prediction Dashboard ── */}
-      {churnData && !churnData.error && churnData.customers?.length > 0 && (() => {
+      {mlLoading ? (
+        <div className="an-chart-card" style={{ marginTop: 20, padding: '2rem', display: 'flex', alignItems: 'center', gap: 12, color: '#6B7280', fontSize: '0.88rem' }}>
+          <RefreshCw size={16} className="spin" /> Loading churn prediction model...
+        </div>
+      ) : churnData && !churnData.error && churnData.customers?.length > 0 && (() => {
         const summary = churnData.summary || {};
         const modelInfo = churnData.model_info || {};
         const customers = churnData.customers || [];
@@ -417,7 +485,11 @@ export default function AnalyticsSummary() {
       })()}
 
       {/* ── RFM Customer Segmentation ── */}
-      {rfmData.length > 0 && (() => {
+      {mlLoading ? (
+        <div className="an-chart-card" style={{ marginTop: 20, padding: '2rem', display: 'flex', alignItems: 'center', gap: 12, color: '#6B7280', fontSize: '0.88rem' }}>
+          <RefreshCw size={16} className="spin" /> Loading customer segmentation model...
+        </div>
+      ) : rfmData.length > 0 && (() => {
         const segmentCounts = rfmData.reduce((acc, c) => { acc[c.segment] = (acc[c.segment] || 0) + 1; return acc; }, {});
         const segmentRevenue = rfmData.reduce((acc, c) => { acc[c.segment] = (acc[c.segment] || 0) + (c.monetary || 0); return acc; }, {});
         const segments = Object.keys(segmentCounts);
@@ -509,53 +581,42 @@ export default function AnalyticsSummary() {
         );
       })()}
 
-      {/* Top Products Table */}
-      <div className="an-chart-card" style={{ marginTop: 20 }}>
-        <h3 className="an-chart-title">Top 10 Products</h3>
-        <div className="an-table-wrap">
-          <table className="an-table">
-            <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Category</th><th>Units Sold</th><th>Revenue</th></tr></thead>
-            <tbody>
-              {topProducts.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20, color: '#9CA3AF' }}>No data</td></tr>
-              ) : topProducts.map((p, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 700, color: '#F97316' }}>{i + 1}</td>
-                  <td style={{ fontWeight: 600 }}>{p.name}</td>
-                  <td>{p.brand || '-'}</td>
-                  <td>{p.category || '-'}</td>
-                  <td>{p.total_quantity_sold}</td>
-                  <td style={{ fontWeight: 600, color: '#16A34A' }}>{fmtNPR(p.total_revenue)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Low Stock Alert Table */}
-      {lowStock.length > 0 && (
-        <div className="an-chart-card" style={{ marginTop: 20 }}>
-          <h3 className="an-chart-title" style={{ color: '#D97706' }}>Low Stock Alert ({lowStock.length} items)</h3>
-          <div className="an-table-wrap">
-            <table className="an-table">
-              <thead><tr><th>#</th><th>Product</th><th>Category</th><th>Stock</th><th>Reorder Level</th><th>Status</th></tr></thead>
-              <tbody>
-                {lowStock.slice(0, 15).map((p, i) => (
-                  <tr key={i}>
-                    <td style={{ fontWeight: 600, color: '#9CA3AF' }}>{i + 1}</td>
-                    <td style={{ fontWeight: 600 }}>{p.name}</td>
-                    <td>{p.category_name || '-'}</td>
-                    <td style={{ fontWeight: 700, color: (p.stock || p.stock_quantity || 0) <= 0 ? '#DC2626' : '#D97706' }}>{p.stock || p.stock_quantity || 0}</td>
-                    <td>{p.reorder_level}</td>
-                    <td><span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: (p.stock || p.stock_quantity || 0) <= 0 ? '#FEE2E2' : '#FEF3C7', color: (p.stock || p.stock_quantity || 0) <= 0 ? '#DC2626' : '#D97706' }}>{(p.stock || p.stock_quantity || 0) <= 0 ? 'Out of Stock' : 'Low Stock'}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Top Products Table — 1 top-selling product per store */}
+      {(() => {
+        const seen = new Set();
+        const topPerStore = topProducts.filter(p => {
+          const storeKey = (p.owner_name || '').trim().toLowerCase() || 'unknown store';
+          if (seen.has(storeKey)) return false;
+          seen.add(storeKey);
+          return true;
+        });
+        return (
+          <div className="an-chart-card" style={{ marginTop: 20 }}>
+            <h3 className="an-chart-title">Top Product Per Store</h3>
+            <div className="an-table-wrap">
+              <table className="an-table">
+                <thead><tr><th>#</th><th>Store</th><th>Product</th><th>Brand</th><th>Category</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+                <tbody>
+                  {topPerStore.length === 0 ? (
+                    <tr><td colSpan={7} style={{ textAlign: 'center', padding: 20, color: '#9CA3AF' }}>No data</td></tr>
+                  ) : topPerStore.map((p, i) => (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 700, color: '#F97316' }}>{i + 1}</td>
+                      <td style={{ fontWeight: 600, color: '#374151' }}>{p.owner_name || '—'}</td>
+                      <td style={{ fontWeight: 600 }}>{p.name}</td>
+                      <td>{p.brand || '-'}</td>
+                      <td>{p.category || '-'}</td>
+                      <td>{p.total_quantity_sold}</td>
+                      <td style={{ fontWeight: 600, color: '#16A34A' }}>{fmtNPR(p.total_revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
 
       <style>{`
         .an-page { padding: 28px 32px 40px; max-width: 1400px; margin: 0 auto; }

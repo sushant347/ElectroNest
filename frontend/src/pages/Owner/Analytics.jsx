@@ -7,6 +7,114 @@ import ComprehensiveForecastModal from '../../components/Owner/ComprehensiveFore
 const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(v);
 const fmtShort = (v) => { if (v >= 10000000) return `Rs.${(v / 10000000).toFixed(1)}Cr`; if (v >= 100000) return `Rs.${(v / 100000).toFixed(1)}L`; if (v >= 1000) return `Rs.${(v / 1000).toFixed(0)}K`; return `Rs.${v}`; };
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
+const STATUS_COLORS_MAP = { Pending: '#F59E0B', Processing: '#3B82F6', Shipped: '#8B5CF6', Delivered: '#10B981', Cancelled: '#EF4444' };
+
+/* ── SVG Donut helpers ── */
+function _ptc(cx, cy, r, a) { const rad = ((a - 90) * Math.PI) / 180; return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }; }
+function _arc(cx, cy, oR, iR, s, e) {
+  const se = e - s >= 359.99 ? s + 359.99 : e;
+  const o1 = _ptc(cx, cy, oR, s), o2 = _ptc(cx, cy, oR, se), i1 = _ptc(cx, cy, iR, se), i2 = _ptc(cx, cy, iR, s);
+  const lg = se - s > 180 ? 1 : 0;
+  return [`M ${o1.x} ${o1.y}`, `A ${oR} ${oR} 0 ${lg} 1 ${o2.x} ${o2.y}`, `L ${i1.x} ${i1.y}`, `A ${iR} ${iR} 0 ${lg} 0 ${i2.x} ${i2.y}`, 'Z'].join(' ');
+}
+function SvgDonut({ data, labelKey = 'name', valueKey = 'value', colorMap = null, fmtVal = null, id = 'sd' }) {
+  const [hovered, setHovered] = useState(null);
+  const [tooltip, setTooltip] = useState({ x: 0, y: 0 });
+  const total = data.reduce((s, d) => s + (Number(d[valueKey]) || 0), 0);
+  if (!data.length || total === 0) return <p className="an-no-data">No data available</p>;
+  const CX = 110, CY = 110, OR = 100, IR = 56;
+  let cumDeg = 0;
+  const segments = data.map((d, i) => {
+    const sv = Number(d[valueKey]) || 0;
+    const startDeg = cumDeg;
+    const sweep = (sv / total) * 360;
+    cumDeg += sweep;
+    const color = colorMap ? (colorMap[d[labelKey]] || COLORS[i % COLORS.length]) : COLORS[i % COLORS.length];
+    return { label: d[labelKey], value: sv, startDeg, endDeg: cumDeg, pct: (sv / total) * 100, color, path: _arc(CX, CY, OR, IR, startDeg, cumDeg), midDeg: startDeg + sweep / 2 };
+  });
+  const active = hovered !== null ? segments[hovered] : null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setHovered(null)}>
+        <svg width={220} height={220} viewBox="0 0 220 220" style={{ display: 'block', overflow: 'visible' }}>
+          <defs>
+            <filter id={`${id}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#00000030" />
+            </filter>
+          </defs>
+          {segments.map((s, i) => {
+            const isActive = hovered === i;
+            const midRad = ((s.midDeg - 90) * Math.PI) / 180;
+            const offset = isActive ? 8 : 0;
+            return (
+              <path key={i} d={s.path} fill={s.color}
+                transform={`translate(${offset * Math.cos(midRad)}, ${offset * Math.sin(midRad)})`}
+                filter={isActive ? `url(#${id}-shadow)` : undefined}
+                stroke="#fff" strokeWidth={isActive ? 2.5 : 1.5}
+                style={{ cursor: 'pointer', transition: 'transform 0.18s ease' }}
+                onMouseMove={e => { setHovered(i); setTooltip({ x: e.clientX, y: e.clientY }); }}
+                onMouseEnter={e => { setHovered(i); setTooltip({ x: e.clientX, y: e.clientY }); }}
+              />
+            );
+          })}
+          <circle cx={CX} cy={CY} r={IR - 2} fill="#fff" />
+          {active ? (
+            <>
+              <text x={CX} y={CY - 10} textAnchor="middle" style={{ fontSize: 9, fill: active.color, fontWeight: 700, fontFamily: 'inherit' }}>
+                {active.label.length > 14 ? active.label.slice(0, 13) + '…' : active.label}
+              </text>
+              <text x={CX} y={CY + 8} textAnchor="middle" style={{ fontSize: 11, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>
+                {fmtVal ? fmtVal(active.value) : active.value}
+              </text>
+              <text x={CX} y={CY + 24} textAnchor="middle" style={{ fontSize: 10, fill: active.color, fontWeight: 600, fontFamily: 'inherit' }}>
+                {active.pct.toFixed(1)}%
+              </text>
+            </>
+          ) : (
+            <>
+              <text x={CX} y={CY - 4} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'inherit', fontWeight: 600 }}>
+                {segments.length} {segments.length === 1 ? 'item' : 'items'}
+              </text>
+              <text x={CX} y={CY + 12} textAnchor="middle" style={{ fontSize: 11, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>
+                {total}
+              </text>
+            </>
+          )}
+        </svg>
+        {active && (
+          <div style={{
+            position: 'fixed',
+            left: tooltip.x > (typeof window !== 'undefined' ? window.innerWidth / 2 : 400) ? 'auto' : tooltip.x + 14,
+            right: tooltip.x > (typeof window !== 'undefined' ? window.innerWidth / 2 : 400) ? window.innerWidth - tooltip.x + 14 : 'auto',
+            top: Math.min(tooltip.y - 10, typeof window !== 'undefined' ? window.innerHeight - 120 : tooltip.y),
+            zIndex: 9999, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+            padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 150, pointerEvents: 'none',
+          }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', borderLeft: `3px solid ${active.color}`, paddingLeft: 8, marginBottom: 8 }}>{active.label}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: '0.78rem', color: '#6B7280', marginBottom: 3 }}>
+              <span>{fmtVal ? 'Revenue' : 'Count'}</span><strong style={{ color: active.color }}>{fmtVal ? fmtVal(active.value) : active.value}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: '0.78rem', color: '#6B7280' }}>
+              <span>Share</span><strong>{active.pct.toFixed(1)}%</strong>
+            </div>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: 120, maxHeight: 200, overflowY: 'auto' }}>
+        {segments.map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '3px 0' }}
+            onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0, transform: hovered === i ? 'scale(1.3)' : 'scale(1)', transition: 'transform 0.15s' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: hovered === i ? 700 : 600, color: hovered === i ? s.color : '#374151' }}>{s.label}</span>
+              <span style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>{fmtVal ? fmtVal(s.value) : s.value} ({s.pct.toFixed(1)}%)</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** Aggregate daily data into weekly buckets when there are too many data points */
 function aggregateToWeekly(data) {
@@ -109,7 +217,6 @@ export default function Analytics() {
 
   const tabs = [
     { key: 'revenue', label: 'Revenue' },
-    { key: 'products', label: 'Products' },
     { key: 'orders', label: 'Orders' },
   ];
 
@@ -315,22 +422,10 @@ export default function Analytics() {
               />
             </div>
 
-            {/* Payment Methods Pie — Plotly */}
+            {/* Payment Methods — SVG 3D Donut */}
             <div className="an-chart-card">
               <h3 className="an-card-title">Revenue by Payment Method</h3>
-              <Plot
-                data={[{
-                  labels: paymentMethods.map((d) => d.name),
-                  values: paymentMethods.map((d) => d.value),
-                  type: 'pie', hole: 0.4,
-                  marker: { colors: COLORS.slice(0, paymentMethods.length) },
-                  hovertemplate: '<b>%{label}</b><br>₹%{value:,.0f}<br>%{percent}<extra></extra>',
-                  textinfo: 'label+percent', textposition: 'outside', textfont: { size: 11 },
-                }]}
-                layout={{ autosize: true, height: 300, margin: { t: 10, r: 10, b: 10, l: 10 }, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: { family: 'inherit', size: 11 }, showlegend: true, legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center', font: { size: 10, color: '#4b5563' } } }}
-                config={{ responsive: true, displayModeBar: false }}
-                useResizeHandler style={{ width: '100%' }}
-              />
+              <SvgDonut data={paymentMethods} labelKey="name" valueKey="value" fmtVal={fmt} id="pay-donut" />
             </div>
           </div>
 
@@ -397,155 +492,83 @@ export default function Analytics() {
           </div>
       </div>
 
-      {/* Products Tab */}
-      <div className={`an-content${activeTab !== 'products' ? ' an-tab-hidden' : ''}`} data-tab="products">
-          <h2 className="an-print-section-title">Products Analysis</h2>
-          {/* ── Interactive Filters: Dropdown + Slider ── */}
-          <div className="an-filters-bar">
-            <SlidersHorizontal size={16} color="#6b7280" />
-            <span className="an-filters-label">Filters:</span>
-
-            {/* Category Dropdown */}
-            <div className="an-filter-group">
-              <label className="an-filter-lbl">Category</label>
-              <select className="an-filter-select" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-                <option value="all">All Categories</option>
-                {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-
-            {/* Revenue Range Slider */}
-            <div className="an-filter-group slider-group">
-              <label className="an-filter-lbl">Min Revenue: {fmtShort(revenueRange[0])}</label>
-              <input type="range" className="an-filter-slider" min={0} max={maxRevenueValue} step={Math.max(1, Math.round(maxRevenueValue / 100))} value={revenueRange[0]} onChange={(e) => setRevenueRange([Number(e.target.value), revenueRange[1]])} />
-            </div>
-            <div className="an-filter-group slider-group">
-              <label className="an-filter-lbl">Max Revenue: {fmtShort(revenueRange[1])}</label>
-              <input type="range" className="an-filter-slider" min={0} max={maxRevenueValue} step={Math.max(1, Math.round(maxRevenueValue / 100))} value={revenueRange[1]} onChange={(e) => setRevenueRange([revenueRange[0], Number(e.target.value)])} />
-            </div>
-
-            <button className="an-filter-reset" onClick={() => { setSelectedCategory('all'); setRevenueRange([0, maxRevenueValue]); }}>Reset</button>
-          </div>
-
-          <div className="an-grid-2">
-            {/* Category Performance — Plotly horizontal bar */}
-            <div className="an-chart-card">
-              <h3 className="an-card-title">Category Performance</h3>
-              <Plot
-                data={[{
-                  y: categoryData.map((d) => d.category_name),
-                  x: categoryData.map((d) => d.total_revenue),
-                  type: 'bar', orientation: 'h', name: 'Revenue',
-                  marker: { color: '#F97316', cornerradius: 4 },
-                  hovertemplate: '<b>%{y}</b><br>Revenue: ₹%{x:,.0f}<extra></extra>',
-                }]}
-                layout={{ autosize: true, height: 300, margin: { t: 0, r: 20, b: 30, l: 110 }, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: { family: 'inherit', size: 11, color: '#374151' }, xaxis: { gridcolor: '#e5e7eb', tickprefix: '₹', separatethousands: true }, yaxis: { autorange: 'reversed' } }}
-                config={{ responsive: true, displayModeBar: false }}
-                useResizeHandler style={{ width: '100%' }}
-              />
-            </div>
-
-            {/* Top Products (filtered) */}
-            <div className="an-chart-card">
-              <h3 className="an-card-title">Top Products by Revenue {selectedCategory !== 'all' ? `(${selectedCategory})` : ''}</h3>
-              <div className="an-top-list">
-                {filteredTopProducts.slice(0, 10).map((p, i) => (
-                  <div key={p.product_id} className="an-top-item">
-                    <span className="an-top-rank">{i + 1}</span>
-                    <div className="an-top-info">
-                      <span className="an-top-name">{p.name}</span>
-                      <span className="an-top-meta">{p.brand} · {p.total_quantity_sold.toLocaleString('en-IN')} sold</span>
-                    </div>
-                    <span className="an-top-revenue">{fmt(p.total_revenue)}</span>
-                    <button className="an-eye-btn" title="View Growth Chart" onClick={() => setGrowthProduct(p)}>
-                      <Eye size={13} />
-                    </button>
-                  </div>
-                ))}
-                {filteredTopProducts.length === 0 && <p className="an-no-data">No products match current filters</p>}
-              </div>
-            </div>
-          </div>
-
-          {/* Low Stock Alert */}
-          <div className="an-chart-card">
-            <h3 className="an-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertTriangle size={18} color="#CA8A04" /> Low Stock Items ({lowStockProducts.length})
-            </h3>
-            <div className="an-low-stock-table">
-              <table className="owner-om-table" style={{ fontSize: '0.82rem' }}>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '0.6rem 0.75rem', background: '#f9fafb', color: '#6b7280', fontWeight: 600, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e5e7eb' }}>Product</th>
-                    <th style={{ padding: '0.6rem 0.75rem', background: '#f9fafb', color: '#6b7280', fontWeight: 600, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e5e7eb' }}>Category</th>
-                    <th style={{ padding: '0.6rem 0.75rem', background: '#f9fafb', color: '#6b7280', fontWeight: 600, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>Stock</th>
-                    <th style={{ padding: '0.6rem 0.75rem', background: '#f9fafb', color: '#6b7280', fontWeight: 600, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>Reorder Level</th>
-                    <th style={{ padding: '0.6rem 0.75rem', background: '#f9fafb', color: '#6b7280', fontWeight: 600, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e5e7eb' }}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lowStockProducts.map((p) => (
-                    <tr key={p.product_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600, color: '#1e293b' }}>{p.name}</td>
-                      <td style={{ padding: '0.6rem 0.75rem', color: '#6b7280' }}>{p.category_name}</td>
-                      <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 700, color: (p.stock ?? p.stock_quantity ?? 0) === 0 ? '#dc2626' : '#ca8a04' }}>{p.stock ?? p.stock_quantity ?? 0}</td>
-                      <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: '#6b7280' }}>{p.reorder_level}</td>
-                      <td style={{ padding: '0.6rem 0.75rem' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 20, background: (p.stock ?? p.stock_quantity ?? 0) === 0 ? '#FEE2E2' : '#FEF3C7', color: (p.stock ?? p.stock_quantity ?? 0) === 0 ? '#DC2626' : '#CA8A04' }}>
-                          {(p.stock ?? p.stock_quantity ?? 0) === 0 ? 'Out of Stock' : 'Low Stock'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-      </div>
-
       {/* Orders Tab */}
       <div className={`an-content${activeTab !== 'orders' ? ' an-tab-hidden' : ''}`} data-tab="orders">
           <h2 className="an-print-section-title">Orders Analysis</h2>
-          <div className="an-grid-2">
-            {/* Order Status Distribution — Plotly Pie */}
-            <div className="an-chart-card">
-              <h3 className="an-card-title">Order Status Distribution</h3>
-              <Plot
-                data={[{
-                  labels: statusDistribution.map((d) => d.name),
-                  values: statusDistribution.map((d) => d.value),
-                  type: 'pie', hole: 0.4,
-                  marker: { colors: statusDistribution.map((d) => ({ Pending: '#F59E0B', Processing: '#3B82F6', Shipped: '#8B5CF6', Delivered: '#10B981', Cancelled: '#EF4444' }[d.name] || COLORS[0])) },
-                  hovertemplate: '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>',
-                  textinfo: 'label+percent', textposition: 'outside', textfont: { size: 11 },
-                }]}
-                layout={{ autosize: true, height: 300, margin: { t: 10, r: 10, b: 10, l: 10 }, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: { family: 'inherit', size: 11 }, showlegend: true, legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center', font: { size: 10, color: '#4b5563' } } }}
-                config={{ responsive: true, displayModeBar: false }}
-                useResizeHandler style={{ width: '100%' }}
-              />
-            </div>
-
-            {/* Recent Orders */}
-            <div className="an-chart-card">
-              <h3 className="an-card-title">Orders Summary</h3>
-              <div className="an-top-list">
-                {recentOrders.slice(0, 6).map((o) => {
-                  const sc = { Pending: '#CA8A04', Processing: '#2563EB', Shipped: '#7C3AED', Delivered: '#16A34A', Cancelled: '#DC2626' };
-                  return (
-                    <div key={o.id} className="an-top-item">
-                      <span className="an-order-id">#{o.id}</span>
-                      <div className="an-top-info">
-                        <span className="an-top-name">{o.user_name}</span>
-                        <span className="an-top-meta">{new Date(o.order_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-                      </div>
-                      <span className="an-top-status" style={{ color: sc[o.status] }}>{o.status}</span>
-                      <span className="an-top-revenue">{fmt(o.grand_total)}</span>
-                    </div>
-                  );
-                })}
+          {loading ? (
+            <div className="an-grid-2">
+              <div className="an-chart-card an-shimmer-card">
+                <div className="an-shim an-shim-title" />
+                <div className="an-shim an-shim-circle" />
+              </div>
+              <div className="an-chart-card an-shimmer-card">
+                <div className="an-shim an-shim-title" />
+                <div className="an-shim an-shim-bar" style={{ marginBottom: 10 }} />
+                <div className="an-shim an-shim-bar" style={{ width: '75%', marginBottom: 10 }} />
+                <div className="an-shim an-shim-bar" style={{ width: '85%', marginBottom: 10 }} />
+                <div className="an-shim an-shim-bar" style={{ width: '60%' }} />
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="an-grid-2">
+              {/* Order Status Distribution — SVG 3D Donut */}
+              <div className="an-chart-card">
+                <h3 className="an-card-title">Order Status Distribution</h3>
+                <SvgDonut data={statusDistribution} labelKey="name" valueKey="value" colorMap={STATUS_COLORS_MAP} id="status-donut" />
+              </div>
+
+              {/* Category Performance — moved from products tab */}
+              <div className="an-chart-card an-cat-chart-card">
+                <h3 className="an-card-title">Category Performance</h3>
+                <div className="an-cat-bar-wrap">
+                  {categoryData.length === 0 ? (
+                    <p className="an-no-data">No category data</p>
+                  ) : (
+                    <div className="an-cat-plot-host">
+                      <Plot
+                        data={[{
+                          y: categoryData.map((d) => d.category_name),
+                          x: categoryData.map((d) => d.total_revenue),
+                          customdata: categoryData.map((d) => [d.total_orders ?? 0, d.product_count ?? 0]),
+                          type: 'bar', orientation: 'h',
+                          cliponaxis: true,
+                          marker: { color: categoryData.map((_, i) => COLORS[i % COLORS.length]), cornerradius: 4 },
+                          hovertemplate:
+                            '<b>%{y}</b><br>Revenue: NPR %{x:,.0f}<br>Orders: %{customdata[0]} · Products: %{customdata[1]}<extra></extra>',
+                        }]}
+                        layout={{
+                          autosize: true,
+                          height: Math.max(300, categoryData.length * 44 + 72),
+                          margin: { t: 12, r: 28, b: 52, l: 12 },
+                          paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+                          font: { family: 'system-ui, -apple-system, Segoe UI, sans-serif', size: 12, color: '#374151' },
+                          xaxis: {
+                            gridcolor: '#e5e7eb',
+                            zerolinecolor: '#e5e7eb',
+                            tickprefix: 'NPR ',
+                            separatethousands: true,
+                            automargin: true,
+                            title: { text: 'Revenue', font: { size: 11, color: '#64748b' }, standoff: 14 },
+                            fixedrange: true,
+                          },
+                          yaxis: {
+                            autorange: 'reversed',
+                            automargin: true,
+                            tickfont: { size: 11, color: '#334155' },
+                            fixedrange: true,
+                          },
+                          hovermode: 'closest',
+                        }}
+                        config={{ responsive: true, displayModeBar: false, scrollZoom: false }}
+                        useResizeHandler
+                        style={{ width: '100%', minHeight: 260 }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
       </div>
 
       {/* Comprehensive Forecast Modal */}
@@ -587,6 +610,7 @@ export default function Analytics() {
         .an-tab-hidden { display: none; }
         .an-print-section-title { display: none; }
         .an-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+        .an-grid-2 > .an-chart-card { min-width: 0; }
         .an-chart-card { background: #fff; padding: 1.5rem; border-radius: 14px; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
         .an-card-title { font-size: 1rem; font-weight: 700; color: #1e293b; margin: 0 0 1rem; }
 
@@ -629,6 +653,38 @@ export default function Analytics() {
         .an-filter-reset:hover { border-color: #F97316; color: #F97316; background: #FFF7ED; }
 
         .an-no-data { text-align: center; color: #9ca3af; font-size: 0.85rem; padding: 1.5rem 0; }
+
+        /* Category bar chart */
+        .an-cat-chart-card { display: flex; flex-direction: column; min-width: 0; }
+        .an-cat-bar-wrap {
+          flex: 1;
+          border-radius: 10px;
+          border: 1px solid #e2e8f0;
+          background: linear-gradient(180deg, #fafbfc 0%, #fff 40%);
+        }
+        .an-cat-plot-host {
+          width: 100%;
+          box-sizing: border-box;
+          padding: 4px 2px 8px;
+        }
+        .an-cat-bar-wrap .js-plotly-plot,
+        .an-cat-bar-wrap .plot-container,
+        .an-cat-bar-wrap .svg-container {
+          max-width: 100% !important;
+        }
+
+        /* Shimmer skeleton for orders tab */
+        @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+        .an-shim {
+          border-radius: 8px;
+          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background-size: 800px 100%;
+          animation: shimmer 1.4s infinite linear;
+        }
+        .an-shim-title { height: 18px; width: 55%; margin-bottom: 18px; }
+        .an-shim-circle { width: 180px; height: 180px; border-radius: 50%; margin: 12px auto; }
+        .an-shim-bar { height: 28px; width: 100%; border-radius: 6px; }
+        .an-shimmer-card { min-height: 300px; }
 
         /* Top List */
         .an-top-list { display: flex; flex-direction: column; gap: 0; }
