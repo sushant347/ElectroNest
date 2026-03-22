@@ -150,14 +150,19 @@ const styles = {
   imgWrap: {
     position: "relative",
     overflow: "hidden",
-    background: "#f1f5f9",
+    background: "#f8fafc",
     height: 210,
+    width: "calc(100% - 18px)",
+    margin: "10px auto 0",
+    borderRadius: 10,
+    flexShrink: 0,
   },
   img: {
     display: "block",
     width: "100%",
     height: "100%",
-    objectFit: "cover",
+    objectFit: "contain",
+    background: "#fff",
     transition: "transform .45s",
   },
   catBadge: {
@@ -469,7 +474,7 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
     <section style={styles.page}>
       <style>{`
         .wl-img-wrap { height: 210px; }
-        @media (max-width: 640px) { .wl-img-wrap { height: 200px; } }
+        @media (max-width: 768px) { .wl-img-wrap { height: 180px; } }
       `}</style>
       <div style={styles.container}>
         {/* ── Header ─────────────────────────────────────── */}
