@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, TrendingUp, BarChart3, Users, PieChart, CreditCard, PackageCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { RefreshCw, TrendingUp, BarChart3, PieChart, CreditCard, PackageCheck } from 'lucide-react';
 import Plot from 'react-plotly.js';
 import { adminAPI } from '../../services/api';
 
@@ -92,18 +92,14 @@ export default function AnalyticsSummary() {
   const [trend, setTrend] = useState([]);
   const [categories, setCategories] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
-  const [rfmData, setRfmData] = useState([]);
-  const [churnData, setChurnData] = useState(null);
   const [orderStatus, setOrderStatus] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [mlLoading, setMlLoading] = useState(true);
   const [error, setError] = useState('');
   const [days, setDays] = useState(3650);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    setMlLoading(true);
     setError('');
 
     // Wave 1: fast core data — renders the page immediately
@@ -128,21 +124,6 @@ export default function AnalyticsSummary() {
       setError('Failed to load analytics data.');
     } finally {
       setLoading(false);
-    }
-
-    // Wave 2: slow ML data — loads in background, doesn't block page render
-    try {
-      const mlDays = Math.min(days, 365);
-      const [rfmRes, churnRes] = await Promise.all([
-        adminAPI.getCustomerSegmentation({ days: mlDays }).catch(() => ({ data: [] })),
-        adminAPI.getChurnPrediction({ days: mlDays }).catch(() => ({ data: null })),
-      ]);
-      setRfmData(rfmRes.data || []);
-      setChurnData(churnRes.data);
-    } catch (err) {
-      console.error('ML analytics fetch error:', err);
-    } finally {
-      setMlLoading(false);
     }
   }, [days]);
 
@@ -310,276 +291,6 @@ export default function AnalyticsSummary() {
           ) : <p style={{ color: '#9CA3AF', textAlign: 'center', padding: 40 }}>No payment data</p>}
         </div>
       </div>
-
-      {/* ── Churn Prediction Dashboard ── */}
-      {mlLoading ? (
-        <div className="an-chart-card" style={{ marginTop: 20, padding: '2rem', display: 'flex', alignItems: 'center', gap: 12, color: '#6B7280', fontSize: '0.88rem' }}>
-          <RefreshCw size={16} className="spin" /> Loading churn prediction model...
-        </div>
-      ) : churnData && !churnData.error && churnData.customers?.length > 0 && (() => {
-        const summary = churnData.summary || {};
-        const modelInfo = churnData.model_info || {};
-        const customers = churnData.customers || [];
-        const riskColors = { 'Critical Risk': '#991B1B', 'High Risk': '#DC2626', 'Medium Risk': '#F59E0B', 'Low Risk': '#16A34A' };
-        const riskBgs = { 'Critical Risk': '#FEF2F2', 'High Risk': '#FEF2F2', 'Medium Risk': '#FFFBEB', 'Low Risk': '#F0FDF4' };
-        const riskSegments = ['Critical Risk', 'High Risk', 'Medium Risk', 'Low Risk'];
-        const segCounts = riskSegments.map(s => customers.filter(c => c.risk_segment === s).length);
-
-        return (
-          <div className="an-chart-card" style={{ marginTop: 20 }}>
-            <h3 className="an-chart-title"><ShieldAlert size={16} style={{ marginRight: 6 }} />Churn Prediction (ML-Powered)</h3>
-            <p style={{ fontSize: '0.78rem', color: '#6B7280', margin: '-8px 0 14px' }}>
-              GradientBoosting model analyzing {summary.total_customers} customers
-              {modelInfo.accuracy != null && <> — Model accuracy: <strong style={{ color: '#2563EB' }}>{(modelInfo.accuracy * 100).toFixed(1)}%</strong></>}
-              {modelInfo.f1_score != null && <> | F1: <strong>{(modelInfo.f1_score * 100).toFixed(1)}%</strong></>}
-            </p>
-
-            {/* Churn KPI Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 18 }}>
-              <div className="an-churn-kpi" style={{ borderLeft: '4px solid #991B1B' }}>
-                <span className="an-churn-kpi-val" style={{ color: '#991B1B' }}>{summary.critical_risk || 0}</span>
-                <span className="an-churn-kpi-lbl">Critical Risk</span>
-              </div>
-              <div className="an-churn-kpi" style={{ borderLeft: '4px solid #DC2626' }}>
-                <span className="an-churn-kpi-val" style={{ color: '#DC2626' }}>{summary.high_risk || 0}</span>
-                <span className="an-churn-kpi-lbl">High Risk</span>
-              </div>
-              <div className="an-churn-kpi" style={{ borderLeft: '4px solid #F59E0B' }}>
-                <span className="an-churn-kpi-val" style={{ color: '#F59E0B' }}>{summary.medium_risk || 0}</span>
-                <span className="an-churn-kpi-lbl">Medium Risk</span>
-              </div>
-              <div className="an-churn-kpi" style={{ borderLeft: '4px solid #16A34A' }}>
-                <span className="an-churn-kpi-val" style={{ color: '#16A34A' }}>{summary.low_risk || 0}</span>
-                <span className="an-churn-kpi-lbl">Low Risk</span>
-              </div>
-            </div>
-
-            {/* Summary banner */}
-            <div style={{ display: 'flex', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 200, padding: '12px 16px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#991B1B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Churn Rate</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#DC2626' }}>{summary.churn_rate || 0}%</div>
-                <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>of customers at high/critical risk</div>
-              </div>
-              <div style={{ flex: 1, minWidth: 200, padding: '12px 16px', borderRadius: 10, background: '#FFF7ED', border: '1px solid #FED7AA' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#C2410C', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Revenue at Risk</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#EA580C' }}>{fmtNPR(summary.revenue_at_risk)}</div>
-                <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>from high & critical risk customers</div>
-              </div>
-              <div style={{ flex: 1, minWidth: 200, padding: '12px 16px', borderRadius: 10, background: '#EFF6FF', border: '1px solid #BFDBFE' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Avg Churn Probability</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2563EB' }}>{((summary.avg_churn_probability || 0) * 100).toFixed(1)}%</div>
-                <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>across all customers</div>
-              </div>
-            </div>
-
-            {/* Charts Row: Risk distribution + Feature importance */}
-            <div className="an-charts-row">
-              <div>
-                <Plot
-                  data={[{
-                    type: 'pie',
-                    labels: riskSegments,
-                    values: segCounts,
-                    hole: 0.45,
-                    marker: { colors: riskSegments.map(s => riskColors[s]) },
-                    textinfo: 'label+value+percent',
-                    textfont: { size: 11 },
-                    hovertemplate: '<b>%{label}</b><br>Customers: %{value}<br>%{percent}<extra></extra>',
-                  }]}
-                  layout={{
-                    height: 260, margin: { t: 10, b: 20, l: 10, r: 10 },
-                    showlegend: false, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-                    annotations: [{ text: `${summary.churn_rate || 0}%<br><span style="font-size:9px;color:#6B7280">Churn Rate</span>`, showarrow: false, font: { size: 14, color: '#DC2626' }, x: 0.5, y: 0.5 }],
-                  }}
-                  config={{ displayModeBar: false, responsive: true }}
-                  style={{ width: '100%' }}
-                />
-              </div>
-              {modelInfo.feature_importance && (
-                <div>
-                  {(() => {
-                    const features = Object.entries(modelInfo.feature_importance).sort((a, b) => b[1] - a[1]);
-                    const featureLabels = { recency: 'Recency', frequency: 'Frequency', monetary: 'Monetary', avg_order_value: 'Avg Order Value', days_between_orders: 'Days Between Orders', order_trend: 'Order Trend', order_std: 'Order Volatility', tenure_days: 'Customer Tenure' };
-                    return (
-                      <Plot
-                        data={[{
-                          type: 'bar', orientation: 'h',
-                          y: features.map(([k]) => featureLabels[k] || k),
-                          x: features.map(([, v]) => v),
-                          marker: { color: features.map(([, v], i) => i < 3 ? '#DC2626' : '#3B82F6'), opacity: 0.85 },
-                          text: features.map(([, v]) => `${(v * 100).toFixed(1)}%`),
-                          textposition: 'outside', textfont: { size: 10, color: '#374151' },
-                          hovertemplate: '<b>%{y}</b><br>Importance: %{x:.1%}<extra></extra>',
-                        }]}
-                        layout={{
-                          height: 260, margin: { t: 10, b: 30, l: 130, r: 60 },
-                          xaxis: { showgrid: true, gridcolor: '#f1f5f9', tickformat: '.0%', tickfont: { size: 10 }, title: { text: 'Feature Importance', font: { size: 10, color: '#9CA3AF' } } },
-                          yaxis: { autorange: 'reversed', tickfont: { size: 11 } },
-                          paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', bargap: 0.15,
-                        }}
-                        config={{ displayModeBar: false, responsive: true }}
-                        style={{ width: '100%' }}
-                      />
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-
-            {/* Top at-risk customers table */}
-            <div className="an-table-wrap" style={{ marginTop: 14 }}>
-              <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#374151', marginBottom: 10 }}>
-                <AlertTriangle size={14} style={{ marginRight: 6, color: '#DC2626' }} />
-                Top At-Risk Customers
-              </h4>
-              <table className="an-table">
-                <thead>
-                  <tr>
-                    <th>Customer</th>
-                    <th>Risk</th>
-                    <th>Churn Prob.</th>
-                    <th>Last Order</th>
-                    <th>Orders</th>
-                    <th>Total Spent</th>
-                    <th>Recommended Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.slice(0, 15).map((c, i) => (
-                    <tr key={i}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{c.name}</div>
-                        <div style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>{c.email}</div>
-                      </td>
-                      <td>
-                        <span style={{
-                          fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                          background: riskBgs[c.risk_segment] || '#F3F4F6',
-                          color: riskColors[c.risk_segment] || '#6B7280',
-                        }}>
-                          {c.risk_segment}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <div style={{ width: 48, height: 6, background: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${c.churn_probability * 100}%`, background: riskColors[c.risk_segment] || '#6B7280', borderRadius: 3 }} />
-                          </div>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: riskColors[c.risk_segment] || '#374151' }}>
-                            {(c.churn_probability * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                      </td>
-                      <td style={{ fontSize: '0.82rem' }}>{c.last_order || '-'}</td>
-                      <td>{c.frequency}</td>
-                      <td style={{ fontWeight: 600, color: '#16A34A' }}>{fmtNPR(c.monetary)}</td>
-                      <td style={{ fontSize: '0.78rem', color: '#6B7280', maxWidth: 220 }}>{c.recommended_action}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── RFM Customer Segmentation ── */}
-      {mlLoading ? (
-        <div className="an-chart-card" style={{ marginTop: 20, padding: '2rem', display: 'flex', alignItems: 'center', gap: 12, color: '#6B7280', fontSize: '0.88rem' }}>
-          <RefreshCw size={16} className="spin" /> Loading customer segmentation model...
-        </div>
-      ) : rfmData.length > 0 && (() => {
-        const segmentCounts = rfmData.reduce((acc, c) => { acc[c.segment] = (acc[c.segment] || 0) + 1; return acc; }, {});
-        const segmentRevenue = rfmData.reduce((acc, c) => { acc[c.segment] = (acc[c.segment] || 0) + (c.monetary || 0); return acc; }, {});
-        const segments = Object.keys(segmentCounts);
-        // Use colors from backend if available, otherwise fallback
-        const fallbackColors = { Champions: '#16A34A', 'Loyal High-Value': '#059669', 'Recent Customers': '#0EA5E9', 'Loyal Customers': '#2563EB', 'Potential Loyalists': '#7C3AED', 'Promising': '#8B5CF6', 'Need Attention': '#F59E0B', 'At Risk': '#F97316', 'About to Sleep': '#EF4444', Lost: '#DC2626', Regulars: '#F97316' };
-        const getSegColor = (seg) => {
-          const sample = rfmData.find(c => c.segment === seg);
-          return sample?.segment_color || fallbackColors[seg] || '#6B7280';
-        };
-        const totalCLV = rfmData.reduce((s, c) => s + (c.clv_estimate || 0), 0);
-        return (
-          <div className="an-chart-card" style={{ marginTop: 20 }}>
-            <h3 className="an-chart-title"><Users size={16} style={{ marginRight: 6 }} />Customer Segmentation (RFM Analysis)</h3>
-            <p style={{ fontSize: '0.78rem', color: '#6B7280', margin: '-8px 0 14px' }}>
-              Recency-Frequency-Monetary analysis of {rfmData.length} customers
-              {totalCLV > 0 && <> — Total est. CLV: <strong style={{ color: '#16A34A' }}>{fmtNPR(totalCLV)}</strong>/yr</>}
-            </p>
-            <div className="an-charts-row">
-              <div>
-                <Plot
-                  data={[{
-                    type: 'pie',
-                    labels: segments,
-                    values: segments.map(s => segmentCounts[s]),
-                    hole: 0.45,
-                    marker: { colors: segments.map(s => getSegColor(s)) },
-                    textinfo: 'label+value+percent',
-                    textfont: { size: 11 },
-                    hovertemplate: '<b>%{label}</b><br>Customers: %{value}<br>%{percent}<extra></extra>',
-                  }]}
-                  layout={{
-                    height: 280, margin: { t: 10, b: 20, l: 10, r: 10 },
-                    showlegend: false, paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-                    annotations: [{ text: `${rfmData.length}<br><span style="font-size:10px;color:#6B7280">Customers</span>`, showarrow: false, font: { size: 14, color: '#111827' }, x: 0.5, y: 0.5 }],
-                  }}
-                  config={{ displayModeBar: false, responsive: true }}
-                  style={{ width: '100%' }}
-                />
-              </div>
-              <div>
-                <Plot
-                  data={[{
-                    type: 'bar', orientation: 'h',
-                    y: segments, x: segments.map(s => segmentRevenue[s]),
-                    marker: { color: segments.map(s => getSegColor(s)), opacity: 0.85 },
-                    text: segments.map(s => fmtNPR(segmentRevenue[s])),
-                    textposition: 'outside', textfont: { size: 10, color: '#374151' },
-                    hovertemplate: '<b>%{y}</b><br>Revenue: NPR %{x:,.0f}<extra></extra>',
-                  }]}
-                  layout={{
-                    height: 280, margin: { t: 10, b: 30, l: 130, r: 80 },
-                    xaxis: { showgrid: true, gridcolor: '#f1f5f9', tickprefix: 'NPR ', tickfont: { size: 10 } },
-                    yaxis: { autorange: 'reversed', tickfont: { size: 11 } },
-                    paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', bargap: 0.2,
-                  }}
-                  config={{ displayModeBar: false, responsive: true }}
-                  style={{ width: '100%' }}
-                />
-              </div>
-            </div>
-            {/* RFM Segment summary table */}
-            <div className="an-table-wrap" style={{ marginTop: 14 }}>
-              <table className="an-table">
-                <thead><tr><th>Segment</th><th>Customers</th><th>Avg Recency</th><th>Avg Frequency</th><th>Total Revenue</th><th>Avg CLV/yr</th><th>Action</th></tr></thead>
-                <tbody>
-                  {segments.map(seg => {
-                    const segCustomers = rfmData.filter(c => c.segment === seg);
-                    const avgRecency = (segCustomers.reduce((s, c) => s + (c.recency || 0), 0) / segCustomers.length).toFixed(0);
-                    const avgFreq = (segCustomers.reduce((s, c) => s + (c.frequency || 0), 0) / segCustomers.length).toFixed(1);
-                    const totalRev = segCustomers.reduce((s, c) => s + (c.monetary || 0), 0);
-                    const avgCLV = segCustomers.reduce((s, c) => s + (c.clv_estimate || 0), 0) / segCustomers.length;
-                    const action = segCustomers[0]?.recommended_action || '';
-                    return (
-                      <tr key={seg}>
-                        <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: getSegColor(seg), display: 'inline-block' }} /><strong>{seg}</strong></span></td>
-                        <td>{segCustomers.length}</td>
-                        <td>{avgRecency} days</td>
-                        <td>{avgFreq}</td>
-                        <td style={{ fontWeight: 600, color: '#16A34A' }}>{fmtNPR(totalRev)}</td>
-                        <td style={{ fontWeight: 600, color: '#2563EB' }}>{fmtNPR(avgCLV)}</td>
-                        <td style={{ fontSize: '0.78rem', color: '#6B7280', maxWidth: 240 }}>{action}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Top Products Table — 1 top-selling product per store */}
       {(() => {
