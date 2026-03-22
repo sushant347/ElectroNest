@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: electronest-backend
+    runtime: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn page.wsgi:application"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.0"

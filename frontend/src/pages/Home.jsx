@@ -335,7 +335,7 @@ const STYLES = `
 .hm-cat-nm{font-size:.78rem;font-weight:600;color:#374151;text-align:center;max-width:92px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hm-cat.act .hm-cat-nm{color:#F97316;}
 /* PRODUCTS */
-.hm-prods-sec{background:#F3F4F6;padding:1.5rem 2.5rem;width:100%;}
+.hm-prods-sec{background:#F3F4F6;padding:1.5rem 5rem;width:100%;}
 .hm-prods-ttl{font-size:1.3rem;font-weight:700;color:#232F3E;margin-bottom:1.2rem;text-align:center;display:flex;align-items:center;justify-content:center;gap:.5rem;}
 .hm-clr{font-size:.77rem;color:#F97316;background:none;border:1px solid #fed7aa;border-radius:4px;cursor:pointer;font-weight:600;padding:3px 10px;}
 .hm-ld{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:160px;gap:10px;color:#64748b;}
