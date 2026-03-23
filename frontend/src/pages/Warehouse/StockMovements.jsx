@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, AlertCircle, Truck, Search, X, Package, User, Eye, CheckCircle2, Printer, BarChart2, ShoppingBag, Store, Filter, PieChart, CalendarDays } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, AlertCircle, Truck, Search, X, Package, User, CheckCircle2, Printer, BarChart2, ShoppingBag, Store, Filter, PieChart, CalendarDays } from 'lucide-react';
 import { warehouseAPI } from '../../services/api';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -826,13 +826,13 @@ export default function StockMovements() {
             ) : (
               <div className={`sm-table-wrap${coMovementsLoading ? ' sm-co-period-loading' : ''}`}>
                 <table className="sm-table">
-                  <thead><tr><th>#</th><th>Order</th><th>Customer</th><th>Status</th><th>Items</th><th>Amount</th><th>Store</th><th>Date</th><th>Action</th></tr></thead>
+                  <thead><tr><th>#</th><th>Order</th><th>Customer</th><th>Status</th><th>Items</th><th>Amount</th><th>Store</th><th>Date</th></tr></thead>
                   <tbody>
                     {pagedShipped.map((o, idx) => {
                       const osc = ORDER_STATUS_COLORS[o.status] || { color: '#6B7280', bg: '#F3F4F6' };
                       const globalIdx = (coPage - 1) * CO_PER_PAGE + idx + 1;
                       return (
-                        <tr key={o.id}>
+                        <tr key={o.id} className="sm-order-row" onClick={() => handleViewOrder(o)}>
                           <td style={{ color: '#9CA3AF', fontSize: '0.75rem' }}>{globalIdx}</td>
                           <td><strong>{o.order_number}</strong></td>
                           <td><span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={13} color="#9CA3AF" /> {o.customer_name}</span></td>
@@ -849,11 +849,6 @@ export default function StockMovements() {
                               : <span style={{ color: '#9CA3AF' }}>—</span>}
                           </td>
                           <td><span title={fmtDate(o.date)}>{relTime(o.date)}</span></td>
-                          <td>
-                            <button className="sm-eye-btn" onClick={() => handleViewOrder(o)} title="View order details">
-                              <Eye size={15} />
-                            </button>
-                          </td>
                         </tr>
                       );
                     })}
@@ -1093,10 +1088,10 @@ export default function StockMovements() {
         .sm-table td { padding: 12px 16px; font-size: 0.85rem; color: #374151; border-bottom: 1px solid #f3f4f6; }
         .sm-table tr:last-child td { border-bottom: none; }
         .sm-table tr:hover td { background: #F9FAFB; }
+        .sm-order-row { cursor: pointer; }
+        .sm-order-row:hover td { background: #FFF7ED; }
         .sm-status { font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
         .sm-table-footer { padding: 10px 16px; font-size: 0.75rem; color: #9CA3AF; border-top: 1px solid #f3f4f6; text-align: right; }
-        .sm-eye-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; background: #EDE9FE; color: #7C3AED; border: 1px solid #DDD6FE; cursor: pointer; transition: all 0.15s; }
-        .sm-eye-btn:hover { background: #7C3AED; color: #fff; transform: translateY(-1px); }
         .sm-store-badge { font-size: 0.72rem; font-weight: 600; color: #7C3AED; background: #EDE9FE; padding: 3px 9px; border-radius: 20px; white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
 
         /* ═══ PO Cards ═══ */
@@ -1174,8 +1169,8 @@ export default function StockMovements() {
         .ssc-footer { margin-top: 16px; padding-top: 12px; border-top: 1px solid #f3f4f6; font-size: 0.82rem; color: #6B7280; text-align: right; }
 
         /* ── Modal ── */
-        .sm-modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(2px); }
-        .sm-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 640px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .sm-modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(2px); }
+        .sm-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 720px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
         .sm-modal-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 1.1rem 1.4rem; border-bottom: 1px solid #e5e7eb; }
         .sm-modal-title { margin: 0; font-size: 1.05rem; font-weight: 700; color: #1e293b; }
         .sm-modal-date { font-size: 0.75rem; color: #9CA3AF; }
@@ -1241,6 +1236,11 @@ export default function StockMovements() {
           .po-card-footer { padding: 10px 14px; }
           .po-item-row { gap: 8px; }
           .po-item-img-wrap { width: 38px; height: 38px; }
+          .sm-modal-overlay { padding: 0.75rem; align-items: flex-end; }
+          .sm-modal { max-height: 92vh; border-radius: 18px 18px 0 0; }
+          .sm-modal-header { padding: 1rem 1rem 0.85rem; }
+          .sm-modal-body { padding: 0.95rem 1rem; }
+          .sm-modal-footer { padding: 0.85rem 1rem 1rem; }
           .sm-modal-footer { flex-wrap: wrap; justify-content: stretch; }
           .sm-btn-print, .sm-btn-deliver, .sm-btn-close-modal { flex: 1; justify-content: center; }
         }

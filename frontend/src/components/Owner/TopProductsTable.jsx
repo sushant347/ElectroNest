@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trophy, Eye, ArrowUpDown } from 'lucide-react';
+import { Trophy, ArrowUpDown } from 'lucide-react';
 import ComprehensiveForecastModal from './ComprehensiveForecastModal';
 
 const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(v);
@@ -50,7 +50,6 @@ export default function TopProductsTable({ data, loading }) {
                 { key: 'rank', label: '#' },
                 { key: 'name', label: 'Product' },
                 { key: 'total_quantity_sold', label: 'Sales' },
-                { key: 'total_revenue', label: 'Revenue' },
                 { key: 'avg_revenue', label: 'Avg/Unit' },
                 { key: null, label: '' },
               ].map((col) => (
@@ -65,7 +64,7 @@ export default function TopProductsTable({ data, loading }) {
           </thead>
           <tbody>
             {sorted.map((p) => (
-              <tr key={p.product_id}>
+              <tr key={p.product_id} className="tpt-row-clickable" onClick={() => setGrowthProduct(p)}>
                 <td className="rank-cell">
                   {p.rank <= 3 ? (
                     <span className="medal" style={{ background: medalColors[p.rank] }}>
@@ -85,11 +84,6 @@ export default function TopProductsTable({ data, loading }) {
                 <td className="num-cell">{fmt(p.total_revenue || 0)}</td>
                 <td className="num-cell">
                   <span>{fmt(p.total_quantity_sold > 0 ? (p.total_revenue || 0) / p.total_quantity_sold : 0)}</span>
-                </td>
-                <td>
-                  <button className="tpt-view-btn" onClick={() => setGrowthProduct(p)} title="View Growth Chart">
-                    <Eye size={15} />
-                  </button>
                 </td>
               </tr>
             ))}
@@ -126,6 +120,7 @@ const styles = `
   .owner-tpt-table th:hover .th-sort-icon { opacity: 1; }
   .owner-tpt-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid #f3f4f6; color: #374151; }
   .owner-tpt-table tbody tr:hover { background: #FFF7ED; }
+  .tpt-row-clickable { cursor: pointer; }
   .rank-cell { text-align: center; width: 48px; }
   .medal { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
   .rank-num { font-weight: 700; color: #9ca3af; }
@@ -133,11 +128,6 @@ const styles = `
   .product-cell-name { font-weight: 600; color: #1e293b; }
   .product-cell-meta { font-size: 0.72rem; color: #9ca3af; margin-top: 1px; }
   .num-cell { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .tpt-view-btn {
-    background: none; border: 1px solid #e5e7eb; border-radius: 6px; padding: 5px 8px;
-    cursor: pointer; color: #9ca3af; transition: all 0.15s;
-  }
-  .tpt-view-btn:hover { color: #F97316; border-color: #F97316; background: #FFF7ED; }
   .tpt-skel-row { padding: 0.75rem; }
   .skel-line { height: 16px; border-radius: 6px; background: #e5e7eb; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }

@@ -307,7 +307,25 @@ export default function Dashboard() {
   /* ── Derived chart data ── */
   const roleDist = data?.role_distribution || [];
   const roleColors = { admin: '#DC2626', owner: '#EA580C', warehouse: '#2563EB', customer: '#16A34A' };
-  const genderDist = data?.customer_gender_dist || [];
+  const genderDist = (data?.customer_gender_dist || []).reduce((acc, g) => {
+    const raw = String(g?.gender || '').trim();
+    const key = raw ? raw.toLowerCase() : 'unknown';
+    const count = Number(g?.count || 0);
+    const found = acc.find((x) => x.key === key);
+    if (found) {
+      found.count += count;
+      return acc;
+    }
+    const label = key === 'male'
+      ? 'Male'
+      : key === 'female'
+        ? 'Female'
+        : key === 'other'
+          ? 'Other'
+          : 'Unknown';
+    acc.push({ key, label, count });
+    return acc;
+  }, []);
   const genderColors = ['#3B82F6', '#EC4899', '#8B5CF6', '#94a3b8'];
   const catRevenue = data?.category_revenue || [];
   const catColors = ['#DC2626', '#2563EB', '#16A34A', '#7C3AED', '#EC4899', '#D97706', '#0891B2', '#F97316', '#059669', '#8B5CF6', '#F43F5E', '#6366F1'];
@@ -430,7 +448,7 @@ export default function Dashboard() {
         <div className="chart-card">
           <h3 className="chart-title-s">Customer Demographics (Gender)</h3>
           <SvgAdminDonut
-            items={genderDist.map((g, i) => ({ label: g.gender || 'Unknown', value: g.count, color: genderColors[i % genderColors.length] }))}
+            items={genderDist.map((g, i) => ({ label: g.label, value: g.count, color: genderColors[i % genderColors.length] }))}
             id="gender-donut"
             centerLabel="Customers"
           />
