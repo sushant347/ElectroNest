@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import { customerAPI } from '../../services/api';
+import { HeaderSkeleton, CardGridSkeleton, SkeletonText } from '../../components/Common/SkeletonLoader';
 
 const formatPrice = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p);
 
@@ -437,10 +438,14 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
 
   if (loading) {
     return (
-      <div style={s.loaderWrap}>
-        <div style={s.spinner} />
-        <p style={{ color: '#64748b', marginTop: 16 }}>Loading product...</p>
-        <style>{spinnerCSS}</style>
+      <div style={s.page}>
+        <div style={s.container}>
+          <HeaderSkeleton titleWidth={240} subtitleWidth={180} showAction={false} />
+          <CardGridSkeleton cards={2} columns="repeat(auto-fit, minmax(260px, 1fr))" minHeight={320} />
+          <div style={{ marginTop: 18 }}>
+            <CardGridSkeleton cards={2} columns="1fr" minHeight={120} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -625,7 +630,10 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
             )}
           </div>
           {reviewsLoading ? (
-            <p style={{ color: '#64748b', margin: 0 }}>Loading reviews...</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <SkeletonText lines={3} lineHeight={12} lastWidth="70%" />
+              <SkeletonText lines={2} lineHeight={12} lastWidth="55%" />
+            </div>
           ) : reviews.length === 0 ? (
             <p style={{ color: '#64748b', margin: 0 }}>No reviews yet for this product.</p>
           ) : (

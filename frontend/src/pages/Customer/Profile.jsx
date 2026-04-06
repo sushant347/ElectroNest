@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, MapPin, LogOut, Package, Plus, Pencil, Trash2, Check, X, Calendar, ShieldCheck } from 'lucide-react';
 import { customerAPI } from '../../services/api';
+import { SkeletonBlock } from '../../components/Common/SkeletonLoader';
 
 const NEPAL_PROVINCES = ['Koshi', 'Madhesh', 'Bagmati', 'Gandaki', 'Lumbini', 'Karnali', 'Sudurpashchim'];
 const INDIA_STATES = ['Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'];
@@ -230,7 +231,19 @@ export default function Profile() {
 
           {/* Address list */}
           {addrLoading ? (
-            <p style={{ color: '#94a3b8', textAlign: 'center', padding: '24px 0' }}>Loading…</p>
+            <div style={s.addrGrid}>
+              {Array.from({ length: 2 }).map((_, idx) => (
+                <div key={`addr-skl-${idx}`} style={s.addrCard}>
+                  <SkeletonBlock width={92} height={22} radius={999} />
+                  <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <SkeletonBlock width="62%" height={16} />
+                    <SkeletonBlock width="100%" height={13} />
+                    <SkeletonBlock width="88%" height={13} />
+                    <SkeletonBlock width="72%" height={13} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : addresses.length === 0 && !showForm ? (
             <div style={s.empty}><MapPin size={30} style={{ color: '#cbd5e1' }} /><p style={{ color: '#94a3b8', marginTop: 8 }}>No saved addresses yet.</p></div>
           ) : (

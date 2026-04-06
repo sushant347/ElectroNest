@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Package, TrendingUp, DollarSign, BarChart3, Layers, Tag } from 'lucide-react';
 import { ownerAPI } from '../../services/api';
+import { SkeletonBlock, SkeletonText } from '../Common/SkeletonLoader';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
@@ -42,7 +43,17 @@ export default function ProductDetailModal({ isOpen, onClose, productSummary }) 
 
                 <div className="pdm-body">
                     {loading ? (
-                        <div className="pdm-loading"><div className="pdm-spinner" /><p>Loading product details...</p></div>
+                        <div className="pdm-loading" style={{ alignItems: 'stretch' }}>
+                            <div style={{ width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <SkeletonBlock width="45%" height={16} />
+                                <SkeletonText lines={2} lineHeight={11} lastWidth="60%" />
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+                                    {Array.from({ length: 3 }).map((_, idx) => (
+                                        <SkeletonBlock key={`pdm-skl-${idx}`} height={72} radius={10} />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     ) : (
                         <>
                             {/* KPI Row */}

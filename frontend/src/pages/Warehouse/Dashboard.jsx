@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Package, TrendingUp, AlertTriangle, Truck, RefreshCw, AlertCircle, Eye } from 'lucide-react';
 import { warehouseAPI } from '../../services/api';
+import { HeaderSkeleton, CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
@@ -35,11 +36,11 @@ export default function WarehouseDashboard() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <div style={{ textAlign: 'center' }}>
-          <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite', color: '#F97316' }} />
-          <p style={{ marginTop: 12, color: '#6B7280', fontSize: '0.9rem' }}>Loading dashboard...</p>
-          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+      <div style={{ padding: '28px 32px 40px', maxWidth: 1400, margin: '0 auto' }}>
+        <HeaderSkeleton titleWidth={240} subtitleWidth={280} />
+        <CardGridSkeleton cards={4} columns="repeat(auto-fit, minmax(220px, 1fr))" minHeight={110} />
+        <div style={{ marginTop: 20 }}>
+          <CardGridSkeleton cards={2} columns="repeat(auto-fit, minmax(320px, 1fr))" minHeight={220} />
         </div>
       </div>
     );

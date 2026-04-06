@@ -4,6 +4,7 @@ import {
   Clock, CheckCircle2, XCircle, Eye,
 } from 'lucide-react'
 import { adminAPI } from '../../services/api'
+import { TableRowsSkeleton } from '../../components/Common/SkeletonLoader'
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -145,7 +146,7 @@ export default function UserQueries() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 28 }}>Loading...</td></tr>
+                <TableRowsSkeleton rows={6} columns={5} />
               ) : queries.length === 0 ? (
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: 28, color: '#9CA3AF' }}>No user queries found.</td></tr>
               ) : queries.map(q => (

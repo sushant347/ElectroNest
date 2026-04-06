@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Search, Plus, Pencil, Trash2, RotateCcw, ChevronLeft, ChevronRight, Package, AlertCircle, RefreshCw, X, FileText, Layers, Upload, Download, CheckCircle, XCircle } from 'lucide-react';
 import { ownerAPI } from '../../services/api';
+import { TableRowsSkeleton } from '../../components/Common/SkeletonLoader';
 import ProductModal from '../../components/Owner/ProductModal';
 
 const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(v);
@@ -463,7 +464,9 @@ export default function ProductManagement() {
             </tr>
           </thead>
           <tbody>
-            {paged.length === 0 ? (
+            {pageLoading ? (
+              <TableRowsSkeleton rows={8} columns={8} />
+            ) : paged.length === 0 ? (
               <tr><td colSpan={8} className="owner-pm-empty"><Package size={32} /><span>No products found</span></td></tr>
             ) : (
               paged.map((p) => (

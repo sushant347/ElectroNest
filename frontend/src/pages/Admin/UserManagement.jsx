@@ -5,6 +5,7 @@ import {
   CheckCircle, XCircle, SlidersHorizontal
 } from 'lucide-react';
 import { adminAPI } from '../../services/api';
+import { TableRowsSkeleton } from '../../components/Common/SkeletonLoader';
 
 /* ── Shared helper ── */
 const RoleBadge = ({ role }) => {
@@ -164,9 +165,7 @@ function SystemUsersSection() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40 }}>
-                <RefreshCw size={20} className="um-spin" style={{ margin: '0 auto', display: 'block', color: '#DC2626' }} />
-              </td></tr>
+              <TableRowsSkeleton rows={7} columns={8} />
             ) : users.length === 0 ? (
               <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>
                 {search || roleFilter ? 'No users match your filters' : 'No system users found'}
@@ -443,10 +442,7 @@ function CustomersSection() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 48 }}>
-                <RefreshCw size={22} className="um-spin" style={{ margin: '0 auto', display: 'block', color: '#16A34A' }} />
-                <p style={{ color: '#9CA3AF', marginTop: 8, fontSize: '0.85rem' }}>Loading customers...</p>
-              </td></tr>
+              <TableRowsSkeleton rows={8} columns={8} />
             ) : paged.length === 0 ? (
               <tr><td colSpan={8} style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>
                 {hasFilters ? 'No customers match your filters' : 'No customers found'}

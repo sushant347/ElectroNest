@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, RefreshCw, AlertCircle, Package, Send, CheckCircle } from 'lucide-react';
 import { warehouseAPI } from '../../services/api';
+import { CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 export default function LowStockAlerts() {
   const [alerts, setAlerts] = useState([]);
@@ -52,7 +53,7 @@ export default function LowStockAlerts() {
       )}
 
       {loading ? (
-        <div className="lsa-loading"><RefreshCw size={24} className="spin" /><p>Loading alerts...</p></div>
+        <CardGridSkeleton cards={6} columns="repeat(auto-fill, minmax(320px, 1fr))" minHeight={190} />
       ) : alerts.length === 0 ? (
         <div className="lsa-loading"><Package size={40} color="#16A34A" /><p style={{ color: '#16A34A', fontWeight: 600 }}>All products are well stocked!</p></div>
       ) : (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Tag, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Store, Percent, Truck, Users, Clock } from 'lucide-react';
 import { ownerAPI } from '../../services/api';
+import { CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(v);
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
@@ -318,10 +319,7 @@ export default function CouponManagement() {
       {/* Coupons grid */}
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
-            <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite', marginBottom: 8 }} />
-            <p style={{ fontSize: '0.85rem' }}>Loading your store coupons...</p>
-          </div>
+          <CardGridSkeleton cards={6} columns="repeat(auto-fill, minmax(330px, 1fr))" minHeight={240} />
         ) : coupons.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '4rem', background: '#fff', borderRadius: 20, border: '1.5px dashed #fed7aa' }}>
             <div style={{ width: 64, height: 64, borderRadius: 16, background: '#fff7ed', border: '1.5px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>

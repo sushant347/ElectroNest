@@ -4,6 +4,7 @@ import {
   Filter, Calendar, SlidersHorizontal
 } from 'lucide-react';
 import { adminAPI } from '../../services/api';
+import { TableRowsSkeleton } from '../../components/Common/SkeletonLoader';
 
 const ACTION_COLORS = {
   INSERT: { bg: '#DCFCE7', color: '#16A34A' },
@@ -320,10 +321,7 @@ export default function SystemLogs() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 48 }}>
-                <RefreshCw size={22} className="sl-spin" style={{ margin: '0 auto', display: 'block', color: '#2563EB' }} />
-                <p style={{ color: '#9CA3AF', marginTop: 10, fontSize: '0.85rem' }}>Loading logs...</p>
-              </td></tr>
+              <TableRowsSkeleton rows={8} columns={7} />
             ) : paged.length === 0 ? (
               <tr><td colSpan={7} style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>
                 {hasFilters ? 'No logs match your filters' : 'No audit logs found'}

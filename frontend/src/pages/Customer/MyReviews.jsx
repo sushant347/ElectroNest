@@ -2,6 +2,7 @@ import { useState, useEffect, useId } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Star, Send, Package, ChevronLeft } from 'lucide-react';
 import { customerAPI } from '../../services/api';
+import { HeaderSkeleton, CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 const formatPrice = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p);
@@ -191,7 +192,12 @@ export default function MyReviews() {
   const alreadyReviewed = [...productMap.values()].filter(item => reviewedProductIds.has(item.productId));
 
   if (loading) return (
-    <div style={s.center}><div style={s.spinner} /><p style={{ color: '#64748b', marginTop: 12 }}>Loading...</p></div>
+    <section style={s.page}>
+      <div style={s.container}>
+        <HeaderSkeleton titleWidth={170} subtitleWidth={120} showAction={false} />
+        <CardGridSkeleton cards={2} columns="1fr" minHeight={200} />
+      </div>
+    </section>
   );
 
   return (

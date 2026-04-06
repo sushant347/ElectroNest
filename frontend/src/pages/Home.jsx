@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FiHeart, FiBarChart2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { customerAPI } from '../services/api'
+import { HeaderSkeleton, CardGridSkeleton } from '../components/Common/SkeletonLoader'
 import imgWatch from '../components/images/smart watches.png'
 import imgCamera from '../components/images/camera.png'
 import imgDrone from '../components/images/drone.png'
@@ -314,7 +315,10 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
           {!selCat && !searchQ && <span className="hm-prods-sub">Handpicked deals just for you</span>}
         </div>
         {loading ? (
-          <div className="hm-ld"><div className="hm-spin" /><p>Loading…</p></div>
+          <div className="hm-loading-shell">
+            <HeaderSkeleton titleWidth={210} subtitleWidth={150} showAction={false} />
+            <CardGridSkeleton cards={8} columns="repeat(4, minmax(0, 1fr))" minHeight={280} />
+          </div>
         ) : displayProds.length === 0 ? (
           <div className="hm-ld"><p style={{ color: '#64748b' }}>No products found.</p></div>
         ) : (
@@ -487,6 +491,7 @@ const STYLES = `
 .hm-prods-sub{font-size:.78rem;color:#64748b;font-weight:500;letter-spacing:.02em;}
 .hm-clr{font-size:.77rem;color:#F97316;background:none;border:1px solid #fed7aa;border-radius:4px;cursor:pointer;font-weight:600;padding:3px 10px;}
 .hm-ld{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:160px;gap:10px;color:#64748b;}
+.hm-loading-shell{display:flex;flex-direction:column;gap:1rem;}
 .hm-spin{width:32px;height:32px;border:4px solid #e2e8f0;border-top:4px solid #F97316;border-radius:50%;animation:hmSpin .8s linear infinite;}
 @keyframes hmSpin{to{transform:rotate(360deg);}}
 /* PRODUCT GRID */

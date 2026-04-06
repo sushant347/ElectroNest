@@ -3,6 +3,7 @@ import Plot from 'react-plotly.js';
 import { TrendingUp, TrendingDown, DollarSign, Users, Package, AlertTriangle, Printer, Download, RefreshCw, AlertCircle, SlidersHorizontal, Eye, X } from 'lucide-react';
 import { ownerAPI } from '../../services/api';
 import ComprehensiveForecastModal from '../../components/Owner/ComprehensiveForecastModal';
+import { HeaderSkeleton, CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(v);
 const fmtShort = (v) => { if (v >= 10000000) return `Rs.${(v / 10000000).toFixed(1)}Cr`; if (v >= 100000) return `Rs.${(v / 100000).toFixed(1)}L`; if (v >= 1000) return `Rs.${(v / 1000).toFixed(0)}K`; return `Rs.${v}`; };
@@ -219,6 +220,18 @@ export default function Analytics() {
     { key: 'revenue', label: 'Revenue' },
     { key: 'orders', label: 'Orders' },
   ];
+
+  if (loading && !error && revenueTrend.length === 0 && topProducts.length === 0) {
+    return (
+      <div style={{ padding: '2rem', maxWidth: 1280, margin: '0 auto' }}>
+        <HeaderSkeleton titleWidth={240} subtitleWidth={220} />
+        <CardGridSkeleton cards={4} columns="repeat(auto-fit, minmax(220px, 1fr))" minHeight={130} />
+        <div style={{ marginTop: 18 }}>
+          <CardGridSkeleton cards={2} columns="repeat(auto-fit, minmax(360px, 1fr))" minHeight={260} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="owner-an">

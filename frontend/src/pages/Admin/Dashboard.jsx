@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import Plot from 'react-plotly.js';
 import { adminAPI } from '../../services/api';
+import { HeaderSkeleton, CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 const ADM_COLORS = ['#DC2626', '#EA580C', '#2563EB', '#16A34A', '#7C3AED', '#EC4899', '#D97706', '#0891B2', '#6366F1', '#059669'];
@@ -274,17 +275,12 @@ export default function Dashboard() {
   /* ── Loading state ── */
   if (loading && !data) {
     return (
-      <div className="adm-center">
-        <RefreshCw size={32} className="spin" />
-        <p>Loading admin dashboard…</p>
-        <div className="load-bar"><div className="load-fill" /></div>
-        <style>{`
-          .adm-center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;color:#64748b;gap:12px}
-          .spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}
-          .load-bar{width:200px;height:4px;background:#f1f5f9;border-radius:2px;overflow:hidden}
-          .load-fill{width:50%;height:100%;background:#DC2626;animation:slide 1.5s infinite}
-          @keyframes slide{0%{margin-left:-50%}100%{margin-left:100%}}
-        `}</style>
+      <div style={{ padding: '28px 32px 60px', maxWidth: 1600, margin: '0 auto' }}>
+        <HeaderSkeleton titleWidth={230} subtitleWidth={260} />
+        <CardGridSkeleton cards={4} columns="repeat(auto-fit, minmax(280px, 1fr))" minHeight={160} />
+        <div style={{ marginTop: 20 }}>
+          <CardGridSkeleton cards={2} columns="repeat(auto-fit, minmax(420px, 1fr))" minHeight={260} />
+        </div>
       </div>
     );
   }

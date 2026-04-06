@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Package, ChevronDown, ChevronUp, XCircle, MapPin, Phone, Mail, CreditCard, Truck, ShoppingBag, Printer, Star, X, Clock, CheckCircle, Box, Home } from 'lucide-react';
 import { customerAPI } from '../../services/api';
+import { HeaderSkeleton, CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 /* ── Customer Print Invoice Modal ── */
 function PrintInvoiceModal({ order, onClose }) {
@@ -220,7 +221,12 @@ export default function MyOrders() {
   }, [orders]);
 
   if (loading) return (
-    <div style={s.center}><div style={s.spinner} /><p style={{ color: '#64748b', marginTop: 12 }}>Loading orders...</p></div>
+    <section style={s.page}>
+      <div style={s.container}>
+        <HeaderSkeleton titleWidth={170} subtitleWidth={120} showAction={false} />
+        <CardGridSkeleton cards={3} columns="1fr" minHeight={190} />
+      </div>
+    </section>
   );
 
   return (

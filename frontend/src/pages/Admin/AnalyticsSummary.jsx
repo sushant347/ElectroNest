@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, TrendingUp, BarChart3, PieChart, CreditCard, PackageCheck } from 'lucide-react';
 import Plot from 'react-plotly.js';
 import { adminAPI } from '../../services/api';
+import { HeaderSkeleton, CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
@@ -131,10 +132,12 @@ export default function AnalyticsSummary() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 12, color: '#6B7280' }}>
-        <RefreshCw size={24} className="spin" />
-        <p>Loading analytics...</p>
-        <style>{`.spin { animation: spinF 1s linear infinite; } @keyframes spinF { from { transform: rotate(0); } to { transform: rotate(360deg); } }`}</style>
+      <div style={{ padding: '28px 32px 40px', maxWidth: 1400, margin: '0 auto' }}>
+        <HeaderSkeleton titleWidth={220} subtitleWidth={260} />
+        <CardGridSkeleton cards={4} columns="repeat(auto-fit, minmax(220px, 1fr))" minHeight={130} />
+        <div style={{ marginTop: 20 }}>
+          <CardGridSkeleton cards={2} columns="repeat(auto-fit, minmax(340px, 1fr))" minHeight={280} />
+        </div>
       </div>
     );
   }

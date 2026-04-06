@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Truck, Search, RefreshCw, AlertCircle, Plus, Edit2, Trash2, X, Filter, CheckCircle, XCircle } from 'lucide-react';
 import { adminAPI } from '../../services/api';
+import { TableSkeleton } from '../../components/Common/SkeletonLoader';
 
 export default function SupplierManagement() {
   const [suppliers, setSuppliers] = useState([]);
@@ -145,7 +146,7 @@ export default function SupplierManagement() {
       {error && <div className="sup-error"><AlertCircle size={16} /> {error}</div>}
 
       {loading ? (
-        <div className="sup-loading"><RefreshCw size={24} className="sup-spin" /><p>Loading suppliers...</p></div>
+        <TableSkeleton rows={8} columns={8} />
       ) : (
         <>
           {/* Stats Row */}

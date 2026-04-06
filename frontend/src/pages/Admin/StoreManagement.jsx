@@ -8,6 +8,7 @@ import {
   BarChart, Bar, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, Line
 } from 'recharts';
+import { SkeletonBlock, TableSkeleton } from '../../components/Common/SkeletonLoader';
 
 // Bulletproof chart wrapper — measures its own pixel width, bypasses ResizeObserver issues
 function ChartWrapper({ height, children }) {
@@ -313,9 +314,11 @@ export default function StoreManagement() {
           )}
         </div>
         {chartLoading ? (
-          <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', gap: 8 }}>
-            <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
-            Loading chart...
+          <div style={{ height: 240, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10, padding: '0 8px' }}>
+            <SkeletonBlock width="42%" height={14} />
+            <SkeletonBlock width="100%" height={11} radius={6} />
+            <SkeletonBlock width="92%" height={11} radius={6} />
+            <SkeletonBlock width="76%" height={11} radius={6} />
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : displayTrend.length > 0 ? (
@@ -340,7 +343,12 @@ export default function StoreManagement() {
             )}
           </ChartWrapper>
         ) : loading ? (
-          <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', fontSize: '0.85rem' }}>Loading data...</div>
+          <div style={{ height: 240, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10, padding: '0 8px' }}>
+            <SkeletonBlock width="38%" height={14} />
+            <SkeletonBlock width="100%" height={11} radius={6} />
+            <SkeletonBlock width="88%" height={11} radius={6} />
+            <SkeletonBlock width="66%" height={11} radius={6} />
+          </div>
         ) : (
           <div style={{ height: 240, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', gap: 8 }}>
             <TrendingUp size={28} color="#e5e7eb" />
@@ -370,9 +378,8 @@ export default function StoreManagement() {
           </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '48px 0', color: '#9CA3AF' }}>
-              <RefreshCw size={22} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 10px', display: 'block', color: '#F97316' }} />
-              Loading stores...
+            <div style={{ padding: 16 }}>
+              <TableSkeleton rows={8} columns={7} />
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 0', color: '#9CA3AF', fontSize: '0.85rem' }}>
@@ -542,8 +549,10 @@ export default function StoreManagement() {
                 Revenue Trend ({period}d)
               </div>
               {chartLoading ? (
-                <div style={{ height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', gap: 6, fontSize: '0.8rem' }}>
-                  <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading...
+                <div style={{ height: 140, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
+                  <SkeletonBlock width="60%" height={12} />
+                  <SkeletonBlock width="100%" height={10} radius={6} />
+                  <SkeletonBlock width="90%" height={10} radius={6} />
                 </div>
               ) : storeTrend.length > 0 ? (
                 <ChartWrapper height={140}>

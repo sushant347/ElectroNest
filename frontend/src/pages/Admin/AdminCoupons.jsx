@@ -5,6 +5,7 @@ import {
   Calendar, Shield, Clock, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { adminAPI, ownerAPI } from '../../services/api';
+import { CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 const fmt = n => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -231,10 +232,8 @@ export default function AdminCoupons() {
       {/* Table */}
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>
-            <RefreshCw size={22} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 10px', display: 'block', color: '#F97316' }} />
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            Loading coupons...
+          <div style={{ padding: 14 }}>
+            <CardGridSkeleton cards={6} columns="repeat(auto-fill, minmax(280px, 1fr))" minHeight={180} />
           </div>
         ) : paged.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: '#9CA3AF', fontSize: '0.85rem' }}>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Package, Search, RefreshCw, AlertCircle, ChevronDown } from 'lucide-react';
 import { warehouseAPI } from '../../services/api';
+import { TableSkeleton } from '../../components/Common/SkeletonLoader';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
@@ -62,7 +63,7 @@ export default function InventoryManagement() {
       )}
 
       {loading ? (
-        <div className="inv-loading"><RefreshCw size={24} className="spin" /><p>Loading inventory...</p></div>
+        <TableSkeleton rows={8} columns={8} />
       ) : (
         <>
           <div className="inv-table-wrap">
