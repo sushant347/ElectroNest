@@ -308,4 +308,4 @@ Configured in render.yaml:
 - Consider JWT blacklist/revocation strategy for stricter logout semantics
 
 ## License
-This repository currently has no explicit license file. Add one if you plan to distribute or open-source the project.
+all rights are reserved @sushant347
