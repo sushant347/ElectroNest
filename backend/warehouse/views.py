@@ -372,11 +372,12 @@ class StockMovementsView(APIView):
                     'payment_status': 'Completed' if payment else 'Pending',
                 })
 
-        # 2. Enriched Purchase Orders with customer info, shipping, commission
-        from datetime import timedelta as td
+        all_pos_qs = PurchaseOrder.objects.all()
+        if order_since is not None:
+            all_pos_qs = all_pos_qs.filter(created_at__gte=order_since)
+            
         all_pos = (
-            PurchaseOrder.objects
-            .filter(created_at__gte=since)
+            all_pos_qs
             .select_related('supplier', 'order_status')
             .prefetch_related('details__product__supplier')
             .order_by('-created_at')[:50]
@@ -415,8 +416,8 @@ class StockMovementsView(APIView):
 
             if po_product_ids:
                 # Look for the most recent order containing any of these products within ±1 day
-                window_start = po.created_at - td(days=1)
-                window_end = po.created_at + td(days=1)
+                window_start = po.created_at - timedelta(days=1)
+                window_end = po.created_at + timedelta(days=1)
                 candidate = (
                     Order.objects
                     .filter(
@@ -496,9 +497,12 @@ class StockMovementsView(APIView):
                     store_commission[sname][k] = round(store_commission[sname][k], 2)
 
         # 3. Recently updated products (stock changes by owners)
+        recent_products_qs = Product.objects.all()
+        if order_since is not None:
+            recent_products_qs = recent_products_qs.filter(updated_at__gte=order_since)
+            
         recent_products = (
-            Product.objects
-            .filter(updated_at__gte=since)
+            recent_products_qs
             .select_related('category')
             .order_by('-updated_at')[:20]
         )
