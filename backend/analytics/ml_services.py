@@ -7,6 +7,7 @@ from datetime import timedelta
 
 # Cache TTL for expensive ML computations (1 hour)
 _ML_CACHE_TTL = 3600
+_MODEL_VERSION = '1.0.0'
 
 
 def _read_sql(query, params=None):
@@ -21,16 +22,53 @@ def _read_sql(query, params=None):
     return pd.DataFrame(rows, columns=cols)
 
 
+def _dt_to_iso(value):
+    if value is None or (hasattr(pd, 'isna') and pd.isna(value)):
+        return ''
+    try:
+        return pd.to_datetime(value).isoformat()
+    except Exception:
+        return str(value)
+
+
+def _orders_signature():
+    """Return a lightweight signature that changes when orders change."""
+    df = _read_sql('SELECT MAX("OrderDate") AS last_order_date, COUNT(*) AS order_count FROM "Orders"')
+    if df.empty:
+        return '0:none'
+    count = int(df['order_count'].iloc[0] or 0)
+    last = _dt_to_iso(df['last_order_date'].iloc[0]) or 'none'
+    return f'{count}:{last}'
+
+
+def _product_signature(product_id):
+    """Signature based on order activity and product updates."""
+    df = _read_sql(
+        'SELECT MAX(o."OrderDate") AS last_order_date, COUNT(*) AS order_count '
+        'FROM "OrderDetails" od '
+        'JOIN "Orders" o ON od."OrderID" = o."OrderID" '
+        'WHERE od."ProductID" = %s',
+        [product_id],
+    )
+    count = int(df['order_count'].iloc[0] or 0) if not df.empty else 0
+    last = _dt_to_iso(df['last_order_date'].iloc[0]) if not df.empty else 'none'
+
+    prod_df = _read_sql('SELECT "updatedAt" AS updated_at FROM "Products" WHERE "ProductID" = %s', [product_id])
+    updated = _dt_to_iso(prod_df['updated_at'].iloc[0]) if not prod_df.empty else 'none'
+    return f'{count}:{last or "none"}:{updated or "none"}'
+
+
 # ─────────────────────────────────────────────────────────
 #  RFM Customer Segmentation — 10 segments + CLV
 # ─────────────────────────────────────────────────────────
 
-def get_customer_rfm(days=90):
+def get_customer_rfm(days=90, include_meta=False):
     """
     Professional RFM segmentation with 10 segments, CLV estimation,
     and actionable recommendations per segment.
     """
-    cache_key = f'analytics_rfm_{days}'
+    signature = _orders_signature()
+    cache_key = f'analytics_rfm_{days}_{signature}_meta{int(include_meta)}'
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -164,8 +202,16 @@ def get_customer_rfm(days=90):
             'last_order': row['last_order'].strftime('%Y-%m-%d') if pd.notna(row['last_order']) else '',
         })
 
-    cache.set(cache_key, records, _ML_CACHE_TTL)
-    return records
+    model_info = {
+        'model_type': 'RFM Segmentation',
+        'model_version': _MODEL_VERSION,
+        'generated_at': timezone.now().isoformat(),
+        'data_signature': signature,
+    }
+
+    result = {'items': records, 'model_info': model_info} if include_meta else records
+    cache.set(cache_key, result, _ML_CACHE_TTL)
+    return result
 
 
 # ─────────────────────────────────────────────────────────
@@ -180,7 +226,8 @@ def get_churn_prediction(days=90, churn_threshold_days=30):
     - Feature importance for explainability
     - Model accuracy metrics (precision, recall, F1)
     """
-    cache_key = f'analytics_churn_{days}_{churn_threshold_days}'
+    signature = _orders_signature()
+    cache_key = f'analytics_churn_{days}_{churn_threshold_days}_{signature}'
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -385,6 +432,12 @@ def get_churn_prediction(days=90, churn_threshold_days=30):
         'revenue_at_risk': revenue_at_risk,
     }
 
+    model_info.update({
+        'model_version': _MODEL_VERSION,
+        'generated_at': timezone.now().isoformat(),
+        'data_signature': signature,
+    })
+
     result = {
         'customers': customers,
         'summary': summary,
@@ -403,7 +456,19 @@ def get_dynamic_pricing(product_id):
     Price optimization with demand elasticity estimation,
     competitor-aware factors, and confidence scoring.
     """
+    signature = _product_signature(product_id)
+    cache_key = f'analytics_dynamic_pricing_{product_id}_{signature}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     now = timezone.now()
+    model_info = {
+        'model_type': 'Dynamic Pricing',
+        'model_version': _MODEL_VERSION,
+        'generated_at': now.isoformat(),
+        'data_signature': signature,
+    }
 
     # Get product info
     query_product = """
@@ -413,7 +478,7 @@ def get_dynamic_pricing(product_id):
     """
     prod_df = _read_sql(query_product, [product_id])
     if prod_df.empty:
-        return {'error': 'Product not found'}
+        return {'error': 'Product not found', 'model_info': model_info}
 
     product = prod_df.iloc[0]
     selling_price = float(product['SellingPrice'])
@@ -435,7 +500,7 @@ def get_dynamic_pricing(product_id):
     demand_df = _read_sql(query_demand, [product_id, from_date_90])
 
     if demand_df.empty:
-        return {
+        result = {
             'product_id': product_id,
             'current_price': selling_price,
             'suggested_price': selling_price,
@@ -445,7 +510,10 @@ def get_dynamic_pricing(product_id):
             'factors': [],
             'confidence': 0,
             'elasticity': None,
+            'model_info': model_info,
         }
+        cache.set(cache_key, result, _ML_CACHE_TTL)
+        return result
 
     demand_df['OrderDate'] = pd.to_datetime(demand_df['OrderDate'])
 
@@ -582,7 +650,7 @@ def get_dynamic_pricing(product_id):
 
     confidence = round((confidence_points / max(max_confidence, 1)) * 100) if max_confidence > 0 else 50
 
-    return {
+    result = {
         'product_id': product_id,
         'current_price': selling_price,
         'suggested_price': suggested_price,
@@ -598,7 +666,10 @@ def get_dynamic_pricing(product_id):
         'demand_acceleration': round(acceleration, 1),
         'stock': stock,
         'margin_pct': round(margin, 1),
+        'model_info': model_info,
     }
+    cache.set(cache_key, result, _ML_CACHE_TTL)
+    return result
 
 
 # ─────────────────────────────────────────────────────────
@@ -610,8 +681,21 @@ def get_demand_forecast(product_id, days_history=30, forecast_days=7):
     Demand forecast using EWMA with trend decomposition and
     day-of-week seasonality patterns.
     """
+    signature = _product_signature(product_id)
+    cache_key = f'analytics_demand_forecast_{product_id}_{days_history}_{forecast_days}_{signature}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     now = timezone.now()
     from_date = now - timedelta(days=days_history)
+
+    model_info = {
+        'model_type': 'EWMA + Trend + Seasonality',
+        'model_version': _MODEL_VERSION,
+        'generated_at': now.isoformat(),
+        'data_signature': signature,
+    }
 
     query = """
         SELECT o."OrderDate" AS date, od."Quantity" AS quantity
@@ -626,7 +710,7 @@ def get_demand_forecast(product_id, days_history=30, forecast_days=7):
     df = _read_sql(query, [product_id, from_date])
 
     if df.empty:
-        return {"error": "Not enough data for forecasting"}
+        return {"error": "Not enough data for forecasting", 'model_info': model_info}
 
     df['date'] = pd.to_datetime(df['date']).dt.date
 
@@ -693,7 +777,7 @@ def get_demand_forecast(product_id, days_history=30, forecast_days=7):
             "ci_upper": round(ci_upper, 1),
         })
 
-    return {
+    result = {
         "product_id": product_id,
         "historical_avg_daily": round(float(vals.mean()), 2),
         "ewma_baseline": round(ewma_base, 2),
@@ -705,18 +789,34 @@ def get_demand_forecast(product_id, days_history=30, forecast_days=7):
             d: round(float(dow_factors[i]), 2)
             for i, d in enumerate(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
         },
+        "model_info": model_info,
     }
+    cache.set(cache_key, result, _ML_CACHE_TTL)
+    return result
 
 
 # ─────────────────────────────────────────────────────────
 #  Product Recommendations — Jaccard + Lift scoring
 # ─────────────────────────────────────────────────────────
 
-def get_product_recommendations(product_id, limit=5):
+def get_product_recommendations(product_id, limit=5, include_meta=False):
     """
     Market basket analysis with Jaccard similarity and lift scores
     for more relevant recommendations.
     """
+    signature = _product_signature(product_id)
+    cache_key = f'analytics_recommendations_{product_id}_{limit}_{signature}_meta{int(include_meta)}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    model_info = {
+        'model_type': 'Market Basket (Jaccard + Lift)',
+        'model_version': _MODEL_VERSION,
+        'generated_at': timezone.now().isoformat(),
+        'data_signature': signature,
+    }
+
     # Get all orders containing this product
     query_orders = """
         SELECT DISTINCT od."OrderID"
@@ -725,7 +825,9 @@ def get_product_recommendations(product_id, limit=5):
     """
     order_ids_df = _read_sql(query_orders, [product_id])
     if order_ids_df.empty:
-        return []
+        result = {'items': [], 'model_info': model_info} if include_meta else []
+        cache.set(cache_key, result, _ML_CACHE_TTL)
+        return result
 
     order_ids = order_ids_df['OrderID'].tolist()
     total_orders_with_product = len(order_ids)
@@ -743,7 +845,9 @@ def get_product_recommendations(product_id, limit=5):
     df = _read_sql(query, order_ids + [product_id])
 
     if df.empty:
-        return []
+        result = {'items': [], 'model_info': model_info} if include_meta else []
+        cache.set(cache_key, result, _ML_CACHE_TTL)
+        return result
 
     # Total orders in system (for lift calculation)
     total_orders_df = _read_sql('SELECT COUNT(DISTINCT "OrderID") AS total FROM "Orders"')
@@ -809,6 +913,8 @@ def get_product_recommendations(product_id, limit=5):
             'score': round(float(row['score']), 3),
         })
 
+    result = {'items': result, 'model_info': model_info} if include_meta else result
+    cache.set(cache_key, result, _ML_CACHE_TTL)
     return result
 
 
@@ -956,8 +1062,21 @@ def get_comprehensive_forecast(product_id, days_history=30, forecast_days=7):
     - Stock decision recommendation
     - Key insights & summary table
     """
+    signature = _product_signature(product_id)
+    cache_key = f'analytics_comprehensive_forecast_{product_id}_{days_history}_{forecast_days}_{signature}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     now = timezone.now()
     from_date = now - timedelta(days=days_history)
+
+    model_info = {
+        'model_type': 'Prophet Forecast (Units/Revenue/Profit)',
+        'model_version': _MODEL_VERSION,
+        'generated_at': now.isoformat(),
+        'data_signature': signature,
+    }
 
     # ── Fetch raw order data from database ──
     query = """
@@ -982,7 +1101,7 @@ def get_comprehensive_forecast(product_id, days_history=30, forecast_days=7):
     df = _read_sql(query, [product_id, from_date])
 
     if df.empty:
-        return {'error': 'Not enough sales data for forecasting'}
+        return {'error': 'Not enough sales data for forecasting', 'model_info': model_info}
 
     # ── Extract product metadata ──
     df['date'] = pd.to_datetime(df['date']).dt.date
@@ -1263,7 +1382,7 @@ def get_comprehensive_forecast(product_id, days_history=30, forecast_days=7):
         'growth_vs_historical_pct': round(growth_pct, 1),
     }
 
-    return {
+    result = {
         'product_id': product_id,
         'product_name': product_name,
         'description': description_val,
@@ -1333,4 +1452,7 @@ def get_comprehensive_forecast(product_id, days_history=30, forecast_days=7):
 
         # Key insights
         'key_insights': key_insights,
+        'model_info': model_info,
     }
+    cache.set(cache_key, result, _ML_CACHE_TTL)
+    return result

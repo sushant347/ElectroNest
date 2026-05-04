@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
 from django.db.models import Sum, Count, Avg, F, Case, When, Value, DecimalField
 from django.db.models.functions import TruncDay, TruncMonth
 from django.utils import timezone
@@ -11,6 +12,7 @@ from products.models import Product, Category, Customer
 from accounts.models import CustomUser
 
 from .ml_services import get_customer_rfm, get_demand_forecast, get_product_recommendations, get_comprehensive_forecast, get_churn_prediction, get_dynamic_pricing
+from .jobs import enqueue_job, get_job
 
 
 class IsOwnerOrAdmin(IsAuthenticated):
@@ -24,6 +26,16 @@ def get_owner_store_name(user):
         name = f"{user.first_name} {user.last_name}".strip()
         return name or None
     return None
+
+
+def _wants_async(request):
+    raw = (request.query_params.get('async') or '').strip().lower()
+    return raw in ('1', 'true', 'yes')
+
+
+def _wants_meta(request):
+    raw = (request.query_params.get('include_meta') or '').strip().lower()
+    return raw in ('1', 'true', 'yes')
 
 
 def safe_profit_expr():
@@ -308,12 +320,26 @@ class LowStockView(APIView):
         } for p in products])
 
 
+class AnalyticsJobStatusView(APIView):
+    permission_classes = [IsOwnerOrAdmin]
+
+    def get(self, request, job_id):
+        job = get_job(job_id)
+        if not job:
+            return Response({'detail': 'Job not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(job)
+
+
 class CustomerSegmentationView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
     def get(self, request):
         days = int(request.query_params.get('days', 90))
-        rfm_data = get_customer_rfm(days=days)
+        include_meta = _wants_meta(request)
+        if _wants_async(request):
+            job_id = enqueue_job('segmentation', get_customer_rfm, days=days, include_meta=include_meta)
+            return Response({'job_id': job_id, 'status': 'queued'})
+        rfm_data = get_customer_rfm(days=days, include_meta=include_meta)
         return Response(rfm_data)
 
 
@@ -323,6 +349,9 @@ class DemandForecastView(APIView):
     def get(self, request, product_id):
         history = int(request.query_params.get('history', 30))
         forecast = int(request.query_params.get('forecast', 7))
+        if _wants_async(request):
+            job_id = enqueue_job('demand_forecast', get_demand_forecast, product_id, days_history=history, forecast_days=forecast)
+            return Response({'job_id': job_id, 'status': 'queued'})
         forecast_data = get_demand_forecast(product_id, days_history=history, forecast_days=forecast)
         return Response(forecast_data)
 
@@ -332,7 +361,11 @@ class ProductRecommendationsView(APIView):
 
     def get(self, request, product_id):
         limit = int(request.query_params.get('limit', 5))
-        recs = get_product_recommendations(product_id, limit=limit)
+        include_meta = _wants_meta(request)
+        if _wants_async(request):
+            job_id = enqueue_job('recommendations', get_product_recommendations, product_id, limit=limit, include_meta=include_meta)
+            return Response({'job_id': job_id, 'status': 'queued'})
+        recs = get_product_recommendations(product_id, limit=limit, include_meta=include_meta)
         return Response(recs)
 
 
@@ -343,6 +376,9 @@ class ComprehensiveForecastView(APIView):
     def get(self, request, product_id):
         days = int(request.query_params.get('days', 30))
         forecast_days = int(request.query_params.get('forecast_days', 7))
+        if _wants_async(request):
+            job_id = enqueue_job('comprehensive_forecast', get_comprehensive_forecast, product_id, days_history=days, forecast_days=forecast_days)
+            return Response({'job_id': job_id, 'status': 'queued'})
         result = get_comprehensive_forecast(product_id, days_history=days, forecast_days=forecast_days)
         return Response(result)
 
@@ -426,6 +462,9 @@ class ChurnPredictionView(APIView):
     def get(self, request):
         days = int(request.query_params.get('days', 90))
         threshold = int(request.query_params.get('threshold', 30))
+        if _wants_async(request):
+            job_id = enqueue_job('churn_prediction', get_churn_prediction, days=days, churn_threshold_days=threshold)
+            return Response({'job_id': job_id, 'status': 'queued'})
         result = get_churn_prediction(days=days, churn_threshold_days=threshold)
         return Response(result)
 
@@ -435,5 +474,8 @@ class DynamicPricingView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
     def get(self, request, product_id):
+        if _wants_async(request):
+            job_id = enqueue_job('dynamic_pricing', get_dynamic_pricing, product_id)
+            return Response({'job_id': job_id, 'status': 'queued'})
         result = get_dynamic_pricing(product_id)
         return Response(result)

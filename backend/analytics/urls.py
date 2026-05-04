@@ -4,7 +4,7 @@ from .views import (
     CategoryPerformanceView, PaymentMethodsView, OrderStatusView,
     LowStockView, CustomerSegmentationView, DemandForecastView,
     ProductRecommendationsView, ProductGrowthView, ComprehensiveForecastView,
-    ChurnPredictionView, DynamicPricingView,
+    ChurnPredictionView, DynamicPricingView, AnalyticsJobStatusView,
 )
 
 urlpatterns = [
@@ -32,4 +32,7 @@ urlpatterns = [
 
     # Dynamic Pricing
     path('dynamic-pricing/<int:product_id>/', DynamicPricingView.as_view()),
+
+    # Async job status
+    path('jobs/<str:job_id>/', AnalyticsJobStatusView.as_view()),
 ]
