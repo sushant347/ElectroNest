@@ -96,6 +96,17 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   const catParam = sp.get('cat') || ''
   const searchQ = sp.get('search') || ''
 
+  /* ── Smart Filter state ── */
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
+  const [sortBy, setSortBy] = useState('')
+  const [selBrands, setSelBrands] = useState([])
+  const allBrands = [...new Set(prods.map(p => (p.brand || p.Brand || '')).filter(Boolean))].sort()
+  const toggleBrand = (b) => setSelBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
+  const clearFilters = () => { setMinPrice(''); setMaxPrice(''); setSortBy(''); setSelBrands([]) }
+  const hasFilters = minPrice || maxPrice || sortBy || selBrands.length > 0
+
   const resetTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = setInterval(() => setSlide(s => (s + 1) % HERO_SLIDES.length), 2000)
@@ -211,22 +222,39 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     let f = prods
     if (searchQ) { const q = searchQ.toLowerCase(); f = f.filter(p => norm(p).name.toLowerCase().includes(q) || norm(p).brand.toLowerCase().includes(q) || norm(p).category.toLowerCase().includes(q)) }
     if (selCat) f = f.filter(p => norm(p).category === selCat)
-    if (selCat || searchQ) return applyImgVariants(f.map(norm))
-    const n = f.map(norm)
-    const byStore = {}
-    n.forEach(p => {
-      const store = (p.ownerName || '').trim() || 'Unknown Store'
-      if (!byStore[store]) byStore[store] = []
-      byStore[store].push(p)
-    })
-    const out = []
-    Object.values(byStore).forEach(g => {
-      const topPerStore = [...g]
-        .sort((a, b) => (b.sold - a.sold) || (b.price - a.price))
-        .slice(0, 4)
-      out.push(...topPerStore)
-    })
-    return applyImgVariants(out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price)))
+
+    let items
+    if (selCat || searchQ) {
+      items = f.map(norm)
+    } else {
+      const n = f.map(norm)
+      const byStore = {}
+      n.forEach(p => {
+        const store = (p.ownerName || '').trim() || 'Unknown Store'
+        if (!byStore[store]) byStore[store] = []
+        byStore[store].push(p)
+      })
+      const out = []
+      Object.values(byStore).forEach(g => {
+        const topPerStore = [...g]
+          .sort((a, b) => (b.sold - a.sold) || (b.price - a.price))
+          .slice(0, 4)
+        out.push(...topPerStore)
+      })
+      items = out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price))
+    }
+
+    // ── Apply smart filters ──
+    if (minPrice) items = items.filter(p => p.price >= parseFloat(minPrice))
+    if (maxPrice) items = items.filter(p => p.price <= parseFloat(maxPrice))
+    if (selBrands.length > 0) items = items.filter(p => selBrands.includes(p.brand))
+    if (sortBy === 'price_low') items = [...items].sort((a, b) => a.price - b.price)
+    else if (sortBy === 'price_high') items = [...items].sort((a, b) => b.price - a.price)
+    else if (sortBy === 'best_selling') items = [...items].sort((a, b) => b.sold - a.sold)
+    else if (sortBy === 'top_rated') items = [...items].sort((a, b) => b.rating - a.rating)
+    else if (sortBy === 'newest') items = [...items].sort((a, b) => b.id - a.id)
+
+    return applyImgVariants(items)
   })()
 
   const handleCat = (name) => { suppressScrollRef.current = true; if (selCat === name) { setSelCat(null); nav('/') } else { setSelCat(name); nav(`/?cat=${encodeURIComponent(name)}`) } }
@@ -303,6 +331,130 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
             )
           })}
         </div>
+      </section>
+
+      {/* ── Smart Filter Bar ── */}
+      <section style={{
+        maxWidth: 1320, margin: '0 auto 0', padding: '0 24px',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14,
+          padding: '12px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+        }}>
+          {/* Toggle */}
+          <button
+            onClick={() => setFilterOpen(!filterOpen)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              border: filterOpen ? '1.5px solid #F97316' : '1.5px solid #e2e8f0',
+              background: filterOpen ? '#fff7ed' : '#f8fafc',
+              color: filterOpen ? '#c2410c' : '#475569',
+              transition: 'all .15s',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="9" y2="18"/></svg>
+            Filters {hasFilters ? `(${[minPrice && 1, maxPrice && 1, selBrands.length > 0 && 1, sortBy && 1].filter(Boolean).length})` : ''}
+          </button>
+
+          {/* Sort dropdown — always visible */}
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value)}
+            style={{
+              padding: '7px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0',
+              background: sortBy ? '#fff7ed' : '#f8fafc', fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', color: '#475569', outline: 'none',
+            }}
+          >
+            <option value="">Sort: Default</option>
+            <option value="price_low">Price: Low → High</option>
+            <option value="price_high">Price: High → Low</option>
+            <option value="best_selling">Best Selling</option>
+            <option value="top_rated">Top Rated</option>
+            <option value="newest">Newest First</option>
+          </select>
+
+          {/* Result count */}
+          <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>
+            {displayProds.length} product{displayProds.length !== 1 ? 's' : ''}
+          </span>
+
+          {/* Clear all */}
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              style={{
+                padding: '6px 14px', borderRadius: 8, border: '1px solid #fecaca',
+                background: '#fef2f2', color: '#ef4444', fontSize: 12, fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              ✕ Clear All
+            </button>
+          )}
+        </div>
+
+        {/* Expanded filter panel */}
+        {filterOpen && (
+          <div style={{
+            marginTop: 8, padding: '16px 20px',
+            background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '16px 28px',
+            alignItems: 'start',
+          }}>
+            {/* Price Range */}
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', paddingTop: 6 }}>Price (NPR)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <input
+                type="number" placeholder="Min" value={minPrice} onChange={e => setMinPrice(e.target.value)}
+                style={{
+                  width: 100, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0',
+                  fontSize: 13, outline: 'none', background: '#f8fafc',
+                }}
+              />
+              <span style={{ color: '#cbd5e1', fontWeight: 700 }}>—</span>
+              <input
+                type="number" placeholder="Max" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
+                style={{
+                  width: 100, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0',
+                  fontSize: 13, outline: 'none', background: '#f8fafc',
+                }}
+              />
+              {/* Quick presets */}
+              {[5000, 25000, 100000].map(v => (
+                <button key={v} onClick={() => { setMinPrice(''); setMaxPrice(String(v)) }} style={{
+                  padding: '5px 10px', borderRadius: 6, border: '1px solid #e2e8f0',
+                  background: maxPrice === String(v) ? '#fff7ed' : '#f8fafc',
+                  color: maxPrice === String(v) ? '#c2410c' : '#64748b',
+                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}>
+                  Under {v >= 1000 ? `${v / 1000}K` : v}
+                </button>
+              ))}
+            </div>
+
+            {/* Brands */}
+            {allBrands.length > 0 && (<>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', paddingTop: 4 }}>Brand</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {allBrands.slice(0, 20).map(b => (
+                  <button key={b} onClick={() => toggleBrand(b)} style={{
+                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    border: selBrands.includes(b) ? '1.5px solid #F97316' : '1.5px solid #e2e8f0',
+                    background: selBrands.includes(b) ? '#fff7ed' : '#f8fafc',
+                    color: selBrands.includes(b) ? '#c2410c' : '#64748b',
+                    transition: 'all .15s',
+                  }}>
+                    {selBrands.includes(b) ? '✓ ' : ''}{b}
+                  </button>
+                ))}
+              </div>
+            </>)}
+          </div>
+        )}
       </section>
 
       {/* PRODUCTS */}

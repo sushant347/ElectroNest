@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import random
 import string
 
@@ -88,6 +89,21 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
             qs = qs.filter(brand__icontains=brand)
         if owner:
             qs = qs.filter(owner_name__icontains=owner)
+
+        # ── Smart Filtering: min_price, max_price ──
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+        if min_price:
+            try:
+                qs = qs.filter(selling_price__gte=Decimal(min_price))
+            except (InvalidOperation, ValueError):
+                pass
+        if max_price:
+            try:
+                qs = qs.filter(selling_price__lte=Decimal(max_price))
+            except (InvalidOperation, ValueError):
+                pass
+
         # Owners see only their own products when the 'my_products' param is set
         if (self.request.query_params.get('my_products')
                 and hasattr(self.request, 'user')
@@ -100,7 +116,105 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
             average_rating=Avg('reviews__rating'),
             review_count=Count('reviews', distinct=True)
         )
+
+        # ── Smart Sorting ──
+        sort_by = self.request.query_params.get('sort_by', '')
+        if sort_by == 'price_low':
+            qs = qs.order_by('selling_price')
+        elif sort_by == 'price_high':
+            qs = qs.order_by('-selling_price')
+        elif sort_by == 'newest':
+            qs = qs.order_by('-created_at')
+        elif sort_by == 'best_selling':
+            qs = qs.order_by('-units_sold')
+        elif sort_by == 'top_rated':
+            qs = qs.order_by('-average_rating')
+
         return qs
+
+
+class PriceHistoryView(APIView):
+    """Return price history for the price comparison graph on the product detail page."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, product_id):
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({'detail': 'Product not found.'}, status=drf_status.HTTP_404_NOT_FOUND)
+
+        selling_price = float(product.selling_price)
+        cost_price = float(product.cost_price)
+        discount_price = float(product.discount_price) if product.discount_price else None
+
+        # Simulated market average = cost_price × 1.3 (30% retailer markup)
+        market_price = round(cost_price * 1.3, 2)
+
+        # Get historical price changes from AuditLog
+        price_history = []
+        logs = (
+            AuditLog.objects
+            .filter(table_name='Products', record_id=product_id, action__in=['UPDATE', 'CREATE', 'INSERT'])
+            .order_by('timestamp')
+        )
+
+        for log in logs:
+            try:
+                old_vals = json.loads(log.old_values) if log.old_values else {}
+                new_vals = json.loads(log.new_values) if log.new_values else {}
+            except (json.JSONDecodeError, TypeError):
+                old_vals = {}
+                new_vals = {}
+
+            # Check if selling price changed
+            old_price = old_vals.get('selling_price') or old_vals.get('SellingPrice')
+            new_price = new_vals.get('selling_price') or new_vals.get('SellingPrice')
+
+            if new_price is not None:
+                entry = {
+                    'date': log.timestamp.strftime('%Y-%m-%d'),
+                    'our_price': float(new_price),
+                }
+                if old_price is not None:
+                    entry['old_price'] = float(old_price)
+                price_history.append(entry)
+
+        # If no audit trail, generate synthetic monthly data points (last 6 months)
+        # showing the current price as stable and market price slightly fluctuating
+        if not price_history:
+            from datetime import timedelta
+            from django.utils import timezone
+            now = timezone.now()
+            import random as rng
+            for i in range(6, -1, -1):
+                dt = now - timedelta(days=i * 30)
+                # Market price fluctuates ±5% around baseline
+                variation = rng.uniform(-0.05, 0.05)
+                mp = round(market_price * (1 + variation), 2)
+                price_history.append({
+                    'date': dt.strftime('%Y-%m-%d'),
+                    'our_price': selling_price,
+                    'market_price': mp,
+                })
+
+        # Add market_price to each entry if not already present
+        for entry in price_history:
+            if 'market_price' not in entry:
+                entry['market_price'] = market_price
+
+        # Compute savings
+        savings_percent = round(((market_price - selling_price) / market_price) * 100, 1) if market_price > 0 else 0
+
+        return Response({
+            'product_id': product_id,
+            'product_name': product.name,
+            'current_selling_price': selling_price,
+            'current_cost_price': cost_price,
+            'current_discount_price': discount_price,
+            'market_price': market_price,
+            'savings_percent': max(0, savings_percent),
+            'price_history': price_history,
+        })
 
 
 class ReviewViewSet(viewsets.ModelViewSet):

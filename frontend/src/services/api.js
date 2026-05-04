@@ -230,6 +230,7 @@ export const customerAPI = {
   getCategories: () => api.get('/categories/'),
   getBrands: () => api.get('/brands/'),
   searchProducts: (query) => api.get('/products/', { params: { search: query } }),
+  getPriceHistory: (productId) => api.get(`/products/${productId}/price-history/`),
 
   // Cart
   getCart: () => api.get('/cart/'),

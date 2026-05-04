@@ -47,6 +47,164 @@ function StarRow({ rating, size = 16, color = '#FBBF24' }) {
   );
 }
 
+import Plot from 'react-plotly.js';
+
+/* ── Price Comparison Chart ── */
+function PriceComparisonChart({ productId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    customerAPI.getPriceHistory(productId)
+      .then(res => { if (!cancelled) setData(res.data); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [productId]);
+
+  if (loading || !data || !data.price_history?.length) return null;
+
+  const dates = data.price_history.map(p => p.date);
+  const ourPrices = data.price_history.map(p => p.our_price);
+  const marketPrices = data.price_history.map(p => p.market_price);
+  const savings = data.savings_percent;
+
+  return (
+    <div style={{
+      background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16,
+      padding: '24px 20px', marginTop: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #fff7ed, #ffedd5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>Price Comparison</div>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>Market Price vs Our Price</div>
+          </div>
+        </div>
+        {savings > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1.5px solid #86efac',
+            borderRadius: 999, padding: '6px 16px',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/></svg>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#15803d' }}>You save up to {savings}%</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 12, height: 3, borderRadius: 2, background: '#ef4444' }} />
+          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Market Price (Avg)</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 12, height: 3, borderRadius: 2, background: '#F97316' }} />
+          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Our Price</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 12, height: 12, borderRadius: 2, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)' }} />
+          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Your Savings</span>
+        </div>
+      </div>
+
+      <Plot
+        data={[
+          // Shaded savings area (filled between market and our price)
+          {
+            x: [...dates, ...dates.slice().reverse()],
+            y: [...marketPrices, ...ourPrices.slice().reverse()],
+            fill: 'toself',
+            fillcolor: 'rgba(34,197,94,0.1)',
+            line: { color: 'transparent' },
+            name: 'Savings',
+            showlegend: false,
+            hoverinfo: 'skip',
+            type: 'scatter',
+          },
+          // Market price line
+          {
+            x: dates,
+            y: marketPrices,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Market Price',
+            line: { color: '#ef4444', width: 2.5, shape: 'spline', dash: 'dot' },
+            marker: { size: 6, color: '#ef4444' },
+            hovertemplate: 'Market: Rs.%{y:,.0f}<extra></extra>',
+          },
+          // Our price line
+          {
+            x: dates,
+            y: ourPrices,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Our Price',
+            line: { color: '#F97316', width: 3, shape: 'spline' },
+            marker: { size: 7, color: '#F97316', symbol: 'diamond' },
+            hovertemplate: 'ElectroNest: Rs.%{y:,.0f}<extra></extra>',
+          },
+        ]}
+        layout={{
+          autosize: true,
+          height: 280,
+          margin: { l: 55, r: 20, t: 10, b: 40 },
+          paper_bgcolor: 'transparent',
+          plot_bgcolor: 'transparent',
+          font: { family: 'Inter, system-ui, sans-serif', size: 11, color: '#64748b' },
+          xaxis: {
+            showgrid: false,
+            tickformat: '%b %d',
+            tickfont: { size: 10, color: '#94a3b8' },
+          },
+          yaxis: {
+            gridcolor: '#f1f5f9',
+            gridwidth: 1,
+            tickprefix: 'Rs.',
+            tickfont: { size: 10, color: '#94a3b8' },
+            zeroline: false,
+          },
+          showlegend: false,
+          hovermode: 'x unified',
+          hoverlabel: {
+            bgcolor: '#fff',
+            bordercolor: '#e2e8f0',
+            font: { size: 12, color: '#1e293b', family: 'Inter, system-ui, sans-serif' },
+          },
+        }}
+        config={{ displayModeBar: false, responsive: true }}
+        style={{ width: '100%' }}
+        useResizeHandler
+      />
+
+      <div style={{
+        marginTop: 12, padding: '10px 14px', background: '#f8fafc', borderRadius: 10,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+      }}>
+        <div style={{ fontSize: 12, color: '#64748b' }}>
+          Current: <strong style={{ color: '#F97316' }}>{formatPrice(data.current_selling_price)}</strong>
+        </div>
+        <div style={{ fontSize: 12, color: '#64748b' }}>
+          Market Avg: <strong style={{ color: '#ef4444' }}>{formatPrice(data.market_price)}</strong>
+        </div>
+        {data.current_discount_price && (
+          <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700 }}>
+            🏷️ Sale: {formatPrice(data.current_discount_price)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const normalize = (p) => {
   const selling = parseFloat(p.selling_price || 0);
   const disc = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null;
@@ -602,6 +760,9 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
 
         {/* ── Coupon Carousel (above specs) ── */}
         <CouponCarousel coupons={coupons} storeName={product.ownerName} />
+
+        {/* ── Price Comparison Graph ── */}
+        <PriceComparisonChart productId={product.id} />
 
         {/* Specs */}
         {specEntries.length > 0 && (

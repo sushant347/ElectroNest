@@ -572,6 +572,27 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
   const [couponError, setCouponError] = useState('');
   const claimedCodeRef = useRef(null);
 
+  /* -- payment detail state (eSewa/Khalti/Bank) -- */
+  const [paymentDetails, setPaymentDetails] = useState({
+    esewaPhone: '', esewaPin: '',
+    khaltiPhone: '', khaltiPin: '',
+    bankName: '', bankMobileId: '', bankAccount: '',
+  });
+  const handlePaymentDetail = (e) => {
+    const { name, value } = e.target;
+    setPaymentDetails(prev => ({ ...prev, [name]: value }));
+  };
+
+  /* -- payment validation helpers -- */
+  const isPhoneValid = (phone) => /^(98|97)\d{8}$/.test(phone);
+  const isPinValid = (pin) => /^\d{4}$/.test(pin);
+  const isPaymentFormValid = () => {
+    if (paymentMethod === 'esewa') return isPhoneValid(paymentDetails.esewaPhone) && isPinValid(paymentDetails.esewaPin);
+    if (paymentMethod === 'khalti') return isPhoneValid(paymentDetails.khaltiPhone) && isPinValid(paymentDetails.khaltiPin);
+    if (paymentMethod === 'bank') return paymentDetails.bankName.trim() && paymentDetails.bankMobileId.trim() && paymentDetails.bankAccount.trim().length >= 6;
+    return true; // COD needs no extra details
+  };
+
   const getProvinces = (country = form.country) =>
     country === 'India' ? INDIA_STATES : NEPAL_PROVINCES;
 
@@ -832,6 +853,10 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
     }
     if (!paymentMethod) {
       showToast("Payment Required", "Please select a payment method.", "error");
+      return;
+    }
+    if (!isPaymentFormValid()) {
+      showToast("Payment Details Required", "Please fill all payment details correctly.", "error");
       return;
     }
 
@@ -1331,6 +1356,181 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                       );
                     })}
                   </div>
+
+                  {/* ── Payment Detail Forms ── */}
+                  {(paymentMethod === 'esewa' || paymentMethod === 'khalti') && (
+                    <div style={{
+                      marginTop: 20, padding: 20, borderRadius: 14,
+                      background: paymentMethod === 'esewa' ? 'linear-gradient(135deg, #f0fdf4, #f8fafc)' : 'linear-gradient(135deg, #faf5ff, #f8fafc)',
+                      border: `1.5px solid ${paymentMethod === 'esewa' ? '#86efac' : '#d8b4fe'}`,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                        {paymentMethod === 'esewa' ? <EsewaLogo size={28} /> : <KhaltiLogo size={28} />}
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+                          {paymentMethod === 'esewa' ? 'eSewa' : 'Khalti'} Payment Details
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                        <div style={s.formGroup}>
+                          <label style={s.label}>
+                            <Phone size={13} /> Mobile Number *
+                          </label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              name={paymentMethod === 'esewa' ? 'esewaPhone' : 'khaltiPhone'}
+                              type="tel"
+                              placeholder="98XXXXXXXX"
+                              maxLength={10}
+                              value={paymentMethod === 'esewa' ? paymentDetails.esewaPhone : paymentDetails.khaltiPhone}
+                              onChange={handlePaymentDetail}
+                              style={{
+                                ...s.input,
+                                borderColor: isPhoneValid(paymentMethod === 'esewa' ? paymentDetails.esewaPhone : paymentDetails.khaltiPhone) ? '#16a34a' : undefined,
+                              }}
+                            />
+                            {isPhoneValid(paymentMethod === 'esewa' ? paymentDetails.esewaPhone : paymentDetails.khaltiPhone) && (
+                              <CheckCircle size={16} color="#16a34a" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                            )}
+                          </div>
+                          {(paymentMethod === 'esewa' ? paymentDetails.esewaPhone : paymentDetails.khaltiPhone).length > 0 &&
+                            !isPhoneValid(paymentMethod === 'esewa' ? paymentDetails.esewaPhone : paymentDetails.khaltiPhone) && (
+                            <span style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>Must be 10 digits starting with 98 or 97</span>
+                          )}
+                        </div>
+                        <div style={s.formGroup}>
+                          <label style={s.label}>
+                            <Lock size={13} /> {paymentMethod === 'esewa' ? 'PIN' : 'MPIN'} *
+                          </label>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              name={paymentMethod === 'esewa' ? 'esewaPin' : 'khaltiPin'}
+                              type="password"
+                              placeholder="••••"
+                              maxLength={4}
+                              value={paymentMethod === 'esewa' ? paymentDetails.esewaPin : paymentDetails.khaltiPin}
+                              onChange={(e) => {
+                                const v = e.target.value.replace(/\D/g, '');
+                                handlePaymentDetail({ target: { name: e.target.name, value: v } });
+                              }}
+                              style={{
+                                ...s.input,
+                                letterSpacing: '0.3em', textAlign: 'center', fontWeight: 700,
+                                borderColor: isPinValid(paymentMethod === 'esewa' ? paymentDetails.esewaPin : paymentDetails.khaltiPin) ? '#16a34a' : undefined,
+                              }}
+                            />
+                            {isPinValid(paymentMethod === 'esewa' ? paymentDetails.esewaPin : paymentDetails.khaltiPin) && (
+                              <CheckCircle size={16} color="#16a34a" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                            )}
+                          </div>
+                          {(paymentMethod === 'esewa' ? paymentDetails.esewaPin : paymentDetails.khaltiPin).length > 0 &&
+                            !isPinValid(paymentMethod === 'esewa' ? paymentDetails.esewaPin : paymentDetails.khaltiPin) && (
+                            <span style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>Must be exactly 4 digits</span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{
+                        marginTop: 12, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a',
+                        borderRadius: 8, fontSize: 11, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        <ShieldCheck size={14} /> Your payment details are encrypted and secure
+                      </div>
+                    </div>
+                  )}
+
+                  {paymentMethod === 'bank' && (
+                    <div style={{
+                      marginTop: 20, padding: 20, borderRadius: 14,
+                      background: 'linear-gradient(135deg, #eff6ff, #f8fafc)',
+                      border: '1.5px solid #93c5fd',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                        <BankLogo size={28} />
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>Bank Transfer Details</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
+                        <div style={s.formGroup}>
+                          <label style={s.label}>Bank Name *</label>
+                          <select
+                            name="bankName"
+                            value={paymentDetails.bankName}
+                            onChange={handlePaymentDetail}
+                            style={{ ...s.input, cursor: 'pointer' }}
+                          >
+                            <option value="">Select Bank</option>
+                            <option value="Nepal Bank Limited">Nepal Bank Limited</option>
+                            <option value="Rastriya Banijya Bank">Rastriya Banijya Bank</option>
+                            <option value="Nabil Bank">Nabil Bank</option>
+                            <option value="Nepal Investment Bank">Nepal Investment Bank</option>
+                            <option value="Standard Chartered">Standard Chartered</option>
+                            <option value="Himalayan Bank">Himalayan Bank</option>
+                            <option value="Everest Bank">Everest Bank</option>
+                            <option value="NMB Bank">NMB Bank</option>
+                            <option value="Global IME Bank">Global IME Bank</option>
+                            <option value="Machhapuchchhre Bank">Machhapuchchhre Bank</option>
+                            <option value="Kumari Bank">Kumari Bank</option>
+                            <option value="Laxmi Sunrise Bank">Laxmi Sunrise Bank</option>
+                            <option value="Siddhartha Bank">Siddhartha Bank</option>
+                            <option value="Sanima Bank">Sanima Bank</option>
+                            <option value="NIC Asia Bank">NIC Asia Bank</option>
+                            <option value="Prime Commercial Bank">Prime Commercial Bank</option>
+                            <option value="Mega Bank">Mega Bank</option>
+                            <option value="Citizens Bank">Citizens Bank</option>
+                          </select>
+                          {paymentDetails.bankName && (
+                            <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 2 }}>✓ {paymentDetails.bankName}</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                          <div style={s.formGroup}>
+                            <label style={s.label}>Mobile Banking ID *</label>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                name="bankMobileId"
+                                placeholder="e.g. user123"
+                                value={paymentDetails.bankMobileId}
+                                onChange={handlePaymentDetail}
+                                style={{
+                                  ...s.input,
+                                  borderColor: paymentDetails.bankMobileId.trim() ? '#16a34a' : undefined,
+                                }}
+                              />
+                              {paymentDetails.bankMobileId.trim() && (
+                                <CheckCircle size={16} color="#16a34a" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                              )}
+                            </div>
+                          </div>
+                          <div style={s.formGroup}>
+                            <label style={s.label}>Account Number *</label>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                name="bankAccount"
+                                placeholder="XXXXXXXXXXXX"
+                                value={paymentDetails.bankAccount}
+                                onChange={handlePaymentDetail}
+                                style={{
+                                  ...s.input,
+                                  fontFamily: 'monospace', letterSpacing: '0.05em',
+                                  borderColor: paymentDetails.bankAccount.trim().length >= 6 ? '#16a34a' : undefined,
+                                }}
+                              />
+                              {paymentDetails.bankAccount.trim().length >= 6 && (
+                                <CheckCircle size={16} color="#16a34a" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                              )}
+                            </div>
+                            {paymentDetails.bankAccount.length > 0 && paymentDetails.bankAccount.length < 6 && (
+                              <span style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>Minimum 6 characters</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{
+                        marginTop: 12, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a',
+                        borderRadius: 8, fontSize: 11, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        <ShieldCheck size={14} /> Your banking details are encrypted and secure
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Mobile order summary + button */}

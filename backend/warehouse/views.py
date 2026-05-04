@@ -286,7 +286,6 @@ class StockMovementsView(APIView):
     permission_classes = [IsWarehouseOrOwner]
 
     def get(self, request):
-        since = timezone.now() - timedelta(days=30)
         # Customer orders: `days=30|90|…` limits by order_date; `days=0` or `lifetime` = no date filter (full history).
         days_raw = (request.query_params.get('days') or '90').strip().lower()
         order_since = None
