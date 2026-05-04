@@ -8,7 +8,7 @@ import {
 
 import { customerAPI } from '../../services/api';
 import { HeaderSkeleton, CardGridSkeleton, SkeletonText } from '../../components/Common/SkeletonLoader';
-import Plot from 'react-plotly.js';
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const formatPrice = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p);
 
@@ -115,74 +115,54 @@ function PriceComparisonChart({ productId }) {
         </div>
       </div>
 
-      <Plot
-        data={[
-          // Shaded savings area (filled between market and our price)
-          {
-            x: [...dates, ...dates.slice().reverse()],
-            y: [...marketPrices, ...ourPrices.slice().reverse()],
-            fill: 'toself',
-            fillcolor: 'rgba(34,197,94,0.1)',
-            line: { color: 'transparent' },
-            name: 'Savings',
-            showlegend: false,
-            hoverinfo: 'skip',
-            type: 'scatter',
-          },
-          // Market price line
-          {
-            x: dates,
-            y: marketPrices,
-            type: 'scatter',
-            mode: 'lines+markers',
-            name: 'Market Price',
-            line: { color: '#ef4444', width: 2.5, shape: 'spline', dash: 'dot' },
-            marker: { size: 6, color: '#ef4444' },
-            hovertemplate: 'Market: Rs.%{y:,.0f}<extra></extra>',
-          },
-          // Our price line
-          {
-            x: dates,
-            y: ourPrices,
-            type: 'scatter',
-            mode: 'lines+markers',
-            name: 'Our Price',
-            line: { color: '#F97316', width: 3, shape: 'spline' },
-            marker: { size: 7, color: '#F97316', symbol: 'diamond' },
-            hovertemplate: 'ElectroNest: Rs.%{y:,.0f}<extra></extra>',
-          },
-        ]}
-        layout={{
-          autosize: true,
-          height: 280,
-          margin: { l: 55, r: 20, t: 10, b: 40 },
-          paper_bgcolor: 'transparent',
-          plot_bgcolor: 'transparent',
-          font: { family: 'Inter, system-ui, sans-serif', size: 11, color: '#64748b' },
-          xaxis: {
-            showgrid: false,
-            tickformat: '%b %d',
-            tickfont: { size: 10, color: '#94a3b8' },
-          },
-          yaxis: {
-            gridcolor: '#f1f5f9',
-            gridwidth: 1,
-            tickprefix: 'Rs.',
-            tickfont: { size: 10, color: '#94a3b8' },
-            zeroline: false,
-          },
-          showlegend: false,
-          hovermode: 'x unified',
-          hoverlabel: {
-            bgcolor: '#fff',
-            bordercolor: '#e2e8f0',
-            font: { size: 12, color: '#1e293b', family: 'Inter, system-ui, sans-serif' },
-          },
-        }}
-        config={{ displayModeBar: false, responsive: true }}
-        style={{ width: '100%' }}
-        useResizeHandler
-      />
+      <div style={{ width: '100%', height: 280 }}>
+        <ResponsiveContainer>
+          <ComposedChart data={data.price_history} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+            <defs>
+              <linearGradient id="savingsFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.15}/>
+                <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <XAxis 
+              dataKey="date" 
+              axisLine={false} 
+              tickLine={false} 
+              tick={{ fontSize: 10, fill: '#94a3b8' }}
+              tickFormatter={(val) => {
+                const d = new Date(val);
+                return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
+              }}
+            />
+            <YAxis 
+              axisLine={false} 
+              tickLine={false} 
+              tick={{ fontSize: 10, fill: '#94a3b8' }}
+              tickFormatter={(val) => `Rs.${val}`}
+              domain={['auto', 'auto']}
+            />
+            <RechartsTooltip
+              contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+              labelStyle={{ fontWeight: 700, color: '#1e293b', marginBottom: 4 }}
+              itemStyle={{ fontSize: 13, fontWeight: 600 }}
+              formatter={(value, name) => [formatPrice(value), name === 'our_price' ? 'ElectroNest Price' : 'Market Price']}
+              labelFormatter={(label) => {
+                const d = new Date(label);
+                return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`;
+              }}
+            />
+            {/* Shaded Area for market price (acts as a savings visual) */}
+            <Area type="monotone" dataKey="market_price" fill="url(#savingsFill)" stroke="none" />
+            
+            {/* Market Price Line */}
+            <Line type="monotone" dataKey="market_price" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: '#ef4444' }} activeDot={{ r: 5 }} />
+            
+            {/* Our Price Line */}
+            <Line type="monotone" dataKey="our_price" stroke="#F97316" strokeWidth={3} dot={{ r: 4, fill: '#F97316', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
 
       <div style={{
         marginTop: 12, padding: '10px 14px', background: '#f8fafc', borderRadius: 10,
