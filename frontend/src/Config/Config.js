@@ -14,7 +14,6 @@
 const rawApiUrl = import.meta.env.VITE_API_BASE_URL;
 
 if (!rawApiUrl && import.meta.env.PROD) {
-  // eslint-disable-next-line no-console
   console.error(
     '[Config] VITE_API_BASE_URL is not set! API calls will target http://localhost:8000/api ' +
     'and fail in production. Add this env var in your Vercel project settings.'
@@ -36,4 +35,3 @@ const config = {
 };
 
 export default config;
-

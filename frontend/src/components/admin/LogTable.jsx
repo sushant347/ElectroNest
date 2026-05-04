@@ -67,7 +67,6 @@ export default function LogTable({ logs, loading }) {
         <tbody>
           {logs.map(log => {
             const ac = actionColors[log.action] || actionColors.CREATE;
-            const rowBg = statusColors[log.status] || 'transparent';
             const isExpanded = expandedId === log.id;
             const desc = log.description || '';
             const isTruncated = desc.length > 80;
@@ -140,4 +139,3 @@ export default function LogTable({ logs, loading }) {
     </div>
   );
 }
-

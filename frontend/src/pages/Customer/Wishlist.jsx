@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { Link, useNavigate } from "react-router-dom";
 import {
   Heart,
@@ -422,6 +421,7 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
       setRemovingId(null);
       toast({ title: "Removed", description: `${name} removed from wishlist.` });
     }, 350);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAddToCart = useCallback((id, name) => {
@@ -432,6 +432,7 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
       addToCart(item);
       toast({ title: "Added to cart", description: `${name} added to your cart.` });
     }, 1200);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleClearAll = useCallback(() => {
@@ -726,4 +727,3 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
 };
 
 export default Wishlist;
-

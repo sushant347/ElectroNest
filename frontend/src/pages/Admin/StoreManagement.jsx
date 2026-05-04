@@ -19,12 +19,19 @@ function ChartWrapper({ height, children }) {
     if (!ref.current) return;
     // Measure immediately
     setWidth(Math.floor(ref.current.getBoundingClientRect().width) || 300);
+    const t = setTimeout(() => {
+      setWidth(Math.floor(ref.current.getBoundingClientRect().width) || 300);
+    }, 0);
     const ro = new ResizeObserver(([entry]) => {
       const w = Math.floor(entry.contentRect.width);
       if (w > 0) setWidth(w);
     });
     ro.observe(ref.current);
     return () => ro.disconnect();
+    return () => {
+      clearTimeout(t);
+      ro.disconnect();
+    };
   }, []);
   return (
     <div ref={ref} style={{ width: '100%', height }}>
@@ -50,10 +57,12 @@ const PERIODS = [
 ];
 
 function StatCard({ icon: Icon, label, value, sub, color }) {
+function StatCard({ icon: StatIcon, label, value, sub, color }) {
   return (
     <div className="sm-stat-card">
       <div className="sm-stat-icon" style={{ background: `${color}18` }}>
         <Icon size={18} color={color} />
+        <StatIcon size={18} color={color} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="sm-stat-label">{label}</div>

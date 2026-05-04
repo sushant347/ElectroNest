@@ -27,9 +27,6 @@ import {
 const NEPAL_PROVINCES = ['Koshi', 'Madhesh', 'Bagmati', 'Gandaki', 'Lumbini', 'Karnali', 'Sudurpashchim'];
 const INDIA_STATES = ['Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'];
 
-/* ── Toast replacement ───────────────────────────────────── */
-const toast = ({ title, description }) => console.info(`${title}: ${description}`);
-
 /* ── Price formatter ─────────────────────────────────────── */
 const formatPrice = (price) =>
   new Intl.NumberFormat("en-IN", {
@@ -613,7 +610,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
           email:    u.email || prev.email,
         }));
       }
-    } catch {}
+    } catch (e) { void e; }
   }, []);
 
   /* -- cart calculations -- */
@@ -697,7 +694,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
         const arr = JSON.parse(localStorage.getItem('claimedCoupons') || '[]');
         const filtered = arr.filter(c => c !== code);
         localStorage.setItem('claimedCoupons', JSON.stringify(filtered));
-      } catch {}
+      } catch (e) { void e; }
       claimedCodeRef.current = code;
       setCouponCode(code);
     }
@@ -1604,4 +1601,3 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
 };
 
 export default Checkout;
-

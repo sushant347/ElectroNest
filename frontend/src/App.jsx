@@ -223,9 +223,10 @@ export default function App() {
 
   useEffect(() => {
     if (user && user.role === 'customer') {
-      loadCartFromAPI()
-      loadWishlistFromAPI()
-      loadCompareFromAPI()
+      const t = setTimeout(() => {
+        loadCartFromAPI(); loadWishlistFromAPI(); loadCompareFromAPI();
+      }, 0);
+      return () => clearTimeout(t);
     } else {
       setCartItems([])
       setWishlistItems([])

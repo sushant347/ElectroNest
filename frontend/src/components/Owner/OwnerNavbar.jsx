@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Package, ShoppingCart, BarChart3, LogOut, Bell, Store, ChevronDown, CheckCheck, AlertTriangle, ShoppingBag, Info, Trash2, Tag, Menu, X } from 'lucide-react';
 import electronestLogo from '../images/Electronest.png';
@@ -27,6 +26,12 @@ export default function OwnerNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef(null);
   const notifRef = useRef(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const displayName = user?.firstName
     ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
@@ -38,7 +43,7 @@ export default function OwnerNavbar() {
     try {
       const res = await ownerAPI.getNotifications();
       setNotifications(res.data?.results || res.data || []);
-    } catch { /* silent */ }
+    } catch (err) { void err; }
   }, []);
 
   useEffect(() => { fetchNotifications(); const t = setInterval(fetchNotifications, 30000); return () => clearInterval(t); }, [fetchNotifications]);
@@ -55,15 +60,15 @@ export default function OwnerNavbar() {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const markRead = async (id) => {
-    try { await ownerAPI.markNotificationRead(id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n)); } catch { }
+    try { await ownerAPI.markNotificationRead(id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n)); } catch (err) { void err; }
   };
 
   const markAllRead = async () => {
-    try { await ownerAPI.markAllNotificationsRead(); setNotifications(prev => prev.map(n => ({ ...n, is_read: true }))); } catch { }
+    try { await ownerAPI.markAllNotificationsRead(); setNotifications(prev => prev.map(n => ({ ...n, is_read: true }))); } catch (err) { void err; }
   };
 
   const clearAll = async () => {
-    try { await ownerAPI.clearAllNotifications(); setNotifications([]); } catch { }
+    try { await ownerAPI.clearAllNotifications(); setNotifications([]); } catch (err) { void err; }
   };
 
   // Close mobile menu on route change
@@ -71,13 +76,13 @@ export default function OwnerNavbar() {
 
   const handleLogout = () => { setMobileOpen(false); logout(); navigate('/login'); };
 
-  const relTime = (d) => {
-    const ms = Date.now() - new Date(d).getTime();
+  const relTime = useCallback((d, currentTime) => {
+    const ms = currentTime - new Date(d).getTime();
     if (ms < 60000) return 'Just now';
     if (ms < 3600000) return `${Math.floor(ms / 60000)}m ago`;
     if (ms < 86400000) return `${Math.floor(ms / 3600000)}h ago`;
     return `${Math.floor(ms / 86400000)}d ago`;
-  };
+  }, []);
 
   return (
     <>
@@ -140,7 +145,7 @@ export default function OwnerNavbar() {
                             <div className="notif-content">
                               <span className="notif-item-title">{n.title}</span>
                               <span className="notif-item-msg">{n.message}</span>
-                              <span className="notif-item-meta">{n.sender_name} · {relTime(n.created_at)}</span>
+                              <span className="notif-item-meta">{n.sender_name} · {relTime(n.created_at, now)}</span>
                             </div>
                             {!n.is_read && <span className="notif-unread-dot" />}
                           </div>
@@ -400,4 +405,3 @@ export default function OwnerNavbar() {
     </>
   );
 }
-

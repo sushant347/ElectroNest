@@ -32,7 +32,7 @@ export default function TopProductsTable({ data, loading }) {
     return (
       <div className="owner-tpt-card">
         <div className="owner-tpt-title">Top 10 Products</div>
-        {[...Array(5)].map((_, i) => <div key={i} className="tpt-skel-row"><div className="skel-line" style={{ width: `${60 + Math.random() * 30}%` }} /></div>)}
+        {[...Array(5)].map((_, i) => <div key={i} className="tpt-skel-row"><div className="skel-line" style={{ width: `${60 + (i * 7) % 30}%` }} /></div>)}
         <style>{styles}</style>
       </div>
     );
@@ -133,4 +133,3 @@ const styles = `
   .skel-line { height: 16px; border-radius: 6px; background: #e5e7eb; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 `;
-

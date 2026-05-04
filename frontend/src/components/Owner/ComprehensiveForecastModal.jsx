@@ -130,6 +130,7 @@ function makeCIBand({ dates, upper, lower }) {
 }
 
 function makeForecastLine({ connDates, connVals, prefix }) {
+  const pfx = prefix || '';
   return {
     x: connDates, y: connVals,
     type: 'scatter', mode: 'lines+markers', name: 'Forecast (Prophet)',
@@ -140,7 +141,7 @@ function makeForecastLine({ connDates, connVals, prefix }) {
       color:   C.forecast,
       line:    { color:'#fff', width:1.5 },
     },
-    hovertemplate: `<b>%{x|%a, %d %b %Y}</b><br>Forecast: <b>${prefix}%{y:,.0f}</b><extra></extra>`,
+    hovertemplate: `<b>%{x|%a, %d %b %Y}</b><br>Forecast: <b>${pfx}%{y:,.0f}</b><extra></extra>`,
   };
 }
 
@@ -539,7 +540,6 @@ function WeekdayPattern({ dates, vals }) {
   const avgs  = sums.map((s,i) => cnts[i] ? s/cnts[i] : 0);
   const maxA  = Math.max(...avgs, 0.001);
   const peakI = avgs.indexOf(Math.max(...avgs));
-  const weeklyTotal = Math.round(avgs.reduce((a,b)=>a+b,0) * 7 / 7 * 7); // sum of daily avgs × 7 = expected weekly
   // Use fractional avgs for bar heights but always display rounded integers
   const allZero = avgs.every(v => v < 0.5);
 
@@ -761,7 +761,10 @@ export default function ComprehensiveForecastModal({ product, onClose }) {
       .finally(() => setLoading(false));
   }, [product.product_id, retry]); // eslint-disable-line
 
-  useEffect(() => { doFetch(); }, [doFetch]);
+  useEffect(() => {
+    const t = setTimeout(() => doFetch(), 0);
+    return () => clearTimeout(t);
+  }, [doFetch]);
 
   // Escape to close
   useEffect(() => {

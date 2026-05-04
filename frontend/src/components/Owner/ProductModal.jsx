@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
@@ -30,14 +29,15 @@ function Field({ label, name, type = 'text', required, rows, form, errors, onCha
   );
 }
 
+const BLANK_FORM = {
+  name: '', category: '', brand: '', description: '', specifications: '',
+  cost_price: '', selling_price: '', discount_price: '', stock: '', reorder_level: '',
+  owner_name: '', image_url: '',
+};
+
 export default function ProductModal({ isOpen, onClose, onSave, product, categories = [], owners = [] }) {
   const isEdit = !!product;
-  const blank = {
-    name: '', category: '', brand: '', description: '', specifications: '',
-    cost_price: '', selling_price: '', discount_price: '', stock: '', reorder_level: '',
-    owner_name: '', image_url: '',
-  };
-  const [form, setForm] = useState(blank);
+  const [form, setForm] = useState(BLANK_FORM);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
@@ -45,7 +45,7 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
     if (isOpen) {
       if (product) {
         setForm({
-          ...blank,
+          ...BLANK_FORM,
           ...product,
           category:       product.category       ?? '',
           owner_name:     product.owner_name     ?? '',
@@ -56,7 +56,7 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
           reorder_level:  product.reorder_level  ?? '',
         });
       } else {
-        setForm(blank);
+        setForm(BLANK_FORM);
       }
       setErrors({});
     }
@@ -258,4 +258,3 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
     </div>
   );
 }
-

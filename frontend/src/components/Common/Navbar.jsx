@@ -65,8 +65,10 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setProfileOpen(false); setShowSugg(false); setCatOpen(false) }, [location.pathname])
+  useEffect(() => {
+    const t = setTimeout(() => { setProfileOpen(false); setShowSugg(false); setCatOpen(false) }, 0);
+    return () => clearTimeout(t);
+  }, [location.pathname])
 
   const fetchSugg = useCallback((query) => {
     if (debouncRef.current) clearTimeout(debouncRef.current)

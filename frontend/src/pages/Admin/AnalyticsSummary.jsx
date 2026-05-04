@@ -24,12 +24,14 @@ function SvgCategoryDonut({ data }) {
   const total = data.reduce((s, d) => s + (d.total_revenue || 0), 0);
   if (total === 0) return <p style={{ color: '#9CA3AF', textAlign: 'center', padding: 40 }}>No category data</p>;
   const CX = 120, CY = 120, OR = 108, IR = 60;
-  let cum = 0;
-  const segs = data.map((d, i) => {
-    const start = cum, sweep = (d.total_revenue / total) * 360;
-    cum += sweep;
-    return { ...d, start, end: cum, pct: (d.total_revenue / total) * 100, color: DONUT_COLORS[i % DONUT_COLORS.length], path: _arc(CX, CY, OR, IR, start, cum), mid: start + sweep / 2 };
-  });
+  const segs = [];
+  data.reduce((cum, d, i) => {
+    const sweep = (d.total_revenue / total) * 360;
+    const start = cum;
+    const end = cum + sweep;
+    segs.push({ ...d, start, end, pct: (d.total_revenue / total) * 100, color: DONUT_COLORS[i % DONUT_COLORS.length], path: _arc(CX, CY, OR, IR, start, end), mid: start + sweep / 2 });
+    return end;
+  }, 0);
   const act = hovered !== null ? segs[hovered] : null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -369,4 +371,3 @@ export default function AnalyticsSummary() {
     </div>
   );
 }
-

@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useMemo, useState } from 'react';
 
 const COLORS = ['#F97316', '#2563EB', '#16A34A', '#7C3AED', '#EC4899', '#D97706', '#0891B2', '#6366F1', '#DC2626', '#059669', '#8B5CF6', '#F43F5E'];
@@ -50,21 +49,22 @@ export default function CategoryChart({ data, loading }) {
   }
 
   const CX = 120, CY = 120, OR = 112, IR = 63;
-  let cumDeg = 0;
-  const segments = sortedData.map((d, i) => {
-    const startDeg = cumDeg;
+  const segments = [];
+  sortedData.reduce((cumDeg, d, i) => {
     const sweep = totalRevenue > 0 ? (d.total_revenue / totalRevenue) * 360 : 0;
-    cumDeg += sweep;
-    return {
+    const startDeg = cumDeg;
+    const endDeg = cumDeg + sweep;
+    segments.push({
       ...d,
       startDeg,
-      endDeg: cumDeg,
+      endDeg,
       pct: totalRevenue > 0 ? (d.total_revenue / totalRevenue) * 100 : 0,
       color: COLORS[i % COLORS.length],
-      path: arcPath(CX, CY, OR, IR, startDeg, cumDeg),
+      path: arcPath(CX, CY, OR, IR, startDeg, endDeg),
       midDeg: startDeg + sweep / 2,
-    };
-  });
+    });
+    return endDeg;
+  }, 0);
   const active = hovered !== null ? segments[hovered] : null;
   const topCategory = sortedData[0]?.category_name || '-';
 
@@ -231,4 +231,3 @@ const styles = `
 
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 `;
-

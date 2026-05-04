@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState, useEffect } from 'react';
 import { X, Package, TrendingUp, DollarSign, BarChart3, Layers, Tag } from 'lucide-react';
 import { ownerAPI } from '../../services/api';
@@ -12,11 +11,20 @@ export default function ProductDetailModal({ isOpen, onClose, productSummary }) 
 
     useEffect(() => {
         if (!isOpen || !productSummary?.product_id) return;
-        setLoading(true);
-        ownerAPI.getProduct(productSummary.product_id)
-            .then(res => setProduct(res.data))
-            .catch(() => setProduct(null))
-            .finally(() => setLoading(false));
+        let isMounted = true;
+        const t = setTimeout(() => {
+            if (isMounted) {
+                setLoading(true);
+                ownerAPI.getProduct(productSummary.product_id)
+                    .then(res => { if (isMounted) setProduct(res.data); })
+                    .catch(() => { if (isMounted) setProduct(null); })
+                    .finally(() => { if (isMounted) setLoading(false); });
+            }
+        }, 0);
+        return () => {
+            isMounted = false;
+            clearTimeout(t);
+        };
     }, [isOpen, productSummary?.product_id]);
 
     if (!isOpen || !productSummary) return null;
@@ -197,4 +205,3 @@ const styles = `
 
   @media (max-width: 540px) { .pdm-kpi-row { grid-template-columns: 1fr; } .pdm-info-grid { grid-template-columns: 1fr; } }
 `;
-

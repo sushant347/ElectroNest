@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState, useEffect, useRef, useId } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
@@ -419,6 +418,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
     customerAPI.getCoupons(product.ownerName || undefined)
       .then((res) => setCoupons(res.data?.results || res.data || []))
       .catch(() => setCoupons([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);
 
   // Fetch same-category products for "You May Also Like" (least sold first)
@@ -987,4 +987,3 @@ const spinnerCSS = `
     }
   }
 `;
-

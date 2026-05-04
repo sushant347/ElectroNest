@@ -139,7 +139,7 @@ export default function AdminLayout() {
     <div className="adm-layout">
       {/* Desktop Sidebar */}
       <aside className={`adm-sidebar ${sidebarOpen ? 'expanded' : 'collapsed'}`}>
-        <SidebarContent />
+        {SidebarContent()}
       </aside>
 
       {/* Mobile Overlay Sidebar */}
@@ -147,7 +147,7 @@ export default function AdminLayout() {
         <div className="adm-mobile-overlay" onClick={() => setMobileOpen(false)}>
           <aside className="adm-mobile-sidebar" onClick={e => e.stopPropagation()}>
             <button className="adm-mobile-close" onClick={() => setMobileOpen(false)}><X size={18} /></button>
-            <SidebarContent />
+            {SidebarContent()}
           </aside>
         </div>
       )}
@@ -505,4 +505,3 @@ export default function AdminLayout() {
     </div>
   );
 }
-

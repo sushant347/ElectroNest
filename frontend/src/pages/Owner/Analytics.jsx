@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Plot from 'react-plotly.js';
 import { TrendingUp, TrendingDown, DollarSign, Users, Package, AlertTriangle, Printer, Download, RefreshCw, AlertCircle, SlidersHorizontal, Eye, X } from 'lucide-react';
@@ -7,7 +6,6 @@ import ComprehensiveForecastModal from '../../components/Owner/ComprehensiveFore
 import { HeaderSkeleton, CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(v);
-const fmtShort = (v) => { if (v >= 10000000) return `Rs.${(v / 10000000).toFixed(1)}Cr`; if (v >= 100000) return `Rs.${(v / 100000).toFixed(1)}L`; if (v >= 1000) return `Rs.${(v / 1000).toFixed(0)}K`; return `Rs.${v}`; };
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 const STATUS_COLORS_MAP = { Pending: '#F59E0B', Processing: '#3B82F6', Shipped: '#8B5CF6', Delivered: '#10B981', Cancelled: '#EF4444' };
 
@@ -25,15 +23,16 @@ function SvgDonut({ data, labelKey = 'name', valueKey = 'value', colorMap = null
   const total = data.reduce((s, d) => s + (Number(d[valueKey]) || 0), 0);
   if (!data.length || total === 0) return <p className="an-no-data">No data available</p>;
   const CX = 110, CY = 110, OR = 100, IR = 56;
-  let cumDeg = 0;
-  const segments = data.map((d, i) => {
+  const segments = [];
+  data.reduce((cumDeg, d, i) => {
     const sv = Number(d[valueKey]) || 0;
     const startDeg = cumDeg;
     const sweep = (sv / total) * 360;
-    cumDeg += sweep;
+    const endDeg = cumDeg + sweep;
     const color = colorMap ? (colorMap[d[labelKey]] || COLORS[i % COLORS.length]) : COLORS[i % COLORS.length];
-    return { label: d[labelKey], value: sv, startDeg, endDeg: cumDeg, pct: (sv / total) * 100, color, path: _arc(CX, CY, OR, IR, startDeg, cumDeg), midDeg: startDeg + sweep / 2 };
-  });
+    segments.push({ label: d[labelKey], value: sv, startDeg, endDeg, pct: (sv / total) * 100, color, path: _arc(CX, CY, OR, IR, startDeg, endDeg), midDeg: startDeg + sweep / 2 });
+    return endDeg;
+  }, 0);
   const active = hovered !== null ? segments[hovered] : null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -142,11 +141,6 @@ export default function Analytics() {
   // ── Growth modal state ──
   const [growthProduct, setGrowthProduct] = useState(null);
 
-  // ── Interactive filter states ──
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [revenueRange, setRevenueRange] = useState([0, 100]);
-  const [maxRevenueValue, setMaxRevenueValue] = useState(100);
-
   // API data states
   const [summary, setSummary] = useState({ total_revenue: 0, total_profit: 0, total_orders: 0 });
   const [revenueTrend, setRevenueTrend] = useState([]);
@@ -156,7 +150,6 @@ export default function Analytics() {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [statusDistribution, setStatusDistribution] = useState([]);
   const [lowStockProducts, setLowStockProducts] = useState([]);
-  const [recentOrders, setRecentOrders] = useState([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -171,7 +164,7 @@ export default function Analytics() {
         ownerAPI.getPaymentMethodStats(),
         ownerAPI.getOrderStatusStats(),
         ownerAPI.getLowStockProducts(),
-        ownerAPI.getAllOrders({ page_size: 6, ordering: '-order_date' }),
+        ownerAPI.getAllOrders({ page_size: 6, ordering: '-order_date' }).catch(() => ({ data: [] })),
       ]);
       setSummary(summaryRes.data);
       setRevenueTrend(trendRes.data);
@@ -182,13 +175,6 @@ export default function Analytics() {
       setPaymentMethods(payRes.data);
       setStatusDistribution(statusRes.data);
       setLowStockProducts(lowStockRes.data);
-      setRecentOrders(ordersRes.data.results || ordersRes.data);
-      // Set slider max from top product revenue
-      if (top.length) {
-        const maxRev = Math.max(...top.map((p) => p.total_revenue));
-        setMaxRevenueValue(maxRev);
-        setRevenueRange([0, maxRev]);
-      }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load analytics data. Please try again.');
     } finally {
@@ -201,21 +187,6 @@ export default function Analytics() {
   const totalRevenue = summary.total_revenue || 0;
   const totalProfit = summary.total_profit || 0;
   const totalOrders = summary.total_orders || 0;
-
-  // Derive unique categories for dropdown
-  const categoryOptions = useMemo(() => {
-    const cats = [...new Set(topProducts.map((p) => p.category))].filter(Boolean);
-    return cats;
-  }, [topProducts]);
-
-  // Filtered top products based on dropdown + slider
-  const filteredTopProducts = useMemo(() => {
-    return topProducts.filter((p) => {
-      if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
-      if (p.total_revenue < revenueRange[0] || p.total_revenue > revenueRange[1]) return false;
-      return true;
-    });
-  }, [topProducts, selectedCategory, revenueRange]);
 
   const tabs = [
     { key: 'revenue', label: 'Revenue' },
@@ -899,4 +870,3 @@ export default function Analytics() {
     </div>
   );
 }
-
