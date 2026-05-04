@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Plot from 'react-plotly.js';
 import { TrendingUp, TrendingDown, DollarSign, Users, Package, AlertTriangle, Printer, Download, RefreshCw, AlertCircle, SlidersHorizontal, Eye, X } from 'lucide-react';
 import { ownerAPI } from '../../services/api';
@@ -155,7 +155,7 @@ export default function Analytics() {
     try {
       setLoading(true);
       setError(null);
-      const [summaryRes, trendRes, monthlyRes, topRes, catRes, payRes, statusRes, lowStockRes, ordersRes] = await Promise.all([
+      const [summaryRes, trendRes, monthlyRes, topRes, catRes, payRes, statusRes, lowStockRes, _ordersRes] = await Promise.all([
         ownerAPI.getSalesOverview(),
         ownerAPI.getRevenueTrend(),
         ownerAPI.getRevenueTrend({ period: 'monthly' }),

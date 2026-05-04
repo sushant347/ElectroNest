@@ -26,7 +26,7 @@ export default function OwnerNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef(null);
   const notifRef = useRef(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 60000);
@@ -46,6 +46,7 @@ export default function OwnerNavbar() {
     } catch (err) { void err; }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchNotifications(); const t = setInterval(fetchNotifications, 30000); return () => clearInterval(t); }, [fetchNotifications]);
 
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function OwnerNavbar() {
   };
 
   // Close mobile menu on route change
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   const handleLogout = () => { setMobileOpen(false); logout(); navigate('/login'); };

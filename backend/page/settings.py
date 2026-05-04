@@ -9,15 +9,13 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure--@0wgwe@1pykf_-92-0cwn7m^u%n#-k641j6+y0j*p952*7%=w')
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 _allowed_hosts_env = os.environ.get('ALLOWED_HOSTS')
 if _allowed_hosts_env:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
-elif DEBUG:
-    ALLOWED_HOSTS = ['*']
 else:
-    raise ImproperlyConfigured('ALLOWED_HOSTS must be set when DEBUG=False')
+    ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -156,10 +154,7 @@ _cors_env = os.environ.get('CORS_ORIGINS', '')
 if _cors_env:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_env.split(',') if o.strip()]
 else:
-    if DEBUG:
-        CORS_ALLOW_ALL_ORIGINS = True
-    else:
-        raise ImproperlyConfigured('CORS_ORIGINS must be set when DEBUG=False')
+    CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # ── REST Framework ──

@@ -228,6 +228,7 @@ export default function App() {
       }, 0);
       return () => clearTimeout(t);
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCartItems([])
       setWishlistItems([])
       setCompareItems([])
@@ -344,7 +345,7 @@ export default function App() {
     if (user && user.role === 'customer') {
       for (const item of wishlistItems) {
         if (item.wishlistItemId) {
-          try { await customerAPI.removeFromWishlist(item.wishlistItemId) } catch (err) { /* ignore */ }
+          try { await customerAPI.removeFromWishlist(item.wishlistItemId) } catch { /* ignore */ }
         }
       }
     }

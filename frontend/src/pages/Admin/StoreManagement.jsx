@@ -10,6 +10,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, Line
 } from 'recharts';
 import { SkeletonBlock, TableSkeleton } from '../../components/Common/SkeletonLoader';
+import { adminAPI } from '../../services/api';
 
 // Bulletproof chart wrapper — measures its own pixel width, bypasses ResizeObserver issues
 function ChartWrapper({ height, children }) {
@@ -39,7 +40,6 @@ function ChartWrapper({ height, children }) {
     </div>
   );
 }
-import { adminAPI } from '../../services/api';
 
 const fmt = (n) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(n || 0);
 const fmtNum = (n) => new Intl.NumberFormat('en-IN').format(n || 0);
@@ -56,7 +56,6 @@ const PERIODS = [
   { label: '1Y', value: 365 },
 ];
 
-function StatCard({ icon: Icon, label, value, sub, color }) {
 function StatCard({ icon: StatIcon, label, value, sub, color }) {
   return (
     <div className="sm-stat-card">

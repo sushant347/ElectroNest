@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState } from 'react';
 import { Trophy, ArrowUpDown } from 'lucide-react';
 import ComprehensiveForecastModal from './ComprehensiveForecastModal';

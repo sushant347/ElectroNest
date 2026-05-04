@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Application Configuration
  *
@@ -20,7 +19,7 @@ if (!rawApiUrl && import.meta.env.PROD) {
   );
 }
 
-export const API_BASE_URL = rawApiUrl || 'http://localhost:8000/api';
+export const API_BASE_URL = rawApiUrl || 'http://127.0.0.1:8000/api';
 export const API_TIMEOUT = 65000; // 65 seconds — covers Render free-tier cold starts (up to ~60s)
 export const AUTH_TOKEN_KEY = 'auth_token';
 export const REFRESH_TOKEN_KEY = 'refresh_token';

@@ -706,7 +706,6 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
     const code = claimedCodeRef.current;
     claimedCodeRef.current = null;
     applyCode(code);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cartItems]);
 
   const handleRemoveCoupon = () => {

@@ -266,7 +266,6 @@ export default function Dashboard() {
     fetchCustomers();
     return () => { if (refreshTimer) clearInterval(refreshTimer); };
   }, [fetchData, fetchCustomers]);
-  }, [fetchData, refreshTimer]);
 
   /* ── Export helper ── */
   const exportChart = (key) => {
