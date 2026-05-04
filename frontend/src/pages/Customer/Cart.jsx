@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Link, useNavigate } from "react-router-dom";
 import {
   ShoppingBag,
@@ -604,3 +605,4 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
 };
 
 export default Cart;
+

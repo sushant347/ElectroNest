@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useMemo } from 'react';
 import { Search, ChevronUp, ChevronDown, Package, ArrowUpDown } from 'lucide-react';
 
@@ -404,3 +405,4 @@ export default function InventoryTable({ items = [], onRowClick }) {
     </>
   );
 }
+

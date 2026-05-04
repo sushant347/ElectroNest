@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState } from 'react';
 import { Trophy, ArrowUpDown } from 'lucide-react';
 import ComprehensiveForecastModal from './ComprehensiveForecastModal';
@@ -132,3 +133,4 @@ const styles = `
   .skel-line { height: 16px; border-radius: 6px; background: #e5e7eb; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 `;
+

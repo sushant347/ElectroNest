@@ -59,21 +59,22 @@ function CommissionPieChart({ data }) {
 
   const CX = 135, CY = 135, OR = 125, IR = 70;
 
-  let cumDeg = 0;
-  const segments = data.map((d, i) => {
-    const startDeg = cumDeg;
+  const segments = [];
+  data.reduce((cumDeg, d, i) => {
     const sweep = (d.commission / total) * 360;
-    cumDeg += sweep;
-    return {
+    const startDeg = cumDeg;
+    const endDeg = startDeg + sweep;
+    segments.push({
       ...d,
       startDeg,
-      endDeg: cumDeg,
+      endDeg,
       pct: (d.commission / total) * 100,
       color: PIE_COLORS[i % PIE_COLORS.length],
-      path: arcPath(CX, CY, OR, IR, startDeg, cumDeg),
+      path: arcPath(CX, CY, OR, IR, startDeg, endDeg),
       midDeg: startDeg + sweep / 2,
-    };
-  });
+    });
+    return endDeg;
+  }, 0);
 
   const active = hovered !== null ? segments[hovered] : null;
 
@@ -271,7 +272,6 @@ function StoreShippingChart({ summary }) {
 }
 
 export default function StockMovements() {
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [movements, setMovements] = useState({ shipped_orders: [], enriched_purchase_orders: [], product_updates: [], store_shipping_summary: {}, store_commission: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -324,14 +324,10 @@ export default function StockMovements() {
     setError('');
     try {
       const days = coOrderDaysRef.current;
-      const [poRes, movRes] = await Promise.all([
-        warehouseAPI.getPurchaseOrders(),
-        warehouseAPI.getStockMovements({ days }).catch((err) => {
-          console.error('getStockMovements failed:', err?.response?.data || err?.message);
-          return { data: {} };
-        }),
-      ]);
-      setPurchaseOrders(poRes.data?.results || poRes.data || []);
+      const movRes = await warehouseAPI.getStockMovements({ days }).catch((err) => {
+        console.error('getStockMovements failed:', err?.response?.data || err?.message);
+        return { data: {} };
+      });
       setMovements(movRes.data || {});
     } catch (err) {
       console.error('Failed to fetch stock movements:', err);
@@ -357,15 +353,6 @@ export default function StockMovements() {
     return `No customer orders in the last ${coOrderDays} days`;
   }, [coOrderDays]);
 
-  const handleReceive = async (id) => {
-    if (!confirm('Mark this purchase order as received?')) return;
-    try {
-      await warehouseAPI.receivePurchaseOrder(id);
-      fetchData();
-    } catch (err) {
-      alert('Failed to receive PO: ' + (err.response?.data?.detail || err.message));
-    }
-  };
 
   const handleMarkDelivered = async (orderId) => {
     setDeliveringId(orderId);

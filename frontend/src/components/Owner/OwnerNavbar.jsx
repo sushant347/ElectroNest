@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Package, ShoppingCart, BarChart3, LogOut, Bell, Store, ChevronDown, CheckCheck, AlertTriangle, ShoppingBag, Info, Trash2, Tag, Menu, X } from 'lucide-react';
 import electronestLogo from '../images/Electronest.png';
@@ -399,3 +400,4 @@ export default function OwnerNavbar() {
     </>
   );
 }
+

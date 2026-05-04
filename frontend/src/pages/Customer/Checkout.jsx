@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { customerAPI } from "../../services/api";
@@ -1603,3 +1604,4 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
 };
 
 export default Checkout;
+

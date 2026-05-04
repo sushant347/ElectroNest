@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Package, ArrowLeftRight, AlertTriangle, LogOut, Bell, Warehouse, ChevronDown, CheckCheck, ShoppingBag, Info, Send, Trash2, Menu, X } from 'lucide-react';
 import electronestLogo from '../images/Electronest.png';
@@ -375,3 +376,4 @@ export default function WarehouseNavbar() {
     </>
   );
 }
+

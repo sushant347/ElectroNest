@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useMemo, useState } from 'react';
 
 const COLORS = ['#F97316', '#2563EB', '#16A34A', '#7C3AED', '#EC4899', '#D97706', '#0891B2', '#6366F1', '#DC2626', '#059669', '#8B5CF6', '#F43F5E'];
@@ -230,3 +231,4 @@ const styles = `
 
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 `;
+

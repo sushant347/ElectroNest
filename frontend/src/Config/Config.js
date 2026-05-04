@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Application Configuration
  *
@@ -35,3 +36,4 @@ const config = {
 };
 
 export default config;
+

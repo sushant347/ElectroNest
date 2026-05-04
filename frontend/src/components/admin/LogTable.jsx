@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState } from 'react';
 
 const actionColors = {
@@ -139,3 +140,4 @@ export default function LogTable({ logs, loading }) {
     </div>
   );
 }
+

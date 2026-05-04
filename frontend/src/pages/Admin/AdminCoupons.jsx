@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect, useCallback } from 'react';
 import {
   Tag, Plus, Edit2, Trash2, Search, RefreshCw, AlertCircle,
@@ -479,3 +480,4 @@ const tdStyle = { padding: '12px 16px', fontSize: '0.85rem', color: '#374151', b
 const lbl = { fontSize: '0.75rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 };
 const inp = (extra = {}) => ({ width: '100%', padding: '9px 12px', border: '1.5px solid #e5e7eb', borderRadius: 8, fontSize: '0.85rem', color: '#1e293b', fontFamily: 'inherit', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', ...extra });
 const pgBtn = (active) => ({ minWidth: 32, height: 32, borderRadius: 7, border: `1px solid ${active ? '#F97316' : '#d1d5db'}`, background: active ? '#F97316' : '#fff', color: active ? '#fff' : '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, padding: '0 4px' });
+

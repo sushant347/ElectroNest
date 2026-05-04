@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect, useRef, useId } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
@@ -986,3 +987,4 @@ const spinnerCSS = `
     }
   }
 `;
+

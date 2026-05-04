@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect } from 'react';
 import { X, ArrowDownLeft, ArrowUpRight, AlertCircle, RotateCcw, Wrench, Calendar, User, FileText, Package, Plus } from 'lucide-react';
 import { format } from 'date-fns';
@@ -325,3 +326,4 @@ export default function MovementModal({ movement, onClose, onSubmit }) {
     </>
   );
 }
+

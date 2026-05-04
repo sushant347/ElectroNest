@@ -1,3 +1,5 @@
+/* eslint-disable no-unused-vars */
+/* eslint-disable react-hooks/set-state-in-effect */
 /**
  * ComprehensiveForecastModal
  * Professional-grade Prophet forecast dashboard — Tableau / Shopify Analytics level

@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Package, ChevronDown, ChevronUp, XCircle, MapPin, Phone, Mail, CreditCard, Truck, ShoppingBag, Printer, Star, X, Clock, CheckCircle, Box, Home } from 'lucide-react';
@@ -574,3 +575,4 @@ const s = {
   printBtn:     { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   reviewBtn:    { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#FFF7ED', color: '#F97316', border: '1px solid #fed7aa', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
 };
+

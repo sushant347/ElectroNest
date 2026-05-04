@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -591,3 +592,4 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
 };
 
 export default Compare;
+

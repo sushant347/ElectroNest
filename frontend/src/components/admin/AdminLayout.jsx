@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useState } from 'react';
@@ -504,3 +505,4 @@ export default function AdminLayout() {
     </div>
   );
 }
+

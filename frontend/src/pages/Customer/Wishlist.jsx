@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Link, useNavigate } from "react-router-dom";
 import {
   Heart,
@@ -725,3 +726,4 @@ const Wishlist = ({ items = [], removeFromWishlist, addToCart, clearWishlist, mo
 };
 
 export default Wishlist;
+

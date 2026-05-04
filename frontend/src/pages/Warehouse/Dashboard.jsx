@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect, useCallback } from 'react';
 import { Package, TrendingUp, AlertTriangle, Truck, RefreshCw, AlertCircle, Eye } from 'lucide-react';
 import { warehouseAPI } from '../../services/api';

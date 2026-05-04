@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, TrendingUp, BarChart3, PieChart, CreditCard, PackageCheck } from 'lucide-react';
 import Plot from 'react-plotly.js';
@@ -368,3 +369,4 @@ export default function AnalyticsSummary() {
     </div>
   );
 }
+

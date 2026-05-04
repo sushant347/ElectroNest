@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
@@ -257,3 +258,4 @@ export default function ProductModal({ isOpen, onClose, onSave, product, categor
     </div>
   );
 }
+

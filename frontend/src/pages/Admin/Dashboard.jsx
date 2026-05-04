@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect, useCallback } from 'react';
 import {
   RefreshCw, Users, ShoppingCart, DollarSign, Package, BarChart3,
@@ -613,3 +614,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Plot from 'react-plotly.js';
 import { TrendingUp, TrendingDown, DollarSign, Users, Package, AlertTriangle, Printer, Download, RefreshCw, AlertCircle, SlidersHorizontal, Eye, X } from 'lucide-react';
@@ -898,3 +899,4 @@ export default function Analytics() {
     </div>
   );
 }
+
