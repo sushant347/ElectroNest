@@ -27,19 +27,23 @@ function SvgAdminDonut({ items, id = 'adm-sd', centerLabel = null }) {
   if (!items.length || total === 0) return <div className="chart-empty">No data available</div>;
   const CX = 110, CY = 110, OR = 100, IR = 56;
   let cumDeg = 0;
-  const segments = items.map((d, i) => {
   const segments = [];
-  items.reduce((cumDeg, d, i) => {
+  items.forEach((d, i) => {
     const sv = Number(d.value) || 0;
     const startDeg = cumDeg;
     const sweep = (sv / total) * 360;
     cumDeg += sweep;
-    return { label: d.label, value: sv, startDeg, endDeg: cumDeg, pct: (sv / total) * 100, color: d.color || ADM_COLORS[i % ADM_COLORS.length], path: _admArc(CX, CY, OR, IR, startDeg, cumDeg), midDeg: startDeg + sweep / 2 };
+    segments.push({
+      label: d.label,
+      value: sv,
+      startDeg,
+      endDeg: cumDeg,
+      pct: (sv / total) * 100,
+      color: d.color || ADM_COLORS[i % ADM_COLORS.length],
+      path: _admArc(CX, CY, OR, IR, startDeg, cumDeg),
+      midDeg: startDeg + sweep / 2
+    });
   });
-    const endDeg = cumDeg + sweep;
-    segments.push({ label: d.label, value: sv, startDeg, endDeg, pct: (sv / total) * 100, color: d.color || ADM_COLORS[i % ADM_COLORS.length], path: _admArc(CX, CY, OR, IR, startDeg, endDeg), midDeg: startDeg + sweep / 2 });
-    return endDeg;
-  }, 0);
   const active = hovered !== null ? segments[hovered] : null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
