@@ -7,6 +7,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [initialized, setInitialized] = useState(false);
 
+  const decodeJwtPayload = (token) => {
+    if (!token) return null;
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    try {
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+      return JSON.parse(atob(padded));
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     const handleAuthLogout = () => setUser(null);
     window.addEventListener('auth:logout', handleAuthLogout);
@@ -22,12 +35,18 @@ export const AuthProvider = ({ children }) => {
     if (storedUser && token) {
       try {
         // Basic JWT expiry check (decode payload without verification)
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const isExpired = payload.exp * 1000 < Date.now();
+        const payload = decodeJwtPayload(token);
+        const isExpired = payload?.exp ? payload.exp * 1000 < Date.now() : false;
 
         if (isExpired && refreshToken) {
           // Token expired but refresh token exists — try to refresh silently
-          fetch(`${config.API_BASE_URL}/auth/refresh/`, {
+          const refreshPayload = decodeJwtPayload(refreshToken);
+          const isCustomer = refreshPayload?.user_type === 'customer';
+          const refreshUrl = isCustomer
+            ? `${config.API_BASE_URL}/auth/refresh-customer/`
+            : `${config.API_BASE_URL}/auth/refresh/`;
+
+          fetch(refreshUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ refresh: refreshToken }),

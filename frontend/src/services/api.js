@@ -1,6 +1,19 @@
 import axios from 'axios';
 import config from '../Config/Config';
 
+const decodeJwtPayload = (token) => {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+};
+
 // ── Axios Instance ──
 const api = axios.create({
   baseURL: config.API_BASE_URL,
@@ -43,11 +56,12 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url || '';
     const isAuthEndpoint = requestUrl.includes('/auth/login/') || requestUrl.includes('/auth/register/') || requestUrl.includes('/auth/refresh/');
+    const isCustomerRefreshEndpoint = requestUrl.includes('/auth/refresh-customer/');
     const isAlreadyOnLogin = window.location.pathname === '/login';
     const status = error.response?.status;
 
     // ── Skip auth endpoints and login page ──
-    if (isAuthEndpoint || isAlreadyOnLogin) {
+    if (isAuthEndpoint || isCustomerRefreshEndpoint || isAlreadyOnLogin) {
       return Promise.reject(error);
     }
 
@@ -73,7 +87,12 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await axios.post(`${config.API_BASE_URL}/auth/refresh/`, { refresh: refreshToken });
+        const refreshPayload = decodeJwtPayload(refreshToken);
+        const isCustomer = refreshPayload?.user_type === 'customer';
+        const refreshUrl = isCustomer
+          ? `${config.API_BASE_URL}/auth/refresh-customer/`
+          : `${config.API_BASE_URL}/auth/refresh/`;
+        const { data } = await axios.post(refreshUrl, { refresh: refreshToken });
         const newAccessToken = data.access;
         localStorage.setItem(config.AUTH_TOKEN_KEY, newAccessToken);
         if (data.refresh) {

@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, viewsets, serializers
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import check_password, make_password
@@ -40,6 +41,8 @@ def generate_customer_tokens(customer):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         ser = LoginSerializer(data=request.data)
@@ -94,6 +97,8 @@ class LoginView(APIView):
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         ser = RegisterSerializer(data=request.data)
@@ -108,6 +113,37 @@ class RegisterView(APIView):
             'refresh': refresh_token,
             'user':    CustomerUserSerializer(customer).data,
         }, status=status.HTTP_201_CREATED)
+
+
+class CustomerRefreshView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh = request.data.get('refresh')
+        if not refresh:
+            return Response({'detail': 'Refresh token required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payload = jwt.decode(refresh, settings.SECRET_KEY, algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            return Response({'detail': 'Refresh token expired'}, status=status.HTTP_401_UNAUTHORIZED)
+        except jwt.InvalidTokenError:
+            return Response({'detail': 'Invalid refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if payload.get('user_type') != 'customer' or payload.get('token_type') != 'refresh':
+            return Response({'detail': 'Invalid token type'}, status=status.HTTP_400_BAD_REQUEST)
+
+        customer_id = payload.get('customer_id')
+        customer = Customer.objects.filter(id=customer_id, is_active=True).first()
+        if not customer:
+            return Response({'detail': 'Customer account not found or inactive'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        access_token, refresh_token = generate_customer_tokens(customer)
+
+        return Response({
+            'access':  access_token,
+            'refresh': refresh_token,
+        })
 
 
 class ProfileView(APIView):
@@ -156,6 +192,8 @@ class ProfileView(APIView):
 
 class ChangePasswordView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         # Check for customer token
