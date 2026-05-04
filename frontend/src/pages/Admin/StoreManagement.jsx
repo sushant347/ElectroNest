@@ -28,7 +28,6 @@ function ChartWrapper({ height, children }) {
       if (w > 0) setWidth(w);
     });
     ro.observe(ref.current);
-    return () => ro.disconnect();
     return () => {
       clearTimeout(t);
       ro.disconnect();
@@ -60,7 +59,6 @@ function StatCard({ icon: StatIcon, label, value, sub, color }) {
   return (
     <div className="sm-stat-card">
       <div className="sm-stat-icon" style={{ background: `${color}18` }}>
-        <Icon size={18} color={color} />
         <StatIcon size={18} color={color} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -655,4 +653,3 @@ const td = {
   padding: '12px 16px', fontSize: '0.85rem', color: '#374151',
   borderBottom: '1px solid #f3f4f6', verticalAlign: 'middle',
 };
-

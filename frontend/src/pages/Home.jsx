@@ -27,7 +27,12 @@ function getCatEmoji(n) { return { Smartphones: '📱', Laptops: '💻', Gaming:
 
 function shouldUseContainInCard(categoryName = '', productName = '') {
   return /smartphones|headphones/i.test(categoryName)
-    || /headphone|headset|earbud|earphone|arctis|airpod|buds|apple watch ultra|fenix 7x|amazfit active edge/i.test(productName)
+    || /headphone|headset|earbud|earphone|arctis|airpod|buds|apple watch ultra|fenix 7x|amazfit active edge|benq/i.test(productName)
+}
+
+function cardObjectPosition(categoryName = '', productName = '') {
+  const hay = `${categoryName} ${productName}`.toLowerCase()
+  return /benq/.test(hay) ? 'center top' : 'center'
 }
 
 const CAT_IMGS = {
@@ -97,15 +102,16 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   const searchQ = sp.get('search') || ''
 
   /* ── Smart Filter state ── */
-  const [filterOpen, setFilterOpen] = useState(false)
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [sortBy, setSortBy] = useState('')
   const [selBrands, setSelBrands] = useState([])
+  const [selStores, setSelStores] = useState([])
   const allBrands = [...new Set(prods.map(p => (p.brand || p.Brand || '')).filter(Boolean))].sort()
+  const allStores = [...new Set(prods.map(p => (p.owner_name || p.OwnerName || '').trim()).filter(Boolean))].sort()
   const toggleBrand = (b) => setSelBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
-  const clearFilters = () => { setMinPrice(''); setMaxPrice(''); setSortBy(''); setSelBrands([]) }
-  const hasFilters = minPrice || maxPrice || sortBy || selBrands.length > 0
+  const clearFilters = () => { setMinPrice(''); setMaxPrice(''); setSortBy(''); setSelBrands([]); setSelStores([]) }
+  const hasFilters = minPrice || maxPrice || sortBy || selBrands.length > 0 || selStores.length > 0
 
   const resetTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -248,6 +254,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     if (minPrice) items = items.filter(p => p.price >= parseFloat(minPrice))
     if (maxPrice) items = items.filter(p => p.price <= parseFloat(maxPrice))
     if (selBrands.length > 0) items = items.filter(p => selBrands.includes(p.brand))
+    if (selStores.length > 0) items = items.filter(p => selStores.includes((p.ownerName || '').trim()))
     if (sortBy === 'price_low') items = [...items].sort((a, b) => a.price - b.price)
     else if (sortBy === 'price_high') items = [...items].sort((a, b) => b.price - a.price)
     else if (sortBy === 'best_selling') items = [...items].sort((a, b) => b.sold - a.sold)
@@ -334,127 +341,78 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
       </section>
 
       {/* ── Smart Filter Bar ── */}
-      <section style={{
-        maxWidth: 1320, margin: '0 auto 0', padding: '0 24px',
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14,
-          padding: '12px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-        }}>
-          {/* Toggle */}
-          <button
-            onClick={() => setFilterOpen(!filterOpen)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              border: filterOpen ? '1.5px solid #F97316' : '1.5px solid #e2e8f0',
-              background: filterOpen ? '#fff7ed' : '#f8fafc',
-              color: filterOpen ? '#c2410c' : '#475569',
-              transition: 'all .15s',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="9" y2="18"/></svg>
-            Filters {hasFilters ? `(${[minPrice && 1, maxPrice && 1, selBrands.length > 0 && 1, sortBy && 1].filter(Boolean).length})` : ''}
-          </button>
-
-          {/* Sort dropdown — always visible */}
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-            style={{
-              padding: '7px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0',
-              background: sortBy ? '#fff7ed' : '#f8fafc', fontSize: 13, fontWeight: 600,
-              cursor: 'pointer', color: '#475569', outline: 'none',
-            }}
-          >
-            <option value="">Sort: Default</option>
-            <option value="price_low">Price: Low → High</option>
-            <option value="price_high">Price: High → Low</option>
-            <option value="best_selling">Best Selling</option>
-            <option value="top_rated">Top Rated</option>
-            <option value="newest">Newest First</option>
-          </select>
-
-          {/* Result count */}
-          <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>
-            {displayProds.length} product{displayProds.length !== 1 ? 's' : ''}
-          </span>
-
-          {/* Clear all */}
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              style={{
-                padding: '6px 14px', borderRadius: 8, border: '1px solid #fecaca',
-                background: '#fef2f2', color: '#ef4444', fontSize: 12, fontWeight: 700,
-                cursor: 'pointer',
-              }}
+      <section className="hm-filter-sec">
+        <div className="hm-filter-bar">
+          <div className="hm-filter-field">
+            <span className="hm-filter-cap">Sort</span>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className={`hm-filter-select${sortBy ? ' active' : ''}`}
             >
-              ✕ Clear All
-            </button>
-          )}
-        </div>
-
-        {/* Expanded filter panel */}
-        {filterOpen && (
-          <div style={{
-            marginTop: 8, padding: '16px 20px',
-            background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '16px 28px',
-            alignItems: 'start',
-          }}>
-            {/* Price Range */}
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', paddingTop: 6 }}>Price (NPR)</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <input
-                type="number" placeholder="Min" value={minPrice} onChange={e => setMinPrice(e.target.value)}
-                style={{
-                  width: 100, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0',
-                  fontSize: 13, outline: 'none', background: '#f8fafc',
-                }}
-              />
-              <span style={{ color: '#cbd5e1', fontWeight: 700 }}>—</span>
-              <input
-                type="number" placeholder="Max" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
-                style={{
-                  width: 100, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0',
-                  fontSize: 13, outline: 'none', background: '#f8fafc',
-                }}
-              />
-              {/* Quick presets */}
-              {[5000, 25000, 100000].map(v => (
-                <button key={v} onClick={() => { setMinPrice(''); setMaxPrice(String(v)) }} style={{
-                  padding: '5px 10px', borderRadius: 6, border: '1px solid #e2e8f0',
-                  background: maxPrice === String(v) ? '#fff7ed' : '#f8fafc',
-                  color: maxPrice === String(v) ? '#c2410c' : '#64748b',
-                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                }}>
-                  Under {v >= 1000 ? `${v / 1000}K` : v}
-                </button>
-              ))}
-            </div>
-
-            {/* Brands */}
-            {allBrands.length > 0 && (<>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', paddingTop: 4 }}>Brand</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {allBrands.slice(0, 20).map(b => (
-                  <button key={b} onClick={() => toggleBrand(b)} style={{
-                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    border: selBrands.includes(b) ? '1.5px solid #F97316' : '1.5px solid #e2e8f0',
-                    background: selBrands.includes(b) ? '#fff7ed' : '#f8fafc',
-                    color: selBrands.includes(b) ? '#c2410c' : '#64748b',
-                    transition: 'all .15s',
-                  }}>
-                    {selBrands.includes(b) ? '✓ ' : ''}{b}
-                  </button>
-                ))}
-              </div>
-            </>)}
+              <option value="">Default</option>
+              <option value="price_low">Price: Low → High</option>
+              <option value="price_high">Price: High → Low</option>
+              <option value="best_selling">Best Selling</option>
+              <option value="top_rated">Top Rated</option>
+              <option value="newest">Newest First</option>
+            </select>
           </div>
-        )}
+
+          {allStores.length > 0 && (
+            <div className="hm-filter-field">
+              <span className="hm-filter-cap">Store</span>
+              <select
+                value={selStores.length === 1 ? selStores[0] : ''}
+                onChange={e => setSelStores(e.target.value ? [e.target.value] : [])}
+                className={`hm-filter-select${selStores.length > 0 ? ' active' : ''}`}
+              >
+                <option value="">All</option>
+                {allStores.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
+
+          {allBrands.length > 0 && (
+            <div className="hm-filter-field">
+              <span className="hm-filter-cap">Brand</span>
+              <select
+                value={selBrands.length === 1 ? selBrands[0] : ''}
+                onChange={e => setSelBrands(e.target.value ? [e.target.value] : [])}
+                className={`hm-filter-select${selBrands.length > 0 ? ' active' : ''}`}
+              >
+                <option value="">All</option>
+                {allBrands.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div className="hm-filter-field price">
+            <span className="hm-filter-cap">Min Price</span>
+            <input
+              type="number" placeholder="Min" value={minPrice} onChange={e => setMinPrice(e.target.value)}
+              className={`hm-filter-input${minPrice ? ' active' : ''}`}
+            />
+          </div>
+          <div className="hm-filter-field price">
+            <span className="hm-filter-cap">Max Price</span>
+            <input
+              type="number" placeholder="Max" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
+              className={`hm-filter-input${maxPrice ? ' active' : ''}`}
+            />
+          </div>
+
+          <div className="hm-filter-actions">
+            <span className="hm-filter-count">
+              {displayProds.length} product{displayProds.length !== 1 ? 's' : ''}
+            </span>
+            {hasFilters && (
+              <button className="hm-filter-clear" onClick={clearFilters}>
+                ✕ Clear All
+              </button>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* PRODUCTS */}
@@ -488,7 +446,10 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
                         src={product.image || product.fallbackImage}
                         alt={product.name}
                         className="hm-pimg"
-                        style={{ objectFit: shouldUseContainInCard(product.category, product.name) ? 'contain' : 'cover' }}
+                        style={{
+                          objectFit: shouldUseContainInCard(product.category, product.name) ? 'contain' : 'cover',
+                          objectPosition: cardObjectPosition(product.category, product.name),
+                        }}
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={e => {
@@ -618,6 +579,25 @@ const STYLES = `
 .hm-s-imgbox.lg{width:140px;height:140px;}
 .hm-s-imgbox.sm{width:80px;height:80px;}
 .hm-s-img{width:100%;height:100%;object-fit:cover;display:block;}
+
+/* FILTER BAR */
+.hm-filter-sec{max-width:1200px;margin:18px auto 0;padding:0 24px;}
+.hm-filter-bar{background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:end;}
+.hm-filter-field{display:flex;flex-direction:column;gap:6px;}
+.hm-filter-field.price{min-width:120px;}
+.hm-filter-cap{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;}
+.hm-filter-select{border:1.5px solid #e2e8f0;background:#f8fafc;font-size:13px;font-weight:700;color:#334155;outline:none;cursor:pointer;border-radius:10px;padding:7px 10px;min-width:160px;transition:border-color .15s,background .15s,color .15s;}
+.hm-filter-select.active{border-color:#F97316;background:#fff7ed;color:#c2410c;}
+.hm-filter-input{width:120px;padding:7px 10px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:13px;outline:none;color:#334155;transition:border-color .15s,background .15s,color .15s;}
+.hm-filter-input.active{border-color:#F97316;background:#fff7ed;color:#c2410c;}
+.hm-filter-actions{display:flex;align-items:center;justify-content:center;gap:10px;}
+.hm-filter-count{font-size:12px;color:#F97316;font-weight:800;}
+.hm-filter-clear{padding:6px 14px;border-radius:999px;border:1px solid #fecaca;background:#fef2f2;color:#ef4444;font-size:12px;font-weight:800;cursor:pointer;transition:background .15s,color .15s,border-color .15s;}
+.hm-filter-clear:hover{background:#b91c1c;color:#fff;border-color:#991b1b;}
+
+@media (max-width: 900px){
+  .hm-filter-bar{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));}
+}
 .hm-s-em{font-size:3rem;opacity:.45;}
 .hm-s-em.sm{font-size:2rem;}
 /* CATEGORIES */

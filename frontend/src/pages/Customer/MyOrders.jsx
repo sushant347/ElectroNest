@@ -167,6 +167,7 @@ export default function MyOrders() {
   const [cancellingId, setCancellingId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('All');
   const [printOrder, setPrintOrder] = useState(null);
+  const [hideDelivered, setHideDelivered] = useState(false);
 
   useEffect(() => {
     loadOrders();
@@ -208,18 +209,38 @@ export default function MyOrders() {
     (typeof order.order_status === 'object' ? order.order_status?.name : null) || 'Pending';
   const getStepIndex = (statusName) => STATUS_STEPS.indexOf(statusName);
 
+  const deliveredCutoffMs = 7 * 24 * 60 * 60 * 1000;
+  const getDeliveredAt = (order) => {
+    const raw = order.delivered_at || order.updated_at || order.order_date || order.created_at;
+    const dt = raw ? new Date(raw) : null;
+    return dt && !Number.isNaN(dt.getTime()) ? dt : null;
+  };
+  const isDeliveredExpired = (order) => {
+    if (getStatusName(order) !== 'Delivered') return false;
+    const dt = getDeliveredAt(order);
+    if (!dt) return false;
+    return Date.now() - dt.getTime() > deliveredCutoffMs;
+  };
+
   const FILTER_OPTIONS = ['All', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 
+  const baseOrders = useMemo(
+    () => orders.filter((o) => !isDeliveredExpired(o)),
+    [orders]
+  );
+
   const filteredOrders = useMemo(() => {
-    if (statusFilter === 'All') return orders;
-    return orders.filter(o => getStatusName(o) === statusFilter);
-  }, [orders, statusFilter]);
+    let list = baseOrders;
+    if (hideDelivered) list = list.filter((o) => getStatusName(o) !== 'Delivered');
+    if (statusFilter !== 'All') list = list.filter((o) => getStatusName(o) === statusFilter);
+    return list;
+  }, [baseOrders, statusFilter, hideDelivered]);
 
   const filterCounts = useMemo(() => {
-    const c = { All: orders.length };
-    FILTER_OPTIONS.slice(1).forEach(f => { c[f] = orders.filter(o => getStatusName(o) === f).length; });
+    const c = { All: baseOrders.length };
+    FILTER_OPTIONS.slice(1).forEach(f => { c[f] = baseOrders.filter(o => getStatusName(o) === f).length; });
     return c;
-  }, [orders]);
+  }, [baseOrders]);
 
   if (loading) return (
     <section style={s.page}>
@@ -248,6 +269,12 @@ export default function MyOrders() {
               <span style={{ ...s.filterCount, ...(statusFilter === f ? s.filterCountActive : {}) }}>{filterCounts[f] || 0}</span>
             </button>
           ))}
+          <button
+            style={{ ...s.filterBtn, ...(hideDelivered ? s.filterBtnActive : {}) }}
+            onClick={() => setHideDelivered((v) => !v)}
+          >
+            Hide Delivered
+          </button>
         </div>
 
         {error && <div style={s.errBox}>{error}</div>}

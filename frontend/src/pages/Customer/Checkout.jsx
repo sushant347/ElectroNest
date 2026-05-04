@@ -564,6 +564,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
   const [focusedField, setFocusedField] = useState(null);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
+  const [orderSummary, setOrderSummary] = useState(null);
 
   /* -- coupon state -- */
   const [couponCode, setCouponCode] = useState('');
@@ -840,6 +841,15 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
   };
 
   /* -- submit -- */
+  const buildItemSummary = (items) => {
+    if (!items || items.length === 0) return 'your items';
+    const names = items.map((i) => i.name || i.product_name || 'Item').filter(Boolean);
+    const unique = Array.from(new Set(names));
+    const shown = unique.slice(0, 2);
+    const more = unique.length - shown.length;
+    return more > 0 ? `${shown.join(', ')} + ${more} more` : shown.join(', ');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -898,6 +908,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
       
       const response = await customerAPI.placeOrder(orderData);
       setCreatedOrder(response.data);
+      setOrderSummary({ itemsLabel: buildItemSummary(checkoutItems), amount: subtotal });
 
       const methodName = paymentMethods.find((m) => m.id === paymentMethod)?.name || paymentMethod;
       showToast(
@@ -920,6 +931,9 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
     }
   };
 
+  const itemSummary = orderSummary?.itemsLabel || buildItemSummary(checkoutItems);
+  const orderAmount = orderSummary?.amount ?? subtotal;
+
   /* -- order placed success screen -- */
   if (orderPlaced) {
     return (
@@ -937,7 +951,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
             Order Placed Successfully!
           </h1>
           <p style={{ fontSize: 15, color: "#64748b", marginBottom: 32, lineHeight: 1.6 }}>
-            Thank you for your purchase. Your order of {formatPrice(total)} is being processed.
+            Thank you for your purchase. Your order for {itemSummary} totaling {formatPrice(orderAmount)} is being processed.
             <br />You'll receive a confirmation shortly.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>

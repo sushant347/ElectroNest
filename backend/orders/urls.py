@@ -4,7 +4,7 @@ from .views import (OrderViewSet, CartViewSet, WishlistViewSet,
                     CompareListViewSet,
                     PaymentMethodViewSet, PaymentViewSet,
                     NotificationViewSet, SendLowStockAlertView,
-                    OrderStatusViewSet, CouponViewSet)
+                    OrderStatusViewSet, CouponViewSet, ProductQuestionViewSet, CustomerNotificationViewSet)
 
 router = DefaultRouter()
 router.register('orders',          OrderViewSet,         basename='orders')
@@ -15,6 +15,8 @@ router.register('compare',         CompareListViewSet,   basename='compare')
 router.register('payment-methods', PaymentMethodViewSet, basename='payment-methods')
 router.register('payments',        PaymentViewSet,       basename='payments')
 router.register('notifications',   NotificationViewSet,  basename='notifications')
+router.register('product-questions', ProductQuestionViewSet, basename='product-questions')
+router.register('customer-notifications', CustomerNotificationViewSet, basename='customer-notifications')
 router.register('coupons',         CouponViewSet,        basename='coupons')
 
 urlpatterns = [

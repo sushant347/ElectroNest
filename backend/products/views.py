@@ -3,6 +3,7 @@ import io
 import json
 import random
 import string
+from datetime import timedelta
 
 from rest_framework import viewsets, filters, status as drf_status
 from rest_framework.views import APIView
@@ -12,10 +13,40 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Avg, Count
 from decimal import Decimal, InvalidOperation
+from django.utils import timezone
 
 from .models import Category, Supplier, Product, Review
 from .serializers import CategorySerializer, SupplierSerializer, ProductSerializer, ReviewSerializer
+from .price_matching import get_price_comparison
 from admin_panel.models import AuditMixin, AuditLog
+
+DISCOUNT_BANDS = (5, 10)
+
+
+def _get_market_anchor_price(product: Product) -> Decimal:
+    """Baseline market anchor used when product is created."""
+    return (product.cost_price * Decimal('1.30')).quantize(Decimal('0.01'))
+
+
+def _get_discount_band_for_product(product: Product) -> int:
+    """
+    Pick one of 5/10/15/20 based on product date and id.
+    This stays deterministic per product and does not change when market moves.
+    """
+    created = product.created_at or timezone.now()
+    stable_id = product.id or sum(ord(ch) for ch in (product.sku or product.name or "product"))
+    seed = created.month + created.day + stable_id
+    return DISCOUNT_BANDS[seed % len(DISCOUNT_BANDS)]
+
+
+def _compute_locked_platform_price(product: Product) -> Decimal:
+    """Our platform price snapshot: market anchor minus discount band."""
+    market_anchor = _get_market_anchor_price(product)
+    band = Decimal(_get_discount_band_for_product(product))
+    multiplier = (Decimal('100') - band) / Decimal('100')
+    computed = (market_anchor * multiplier).quantize(Decimal('0.01'))
+    # Respect DB check constraint: SellingPrice must be strictly > 0.
+    return computed if computed > Decimal('0.00') else Decimal('0.01')
 
 
 class IsOwnerOrAdmin(BasePermission):
@@ -72,7 +103,15 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
                 return sku
 
     def perform_create(self, serializer):
-        save_kwargs = {'sku': self._generate_sku()}
+        product_preview = Product(
+            id=0,
+            cost_price=serializer.validated_data.get('cost_price', Decimal('0.00')),
+            created_at=timezone.now(),
+        )
+        # Create-time locked pricing based on market anchor and discount band.
+        # This value is persisted and won't auto-change when market changes later.
+        locked_price = _compute_locked_platform_price(product_preview)
+        save_kwargs = {'sku': self._generate_sku(), 'selling_price': locked_price}
         # Use owner_name from payload if explicitly set; otherwise derive from the logged-in user
         if not serializer.validated_data.get('owner_name', '').strip():
             save_kwargs['owner_name'] = f"{self.request.user.first_name} {self.request.user.last_name}".strip()
@@ -143,12 +182,16 @@ class PriceHistoryView(APIView):
         except Product.DoesNotExist:
             return Response({'detail': 'Product not found.'}, status=drf_status.HTTP_404_NOT_FOUND)
 
-        selling_price = float(product.selling_price)
+        locked_platform_price = _compute_locked_platform_price(product)
+        # Keep persisted DB price as source of truth; if older rows existed before
+        # this rule, we still display their saved selling price.
+        selling_price = float(product.selling_price or locked_platform_price)
         cost_price = float(product.cost_price)
         discount_price = float(product.discount_price) if product.discount_price else None
 
-        # Simulated market average = cost_price × 1.3 (30% retailer markup)
-        market_price = round(cost_price * 1.3, 2)
+        discount_band = _get_discount_band_for_product(product)
+        market_anchor = float(_get_market_anchor_price(product))
+        market_price = market_anchor
 
         # Get historical price changes from AuditLog
         price_history = []
@@ -179,22 +222,34 @@ class PriceHistoryView(APIView):
                     entry['old_price'] = float(old_price)
                 price_history.append(entry)
 
-        # If no audit trail, generate synthetic monthly data points (last 6 months)
-        # showing the current price as stable and market price slightly fluctuating
+        # If no audit trail, generate realistic month/day fluctuations for market.
+        # Our price remains fixed to emphasize "locked platform pricing".
         if not price_history:
-            from datetime import timedelta
-            from django.utils import timezone
             now = timezone.now()
-            import random as rng
-            for i in range(6, -1, -1):
-                dt = now - timedelta(days=i * 30)
-                # Market price fluctuates ±5% around baseline
-                variation = rng.uniform(-0.05, 0.05)
-                mp = round(market_price * (1 + variation), 2)
+            created_at = product.created_at or now
+            total_days = max(1, (now.date() - created_at.date()).days)
+            step_days = max(1, total_days // 8)
+            current = created_at
+
+            while current <= now:
+                seasonal = ((current.month % 4) + 1) * 0.01
+                weekday_adjustment = (current.weekday() - 3) * 0.004
+                day_cycle = ((current.day % 6) - 3) * 0.003
+                variation = seasonal + weekday_adjustment + day_cycle
+                mp = round(market_anchor * (1 + variation), 2)
                 price_history.append({
-                    'date': dt.strftime('%Y-%m-%d'),
+                    'date': current.strftime('%Y-%m-%d'),
                     'our_price': selling_price,
                     'market_price': mp,
+                })
+                current += timedelta(days=step_days)
+
+            if price_history and price_history[-1]['date'] != now.strftime('%Y-%m-%d'):
+                latest_variation = (((now.month % 4) + 1) * 0.01) + ((now.weekday() - 3) * 0.004)
+                price_history.append({
+                    'date': now.strftime('%Y-%m-%d'),
+                    'our_price': selling_price,
+                    'market_price': round(market_anchor * (1 + latest_variation), 2),
                 })
 
         # Add market_price to each entry if not already present
@@ -322,7 +377,6 @@ class BulkImportProductsView(APIView):
                 sku=row.get('sku', '').strip() or f'BULK-{name[:10].upper().replace(" ", "")}-{row_num}',
                 brand=row.get('brand', '').strip(),
                 description=row.get('description', '').strip(),
-                selling_price=selling_price,
                 cost_price=cost_price,
                 stock=stock,
                 reorder_level=reorder_level,
@@ -331,6 +385,9 @@ class BulkImportProductsView(APIView):
                 owner_name=owner_name,
                 image_url=row.get('image_url', '').strip(),
             )
+            # Apply the same locked discount rule for imported rows.
+            product.selling_price = _compute_locked_platform_price(product)
+            product.save(update_fields=['selling_price'])
             created.append({'id': product.id, 'name': product.name})
 
         if created:
@@ -347,3 +404,44 @@ class BulkImportProductsView(APIView):
             'created': created,
             'errors': errors[:20],
         }, status=drf_status.HTTP_201_CREATED if created else drf_status.HTTP_400_BAD_REQUEST)
+
+
+class PriceComparisonView(APIView):
+    """AI-assisted product matching and market price comparison."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        product_name = str(request.data.get('product_name', '')).strip()
+        raw_price = request.data.get('price')
+
+        if not product_name:
+            return Response(
+                {'detail': 'product_name is required.'},
+                status=drf_status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            price = float(raw_price)
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'price must be a valid number.'},
+                status=drf_status.HTTP_400_BAD_REQUEST
+            )
+
+        if price < 0:
+            return Response(
+                {'detail': 'price cannot be negative.'},
+                status=drf_status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            result = get_price_comparison(product_name=product_name, my_price=price)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=drf_status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return Response(
+                {'detail': 'Unable to compare market prices right now.'},
+                status=drf_status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        return Response(result, status=drf_status.HTTP_200_OK)

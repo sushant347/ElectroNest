@@ -4,19 +4,20 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from django.db import transaction
-from django.db.models import Avg, Count, Prefetch
+from django.db.models import Avg, Count, Prefetch, Q, Value
+from django.db.models.functions import Concat
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
 import uuid
 
 from .models import (Order, OrderDetail, OrderStatus, Cart, Wishlist,
-                     Review, PaymentMethod, Payment, Notification, CompareList, Coupon, CouponUsage)
+                     Review, PaymentMethod, Payment, Notification, CompareList, Coupon, CouponUsage, ProductQuestion, CustomerNotification)
 from .serializers import (OrderSerializer, CartSerializer,
                           WishlistSerializer, ReviewSerializer,
                           PaymentMethodSerializer, PaymentSerializer,
                           NotificationSerializer, OrderStatusSerializer,
-                          CompareListSerializer, CouponSerializer, CouponUsageSerializer)
+                          CompareListSerializer, CouponSerializer, CouponUsageSerializer, ProductQuestionSerializer, CustomerNotificationSerializer)
 from products.models import Product, Customer
 from accounts.models import CustomUser
 from accounts.models import CustomerAddress
@@ -783,6 +784,152 @@ class NotificationViewSet(viewsets.ModelViewSet):
         if not isinstance(request.user, CustomUser):
             return Response({'status': 'ok'})
         Notification.objects.filter(recipient=request.user).delete()
+        return Response({'status': 'ok'})
+
+
+class ProductQuestionViewSet(viewsets.ModelViewSet):
+    serializer_class = ProductQuestionSerializer
+    http_method_names = ['get', 'post', 'patch', 'head', 'options']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def _owner_store_name(self, user):
+        if not isinstance(user, CustomUser):
+            return ''
+        return f"{user.first_name} {user.last_name}".strip()
+
+    def get_queryset(self):
+        qs = ProductQuestion.objects.select_related('product', 'customer', 'answered_by')
+        user = self.request.user
+        product_id = self.request.query_params.get('product')
+
+        if not getattr(user, 'is_authenticated', False):
+            if product_id:
+                return qs.filter(product_id=product_id, is_public=True, status=ProductQuestion.STATUS_ANSWERED)
+            return ProductQuestion.objects.none()
+
+        if isinstance(user, CustomUser):
+            if user.role == 'owner':
+                owner_name = self._owner_store_name(user)
+                qs = qs.filter(product__owner_name__iexact=owner_name)
+            else:
+                qs = ProductQuestion.objects.none()
+        else:
+            # Customer sees all public answered questions + their own on a product page.
+            if product_id:
+                qs = qs.filter(product_id=product_id).filter(
+                    Q(is_public=True, status=ProductQuestion.STATUS_ANSWERED) | Q(customer=user)
+                )
+            else:
+                qs = qs.filter(customer=user)
+
+        if product_id and isinstance(user, CustomUser):
+            qs = qs.filter(product_id=product_id)
+        return qs.order_by('-asked_at')
+
+    def create(self, request, *args, **kwargs):
+        if isinstance(request.user, CustomUser):
+            return Response({'detail': 'Only customers can post questions.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        question = serializer.save(customer=request.user, status=ProductQuestion.STATUS_PENDING)
+
+        # Notify the product owner.
+        owner_name = (question.product.owner_name or '').strip()
+        owner = (
+            CustomUser.objects
+            .filter(role='owner')
+            .annotate(full_name=Concat('first_name', Value(' '), 'last_name'))
+            .filter(full_name__iexact=owner_name)
+            .first()
+        )
+        if not owner and owner_name:
+            parts = owner_name.split()
+            if parts:
+                owner = CustomUser.objects.filter(role='owner', last_name__iexact=parts[-1]).first()
+
+        if owner:
+            Notification.objects.create(
+                recipient=owner,
+                title=f"New Q&A on {question.product.name}",
+                message=f"{question.customer.first_name} asked: {question.question[:120]}",
+                type='product_qa',
+                product=question.product,
+            )
+
+        AuditLog.log_action(
+            action='INSERT',
+            table_name='ProductQuestions',
+            record_id=question.id,
+            user=request.user,
+            new_values={'product_id': question.product_id, 'question': question.question[:300]},
+        )
+        return Response(self.get_serializer(question).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['patch'], url_path='answer')
+    def answer(self, request, pk=None):
+        if not (isinstance(request.user, CustomUser) and request.user.role == 'owner'):
+            return Response({'detail': 'Only owners can answer questions.'}, status=status.HTTP_403_FORBIDDEN)
+
+        question = self.get_object()
+        owner_name = self._owner_store_name(request.user)
+        if (question.product.owner_name or '').strip().lower() != owner_name.lower():
+            return Response({'detail': 'You can only answer questions for your products.'}, status=status.HTTP_403_FORBIDDEN)
+
+        answer_text = (request.data.get('answer') or '').strip()
+        if not answer_text:
+            return Response({'detail': 'answer is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        question.answer = answer_text
+        question.status = ProductQuestion.STATUS_ANSWERED
+        question.answered_by = request.user
+        question.answered_at = timezone.now()
+        question.save(update_fields=['answer', 'status', 'answered_by', 'answered_at', 'updated_at'])
+
+        CustomerNotification.objects.create(
+            customer=question.customer,
+            question=question,
+            title=f"Your question was answered: {question.product.name}",
+            message=answer_text[:300],
+        )
+
+        AuditLog.log_action(
+            action='UPDATE',
+            table_name='ProductQuestions',
+            record_id=question.id,
+            user=request.user,
+            new_values={'status': question.status, 'answered_at': question.answered_at.isoformat()},
+        )
+        return Response(self.get_serializer(question).data)
+
+
+class CustomerNotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = CustomerNotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if isinstance(user, CustomUser):
+            return CustomerNotification.objects.none()
+        return CustomerNotification.objects.filter(customer=user).select_related('question', 'question__product')
+
+    @action(detail=True, methods=['patch'], url_path='read')
+    def mark_read(self, request, pk=None):
+        notif = self.get_object()
+        notif.is_read = True
+        notif.save(update_fields=['is_read'])
+        return Response(self.get_serializer(notif).data)
+
+    @action(detail=False, methods=['patch'], url_path='read-all')
+    def mark_all_read(self, request):
+        user = request.user
+        if isinstance(user, CustomUser):
+            return Response({'status': 'ok'})
+        CustomerNotification.objects.filter(customer=user, is_read=False).update(is_read=True)
         return Response({'status': 'ok'})
 
 

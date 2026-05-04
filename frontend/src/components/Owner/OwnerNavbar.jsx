@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingCart, BarChart3, LogOut, Bell, Store, ChevronDown, CheckCheck, AlertTriangle, ShoppingBag, Info, Trash2, Tag, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, BarChart3, LogOut, Bell, Store, ChevronDown, CheckCheck, AlertTriangle, ShoppingBag, Info, Trash2, Tag, Menu, X, MessageSquare } from 'lucide-react';
 import electronestLogo from '../images/Electronest.png';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -9,12 +9,13 @@ const ownerLinks = [
   { label: 'Dashboard', path: '/owner/dashboard', icon: LayoutDashboard },
   { label: 'Products', path: '/owner/products', icon: Package },
   { label: 'Orders', path: '/owner/orders', icon: ShoppingCart },
+  { label: 'Q&A', path: '/owner/questions', icon: MessageSquare },
   { label: 'Analytics', path: '/owner/analytics', icon: BarChart3 },
   { label: 'Coupons', path: '/owner/coupons', icon: Tag },
 ];
 
-const typeIcons = { low_stock: AlertTriangle, order_update: ShoppingBag, purchase_order: Package, general: Info };
-const typeColors = { low_stock: '#D97706', order_update: '#3B82F6', purchase_order: '#7C3AED', general: '#6B7280' };
+const typeIcons = { low_stock: AlertTriangle, order_update: ShoppingBag, purchase_order: Package, product_qa: MessageSquare, general: Info };
+const typeColors = { low_stock: '#D97706', order_update: '#3B82F6', purchase_order: '#7C3AED', product_qa: '#F97316', general: '#6B7280' };
 
 export default function OwnerNavbar() {
   const { pathname } = useLocation();

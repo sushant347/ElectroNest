@@ -159,6 +159,8 @@ export const ownerAPI = {
   markNotificationRead: (id) => api.patch(`/notifications/${id}/read/`),
   markAllNotificationsRead: () => api.patch('/notifications/read-all/'),
   clearAllNotifications: () => api.delete('/notifications/clear-all/'),
+  getProductQuestions: (params) => api.get('/product-questions/', { params }),
+  answerProductQuestion: (id, answer) => api.patch(`/product-questions/${id}/answer/`, { answer }),
 
   // Analytics — Product Growth
   getProductGrowth: (productId, days = 90) => api.get(`/analytics/product-growth/${productId}/`, { params: { days } }),
@@ -231,6 +233,11 @@ export const customerAPI = {
   getBrands: () => api.get('/brands/'),
   searchProducts: (query) => api.get('/products/', { params: { search: query } }),
   getPriceHistory: (productId) => api.get(`/products/${productId}/price-history/`),
+  getProductQuestions: (productId) => api.get('/product-questions/', { params: { product: productId } }),
+  askProductQuestion: (productId, question) => api.post('/product-questions/', { product: productId, question }),
+  getCustomerNotifications: () => api.get('/customer-notifications/'),
+  markCustomerNotificationRead: (id) => api.patch(`/customer-notifications/${id}/read/`),
+  markAllCustomerNotificationsRead: () => api.patch('/customer-notifications/read-all/'),
 
   // Cart
   getCart: () => api.get('/cart/'),

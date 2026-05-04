@@ -227,6 +227,7 @@ class Notification(models.Model):
         ('low_stock', 'Low Stock Alert'),
         ('order_update', 'Order Update'),
         ('purchase_order', 'Purchase Order'),
+        ('product_qa', 'Product Q&A'),
         ('general', 'General'),
     ]
     id         = models.AutoField(primary_key=True)
@@ -246,3 +247,63 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"[{self.type}] {self.title} → {self.recipient}"
+
+
+class ProductQuestion(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_ANSWERED = 'answered'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ANSWERED, 'Answered'),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='questions')
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='product_questions')
+    question = models.TextField()
+    answer = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    is_public = models.BooleanField(default=True)
+    answered_by = models.ForeignKey(
+        CustomUser,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='answered_product_questions',
+        db_constraint=False,
+    )
+    asked_at = models.DateTimeField(auto_now_add=True)
+    answered_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'ProductQuestions'
+        managed = True
+        ordering = ['-asked_at']
+
+    def __str__(self):
+        return f"Q{self.id} on {self.product.name}"
+
+
+class CustomerNotification(models.Model):
+    id = models.AutoField(primary_key=True)
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='notifications')
+    question = models.ForeignKey(
+        ProductQuestion,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='customer_notifications',
+    )
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'CustomerNotifications'
+        managed = True
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} → {self.customer.email}"

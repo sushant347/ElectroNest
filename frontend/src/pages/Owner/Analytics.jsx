@@ -17,12 +17,12 @@ function _arc(cx, cy, oR, iR, s, e) {
   const lg = se - s > 180 ? 1 : 0;
   return [`M ${o1.x} ${o1.y}`, `A ${oR} ${oR} 0 ${lg} 1 ${o2.x} ${o2.y}`, `L ${i1.x} ${i1.y}`, `A ${iR} ${iR} 0 ${lg} 0 ${i2.x} ${i2.y}`, 'Z'].join(' ');
 }
-function SvgDonut({ data, labelKey = 'name', valueKey = 'value', colorMap = null, fmtVal = null, id = 'sd' }) {
+function SvgDonut({ data, labelKey = 'name', valueKey = 'value', colorMap = null, fmtVal = null, id = 'sd', align = 'center', vAlign = 'center', size = 220, hideLegend = false }) {
   const [hovered, setHovered] = useState(null);
   const [tooltip, setTooltip] = useState({ x: 0, y: 0 });
   const total = data.reduce((s, d) => s + (Number(d[valueKey]) || 0), 0);
   if (!data.length || total === 0) return <p className="an-no-data">No data available</p>;
-  const CX = 110, CY = 110, OR = 100, IR = 56;
+  const CX = size / 2, CY = size / 2, OR = (size / 2) - 10, IR = size * 0.25;
   const segments = [];
   data.reduce((cumDeg, d, i) => {
     const sv = Number(d[valueKey]) || 0;
@@ -35,9 +35,9 @@ function SvgDonut({ data, labelKey = 'name', valueKey = 'value', colorMap = null
   }, 0);
   const active = hovered !== null ? segments[hovered] : null;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-      <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setHovered(null)}>
-        <svg width={220} height={220} viewBox="0 0 220 220" style={{ display: 'block', overflow: 'visible' }}>
+    <div style={{ display: 'flex', alignItems: vAlign, gap: '1.25rem', flexWrap: 'wrap', justifyContent: align }}>
+      <div style={{ position: 'relative', flexShrink: 0, margin: hideLegend ? '0 auto' : '0' }} onMouseLeave={() => setHovered(null)}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block', overflow: 'visible' }}>
           <defs>
             <filter id={`${id}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#00000030" />
@@ -61,22 +61,22 @@ function SvgDonut({ data, labelKey = 'name', valueKey = 'value', colorMap = null
           <circle cx={CX} cy={CY} r={IR - 2} fill="#fff" />
           {active ? (
             <>
-              <text x={CX} y={CY - 10} textAnchor="middle" style={{ fontSize: 9, fill: active.color, fontWeight: 700, fontFamily: 'inherit' }}>
+              <text x={CX} y={CY - 10} textAnchor="middle" style={{ fontSize: size >= 260 ? 11 : 9, fill: active.color, fontWeight: 700, fontFamily: 'inherit' }}>
                 {active.label.length > 14 ? active.label.slice(0, 13) + '…' : active.label}
               </text>
-              <text x={CX} y={CY + 8} textAnchor="middle" style={{ fontSize: 11, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>
+              <text x={CX} y={CY + 8} textAnchor="middle" style={{ fontSize: size >= 260 ? 14 : 11, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>
                 {fmtVal ? fmtVal(active.value) : active.value}
               </text>
-              <text x={CX} y={CY + 24} textAnchor="middle" style={{ fontSize: 10, fill: active.color, fontWeight: 600, fontFamily: 'inherit' }}>
+              <text x={CX} y={CY + 24} textAnchor="middle" style={{ fontSize: size >= 260 ? 12 : 10, fill: active.color, fontWeight: 600, fontFamily: 'inherit' }}>
                 {active.pct.toFixed(1)}%
               </text>
             </>
           ) : (
             <>
-              <text x={CX} y={CY - 4} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'inherit', fontWeight: 600 }}>
+              <text x={CX} y={CY - 4} textAnchor="middle" style={{ fontSize: size >= 260 ? 11 : 9, fill: '#9CA3AF', fontFamily: 'inherit', fontWeight: 600 }}>
                 {segments.length} {segments.length === 1 ? 'item' : 'items'}
               </text>
-              <text x={CX} y={CY + 12} textAnchor="middle" style={{ fontSize: 11, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>
+              <text x={CX} y={CY + 14} textAnchor="middle" style={{ fontSize: size >= 260 ? 14 : 11, fill: '#1e293b', fontWeight: 800, fontFamily: 'inherit' }}>
                 {total}
               </text>
             </>
@@ -101,6 +101,7 @@ function SvgDonut({ data, labelKey = 'name', valueKey = 'value', colorMap = null
           </div>
         )}
       </div>
+      {!hideLegend && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: 120, maxHeight: 200, overflowY: 'auto' }}>
         {segments.map((s, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '3px 0' }}
@@ -113,6 +114,7 @@ function SvgDonut({ data, labelKey = 'name', valueKey = 'value', colorMap = null
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
@@ -187,6 +189,19 @@ export default function Analytics() {
   const totalRevenue = summary.total_revenue || 0;
   const totalProfit = summary.total_profit || 0;
   const totalOrders = summary.total_orders || 0;
+
+  const statusOrder = ['Shipped', 'Delivered', 'Cancelled', 'Pending'];
+  const statusMap = new Map(statusDistribution.map((s) => [s.name, Number(s.value) || 0]));
+  const maxStatusValue = Math.max(1, ...statusOrder.map((n) => statusMap.get(n) || 0));
+  const statusRows = statusOrder.map((name) => {
+    const value = statusMap.get(name) || 0;
+    return {
+      name,
+      value,
+      color: STATUS_COLORS_MAP[name] || '#94a3b8',
+      pct: Math.round((value / maxStatusValue) * 100),
+    };
+  });
 
   const tabs = [
     { key: 'revenue', label: 'Revenue' },
@@ -497,9 +512,25 @@ export default function Analytics() {
           ) : (
             <div className="an-grid-2">
               {/* Order Status Distribution — SVG 3D Donut */}
-              <div className="an-chart-card">
+              <div className="an-chart-card an-status-card">
                 <h3 className="an-card-title">Order Status Distribution</h3>
-                <SvgDonut data={statusDistribution} labelKey="name" valueKey="value" colorMap={STATUS_COLORS_MAP} id="status-donut" />
+                <div className="an-status-chart">
+                  <SvgDonut data={statusDistribution} labelKey="name" valueKey="value" colorMap={STATUS_COLORS_MAP} id="status-donut" align="center" vAlign="center" size={280} hideLegend />
+                </div>
+                <div className="an-status-list">
+                  {statusRows.map((row) => (
+                    <div key={row.name} className="an-status-row">
+                      <div className="an-status-left">
+                        <span className="an-status-dot" style={{ background: row.color }} />
+                        <span className="an-status-name">{row.name}</span>
+                      </div>
+                      <div className="an-status-track">
+                        <span className="an-status-fill" style={{ width: `${row.pct}%`, background: row.color }} />
+                      </div>
+                      <span className="an-status-count">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Category Performance — moved from products tab */}
@@ -598,6 +629,18 @@ export default function Analytics() {
         .an-grid-2 > .an-chart-card { min-width: 0; }
         .an-chart-card { background: #fff; padding: 1.5rem; border-radius: 14px; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
         .an-card-title { font-size: 1rem; font-weight: 700; color: #1e293b; margin: 0 0 1rem; }
+
+        /* Order status distribution layout */
+        .an-status-card { display: flex; flex-direction: column; gap: 0.6rem; }
+        .an-status-chart { display: flex; justify-content: center; }
+        .an-status-list { display: grid; gap: 0.55rem; margin-top: 0.15rem; }
+        .an-status-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.6rem; }
+        .an-status-left { display: flex; align-items: center; gap: 0.45rem; min-width: 120px; }
+        .an-status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .an-status-name { font-size: 0.78rem; font-weight: 600; color: #334155; }
+        .an-status-track { position: relative; height: 6px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+        .an-status-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 999px; }
+        .an-status-count { font-size: 0.78rem; font-weight: 700; color: #1e293b; min-width: 28px; text-align: right; }
 
         /* Filters Bar */
         .an-filters-bar {

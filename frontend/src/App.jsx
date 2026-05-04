@@ -28,6 +28,7 @@ const ProductManagement = lazy(() => import('./pages/Owner/ProductManagement'))
 const OrderManagement = lazy(() => import('./pages/Owner/OrderManagement'))
 const Analytics = lazy(() => import('./pages/Owner/Analytics'))
 const CouponManagement = lazy(() => import('./pages/Owner/CouponManagement'))
+const ProductQuestions = lazy(() => import('./pages/Owner/ProductQuestions'))
 const OwnerLayout = lazy(() => import('./components/Owner/OwnerLayout'))
 
 // Warehouse Pages
@@ -496,6 +497,7 @@ export default function App() {
                 <Route path="orders" element={<OrderManagement />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="coupons" element={<CouponManagement />} />
+                <Route path="questions" element={<ProductQuestions />} />
               </Route>
 
               {/* Warehouse Routes */}

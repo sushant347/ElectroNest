@@ -340,6 +340,7 @@ export default function CouponManagement() {
               const exhausted    = isExhausted(c);
               const live         = c.is_active && !expired && !exhausted;
               const remaining    = Math.max(0, c.usage_limit - c.used_count);
+              const accentColor  = expired || exhausted ? '#dc2626' : '#F97316';
               // Bar shows REMAINING capacity → decreases as coupons are claimed
               const remainingPct = c.usage_limit > 0 ? Math.min(100, (remaining / c.usage_limit) * 100) : 0;
               const barColor     = remainingPct > 40 ? '#F97316' : remainingPct > 15 ? '#f59e0b' : '#ef4444';
@@ -369,7 +370,7 @@ export default function CouponManagement() {
                     </div>
 
                     {/* Code */}
-                    <div style={{ fontFamily: 'monospace', fontSize: '1.25rem', fontWeight: 900, color: live ? '#F97316' : '#9ca3af', letterSpacing: '0.1em', marginBottom: 6 }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: '1.25rem', fontWeight: 900, color: accentColor, letterSpacing: '0.1em', marginBottom: 6 }}>
                       {c.code}
                     </div>
 
@@ -401,10 +402,10 @@ export default function CouponManagement() {
                     {/* Meta info row */}
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: '0.72rem', color: '#6b7280' }}>
                       {parseFloat(c.min_order_amount) > 0 && (
-                        <span>Min order: <strong style={{ color: '#374151' }}>{fmt(c.min_order_amount)}</strong></span>
+                        <span>Min order: <strong style={{ color: accentColor }}>{fmt(c.min_order_amount)}</strong></span>
                       )}
-                      <span>Each customer: <strong style={{ color: '#374151' }}>{c.per_customer_limit ?? 1}× use</strong></span>
-                      <span>Total claimed: <strong style={{ color: c.used_count > 0 ? '#F97316' : '#374151' }}>{c.used_count}</strong></span>
+                      <span>Each customer: <strong style={{ color: accentColor }}>{c.per_customer_limit ?? 1}× use</strong></span>
+                      <span>Total claimed: <strong style={{ color: c.used_count > 0 ? accentColor : '#64748b' }}>{c.used_count}</strong></span>
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>
                       <Clock size={10} style={{ display: 'inline', marginRight: 4 }} />

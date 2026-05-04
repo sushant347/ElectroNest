@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (Order, OrderDetail, OrderStatus, Cart, Wishlist,
-                     Review, PaymentMethod, Payment, Notification, CompareList, Coupon, CouponUsage)
+                     Review, PaymentMethod, Payment, Notification, CompareList, Coupon, CouponUsage, ProductQuestion, CustomerNotification)
 from products.serializers import ProductSerializer
 from accounts.serializers import CustomerAddressSerializer
 
@@ -198,3 +198,44 @@ class CouponUsageSerializer(serializers.ModelSerializer):
         model  = CouponUsage
         fields = ['id', 'coupon', 'coupon_code', 'customer', 'customer_email', 'order', 'used_at']
         read_only_fields = ['used_at']
+
+
+class ProductQuestionSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_image = serializers.CharField(source='product.image_url', read_only=True, default='')
+    product_category = serializers.CharField(source='product.category.name', read_only=True, default='')
+    customer_name = serializers.SerializerMethodField()
+    answered_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductQuestion
+        fields = [
+            'id', 'product', 'product_name', 'product_image', 'customer', 'customer_name',
+            'product_category',
+            'question', 'answer', 'status', 'is_public', 'answered_by', 'answered_by_name',
+            'asked_at', 'answered_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'customer', 'status', 'answered_by', 'asked_at', 'answered_at', 'updated_at',
+        ]
+
+    def get_customer_name(self, obj):
+        return f"{obj.customer.first_name} {obj.customer.last_name}".strip()
+
+    def get_answered_by_name(self, obj):
+        if not obj.answered_by:
+            return None
+        return f"{obj.answered_by.first_name} {obj.answered_by.last_name}".strip() or obj.answered_by.email
+
+
+class CustomerNotificationSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(source='question.product_id', read_only=True)
+    product_name = serializers.CharField(source='question.product.name', read_only=True, default='')
+
+    class Meta:
+        model = CustomerNotification
+        fields = [
+            'id', 'customer', 'question', 'product_id', 'product_name',
+            'title', 'message', 'is_read', 'created_at',
+        ]
+        read_only_fields = ['created_at']

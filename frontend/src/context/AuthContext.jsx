@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem(config.REFRESH_TOKEN_KEY);
         } else {
           const u = JSON.parse(storedUser);
-          setTimeout(() => setUser(u), 0);
+          setUser(u);
         }
       } catch (e) {
         console.error("Failed to parse user data", e);

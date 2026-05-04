@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, ShoppingCart, Heart, Truck, ShieldCheck,
   RotateCcw, Package, Cpu, ChevronLeft, ChevronRight, Tag,
-  Percent, Clock, Zap,
+  Percent, Clock, Zap, ChevronDown, ChevronUp, MessageSquare, Send, Bell,
 } from 'lucide-react';
 
 import { customerAPI } from '../../services/api';
@@ -52,6 +52,7 @@ function StarRow({ rating, size = 16, color = '#FBBF24' }) {
 function PriceComparisonChart({ productId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,71 +66,126 @@ function PriceComparisonChart({ productId }) {
 
   if (loading || !data || !data.price_history?.length) return null;
 
-  const dates = data.price_history.map(p => p.date);
-  const ourPrices = data.price_history.map(p => p.our_price);
-  const marketPrices = data.price_history.map(p => p.market_price);
-  const savings = data.savings_percent;
+  const savings = Number(data.savings_percent || 0);
+  const marketPrice = Number(data.market_price || 0);
+  const yourPrice = Number(data.current_selling_price || 0);
+  const spread = Math.max(0, marketPrice - yourPrice);
 
   return (
-    <div style={{
-      background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16,
-      padding: '24px 20px', marginTop: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+    <div className="price-insights-wrap" style={{
+      background: '#fff',
+      border: '1px solid #fed7aa',
+      borderRadius: 20,
+      padding: '20px',
+      marginTop: 24,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+      <button
+        onClick={() => setIsOpen((prev) => !prev)}
+        style={{
+          width: '100%',
+          border: '1px solid #f97316',
+          borderRadius: 14,
+          background: '#f97316',
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
-            width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #fff7ed, #ffedd5)',
+            width: 34, height: 34, borderRadius: 9, background: '#fff7ed',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>Price Comparison</div>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>Market Price vs Our Price</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', textAlign: 'left' }}>Smart Price Insights</div>
+            <div style={{ fontSize: 12, color: '#ffedd5', textAlign: 'left' }}>
+              {isOpen ? 'Hide comparison dashboard' : 'Open market trend dashboard'}
+            </div>
           </div>
         </div>
-        {savings > 0 && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1.5px solid #86efac',
-            borderRadius: 999, padding: '6px 16px',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/></svg>
-            <span style={{ fontSize: 13, fontWeight: 800, color: '#15803d' }}>You save up to {savings}%</span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          {spread > 0 && (
+            <span style={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: '#166534',
+              background: '#dcfce7',
+              border: '1px solid #86efac',
+              borderRadius: 999,
+              padding: '4px 10px',
+            }}>
+              You save {formatPrice(spread)}
+            </span>
+          )}
+          {isOpen ? <ChevronUp size={18} color="#fff" /> : <ChevronDown size={18} color="#fff" />}
+        </div>
+      </button>
+
+      {isOpen && (
+        <>
+      <div style={{ display: 'grid', gap: 10, marginTop: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+        <div style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: 12, padding: '10px 12px' }}>
+          <div style={{ fontSize: 11, color: '#9a3412', marginBottom: 4 }}>Your Price</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#c2410c' }}>{formatPrice(yourPrice)}</div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 12px' }}>
+          <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 4 }}>Market Price</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#dc2626' }}>{formatPrice(marketPrice)}</div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px' }}>
+          <div style={{ fontSize: 11, color: '#166534', marginBottom: 4 }}>You Save</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#15803d' }}>{formatPrice(spread)}</div>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid #c7d2fe', borderRadius: 12, padding: '10px 12px' }}>
+          <div style={{ fontSize: 11, color: '#3730a3', marginBottom: 4 }}>Savings Rate</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#4338ca' }}>{Math.max(0, savings)}%</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>Market vs Platform Trend</div>
+          <div style={{ fontSize: 12, color: '#64748b' }}>
+            Market moves over time, your listed price stays fixed.
           </div>
-        )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 12, height: 3, borderRadius: 2, background: '#ef4444' }} />
-          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Market Price (Avg)</span>
+          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Market Price</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 12, height: 3, borderRadius: 2, background: '#F97316' }} />
-          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Our Price</span>
+          <div style={{ width: 12, height: 3, borderRadius: 2, background: '#0ea5e9' }} />
+          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Platform Price</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 12, height: 12, borderRadius: 2, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)' }} />
-          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Your Savings</span>
+          <div style={{ width: 12, height: 12, borderRadius: 2, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)' }} />
+          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Market Volatility</span>
         </div>
       </div>
 
-      <div style={{ width: '100%', height: 280 }}>
+      <div className="price-chart-box" style={{ width: '100%', height: 280 }}>
         <ResponsiveContainer>
           <ComposedChart data={data.price_history} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
             <defs>
-              <linearGradient id="savingsFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.15}/>
-                <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+              <linearGradient id="marketFillNew" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.18}/>
+                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.02}/>
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
             <XAxis 
               dataKey="date" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fontSize: 10, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
               tickFormatter={(val) => {
                 const d = new Date(val);
                 return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
@@ -138,47 +194,170 @@ function PriceComparisonChart({ productId }) {
             <YAxis 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fontSize: 10, fill: '#94a3b8' }}
-              tickFormatter={(val) => `Rs.${val}`}
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tickFormatter={(val) => `${Math.round(val / 1000)}k`}
               domain={['auto', 'auto']}
             />
             <RechartsTooltip
-              contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+              contentStyle={{ borderRadius: 12, border: '1px solid #fdba74', boxShadow: '0 8px 20px rgba(249,115,22,0.15)' }}
               labelStyle={{ fontWeight: 700, color: '#1e293b', marginBottom: 4 }}
               itemStyle={{ fontSize: 13, fontWeight: 600 }}
-              formatter={(value, name) => [formatPrice(value), name === 'our_price' ? 'ElectroNest Price' : 'Market Price']}
+              formatter={(value, name) => [formatPrice(value), name === 'our_price' ? 'Platform Price' : 'Market Price']}
               labelFormatter={(label) => {
                 const d = new Date(label);
                 return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`;
               }}
             />
-            {/* Shaded Area for market price (acts as a savings visual) */}
-            <Area type="monotone" dataKey="market_price" fill="url(#savingsFill)" stroke="none" />
-            
-            {/* Market Price Line */}
-            <Line type="monotone" dataKey="market_price" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: '#ef4444' }} activeDot={{ r: 5 }} />
-            
-            {/* Our Price Line */}
-            <Line type="monotone" dataKey="our_price" stroke="#F97316" strokeWidth={3} dot={{ r: 4, fill: '#F97316', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+            <Line type="monotone" dataKey="market_price" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 2, fill: '#ef4444' }} activeDot={{ r: 5 }} />
+            <Line type="monotone" dataKey="our_price" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 3, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
       <div style={{
-        marginTop: 12, padding: '10px 14px', background: '#f8fafc', borderRadius: 10,
+        marginTop: 12, padding: '10px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
       }}>
         <div style={{ fontSize: 12, color: '#64748b' }}>
-          Current: <strong style={{ color: '#F97316' }}>{formatPrice(data.current_selling_price)}</strong>
+          Current: <strong style={{ color: '#0ea5e9' }}>{formatPrice(data.current_selling_price)}</strong>
         </div>
         <div style={{ fontSize: 12, color: '#64748b' }}>
-          Market Avg: <strong style={{ color: '#ef4444' }}>{formatPrice(data.market_price)}</strong>
+          Market Price: <strong style={{ color: '#ef4444' }}>{formatPrice(data.market_price)}</strong>
         </div>
         {data.current_discount_price && (
           <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700 }}>
             🏷️ Sale: {formatPrice(data.current_discount_price)}
           </div>
         )}
+      </div>
+      </>
+      )}
+    </div>
+  );
+}
+
+function ProductQASection({ productId, ownerName }) {
+  const [items, setItems] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [question, setQuestion] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const qRes = await customerAPI.getProductQuestions(productId);
+      setItems(qRes.data?.results || qRes.data || []);
+      try {
+        const nRes = await customerAPI.getCustomerNotifications();
+        setNotifications(nRes.data?.results || nRes.data || []);
+      } catch {
+        setNotifications([]);
+      }
+    } catch {
+      setItems([]);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
+
+  const unreadProductReplies = notifications.filter((n) => !n.is_read && n.product_id === productId);
+
+  const askQuestion = async () => {
+    const text = question.trim();
+    if (!text) return;
+    setSubmitting(true);
+    try {
+      await customerAPI.askProductQuestion(productId, text);
+      setQuestion('');
+      await load();
+    } catch {
+      alert('Please login as customer to ask a question.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const markNotifRead = async (notifId) => {
+    try {
+      await customerAPI.markCustomerNotificationRead(notifId);
+      setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, is_read: true } : n)));
+    } catch {
+      // no-op
+    }
+  };
+
+  return (
+    <div style={s.qaCard}>
+      <div style={s.qaHead}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <MessageSquare size={18} color="#F97316" />
+          <h2 style={{ ...s.specsTitle, margin: 0 }}>Q&A</h2>
+        </div>
+        <span style={s.qaCount}>{items.length} discussions</span>
+      </div>
+
+      {unreadProductReplies.length > 0 && (
+        <div style={s.qaNotif}>
+          <Bell size={15} color="#16a34a" />
+          <span>You have {unreadProductReplies.length} new owner repl{unreadProductReplies.length > 1 ? 'ies' : 'y'} for this product.</span>
+        </div>
+      )}
+
+      <div className="qa-scroll" style={s.qaList}>
+        {loading ? (
+          <div style={{ fontSize: 13, color: '#64748b' }}>Loading questions...</div>
+        ) : items.length === 0 ? (
+          <div style={{ fontSize: 13, color: '#64748b' }}>No questions yet. Be the first to ask.</div>
+        ) : (
+          items.map((q) => {
+            const replyNotif = unreadProductReplies.find((n) => n.question === q.id);
+            return (
+              <div key={q.id} style={s.qaItem}>
+                <div style={{ fontSize: 13, color: '#1e293b', fontWeight: 600 }}>{q.customer_name || 'Customer'} asked:</div>
+                <div style={{ fontSize: 14, color: '#334155', lineHeight: 1.55 }}>{q.question}</div>
+                {q.status === 'answered' && q.answer ? (
+                  <div style={s.qaAnswer}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ color: '#2563eb', fontWeight: 700 }}>
+                        {q.owner_name || q.owner || ownerName || 'Store Owner'}
+                      </span>
+                      {replyNotif && (
+                        <button
+                          onClick={() => markNotifRead(replyNotif.id)}
+                          style={{ border: 'none', background: 'transparent', color: '#2563eb', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Mark as read
+                        </button>
+                      )}
+                    </div>
+                    <div>{q.answer}</div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#f97316', fontWeight: 700 }}>Waiting for store owner response</div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div style={s.qaAskBox}>
+        <textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Ask about warranty, compatibility, delivery time, or specifications..."
+          style={s.qaInput}
+        />
+        <button onClick={askQuestion} disabled={submitting || !question.trim()} style={s.qaAskBtn}>
+          <Send size={14} /> {submitting ? 'Sending...' : 'Ask Question'}
+        </button>
       </div>
     </div>
   );
@@ -508,6 +687,8 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [coupons, setCoupons] = useState([]);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [isSpecsOpen, setIsSpecsOpen] = useState(false);
+  const [isMobileSpecs, setIsMobileSpecs] = useState(false);
   const alsoRef = useRef(null);
   const [alsoIndex, setAlsoIndex] = useState(0);
 
@@ -524,6 +705,17 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   };
 
   useEffect(() => { setAlsoIndex(0); }, [relatedProducts]);
+
+  useEffect(() => {
+    const syncSpecsPanel = () => {
+      const isMobile = window.innerWidth <= 768;
+      setIsMobileSpecs(isMobile);
+      setIsSpecsOpen(!isMobile);
+    };
+    syncSpecsPanel();
+    window.addEventListener('resize', syncSpecsPanel);
+    return () => window.removeEventListener('resize', syncSpecsPanel);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -743,21 +935,57 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
         {/* ── Price Comparison Graph ── */}
         <PriceComparisonChart productId={product.id} />
 
+        <ProductQASection productId={product.id} ownerName={product.ownerName} />
+
         {/* Specs */}
         {specEntries.length > 0 && (
           <div style={s.specsCard}>
-            <h2 style={s.specsTitle}>Specifications</h2>
-            <div style={s.specsGrid}>
-              {specEntries.map((sp, i) => (
-                <div key={i} style={s.specItem}>
-                  <div style={s.specIcon}><sp.icon size={20} /></div>
-                  <div>
-                    <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 2 }}>{sp.label}</div>
-                    <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>{sp.value}</div>
+            {isMobileSpecs ? (
+              <>
+                <button
+                  onClick={() => setIsSpecsOpen((prev) => !prev)}
+                  style={s.specsBannerBtn}
+                >
+                  <span>Specifications</span>
+                  {isSpecsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                </button>
+                <div
+                  style={{
+                    ...s.specsSlideWrap,
+                    maxHeight: isSpecsOpen ? 1500 : 0,
+                    opacity: isSpecsOpen ? 1 : 0,
+                    marginTop: isSpecsOpen ? 16 : 0,
+                  }}
+                >
+                  <div style={s.specsGrid}>
+                    {specEntries.map((sp, i) => (
+                      <div key={i} style={s.specItem}>
+                        <div style={s.specIcon}><sp.icon size={20} /></div>
+                        <div>
+                          <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 2 }}>{sp.label}</div>
+                          <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>{sp.value}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <>
+                <h2 style={s.specsTitle}>Specifications</h2>
+                <div style={s.specsGrid}>
+                  {specEntries.map((sp, i) => (
+                    <div key={i} style={s.specItem}>
+                      <div style={s.specIcon}><sp.icon size={20} /></div>
+                      <div>
+                        <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 2 }}>{sp.label}</div>
+                        <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>{sp.value}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -1042,12 +1270,47 @@ const s = {
   wishBtn: { width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', color: '#64748b', transition: 'all .2s' },
   trustRow: { display: 'flex', gap: 20, marginTop: 8, flexWrap: 'wrap' },
   trustItem: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#475569', fontWeight: 500 },
-  specsCard: { marginTop: 28, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  specsCard: {
+    marginTop: 28,
+    background: '#fff',
+    border: '1px solid #e2e8f0',
+    borderRadius: 16,
+    padding: 28,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+  },
   specsTitle: { fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 20, margin: '0 0 20px' },
+  specsBannerBtn: {
+    width: '100%',
+    border: '1px solid #e2e8f0',
+    borderRadius: 10,
+    padding: '11px 14px',
+    background: '#f8fafc',
+    color: '#1e293b',
+    fontSize: 18,
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    cursor: 'pointer',
+  },
+  specsSlideWrap: {
+    overflow: 'hidden',
+    transition: 'max-height 0.35s ease, opacity 0.25s ease, margin-top 0.25s ease',
+  },
   specsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 },
   specItem: { display: 'flex', gap: 12, alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: 10, border: '1px solid #f1f5f9' },
   specIcon: { width: 40, height: 40, borderRadius: 10, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F97316', flexShrink: 0 },
   reviewsCard: { marginTop: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  qaCard: { marginTop: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 22, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  qaHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  qaCount: { fontSize: 12, fontWeight: 700, color: '#64748b', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 10px' },
+  qaNotif: { display: 'flex', alignItems: 'center', gap: 7, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '8px 10px', borderRadius: 10, marginBottom: 10, fontSize: 12, fontWeight: 600 },
+  qaAskBox: { display: 'grid', gap: 8, marginTop: 12 },
+  qaInput: { width: '100%', minHeight: 92, border: '1.5px solid #d1d5db', borderRadius: 10, padding: '10px 12px', fontSize: 14, outline: 'none', fontFamily: 'inherit', resize: 'vertical' },
+  qaAskBtn: { width: 'fit-content', display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none', borderRadius: 9, background: '#F97316', color: '#fff', fontWeight: 700, padding: '9px 14px', cursor: 'pointer' },
+  qaItem: { border: '1px solid #f1f5f9', background: '#f8fafc', borderRadius: 10, padding: '10px 12px', display: 'grid', gap: 5 },
+  qaAnswer: { borderLeft: '3px solid #2563eb', background: '#eff6ff', padding: '8px 10px', borderRadius: 8, color: '#111827', fontSize: 13, lineHeight: 1.55, display: 'grid', gap: 4, marginTop: 6 },
+  qaList: { display: 'grid', gap: 10, maxHeight: 420, overflowY: 'auto', paddingRight: 4 },
   reviewRow: { border: '1px solid #f1f5f9', borderRadius: 12, padding: '12px 14px', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 8 },
   /* "You May Also Like" styles */
   alsoLikeSection: { marginTop: 28, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '28px 40px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
@@ -1105,6 +1368,11 @@ const spinnerCSS = `
   .reviews-scroll::-webkit-scrollbar-thumb { background: #fed7aa; border-radius: 4px; }
   .reviews-scroll::-webkit-scrollbar-thumb:hover { background: #F97316; }
   .reviews-scroll { scrollbar-width: thin; scrollbar-color: #fed7aa #f1f5f9; }
+  .qa-scroll::-webkit-scrollbar { width: 5px; }
+  .qa-scroll::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 4px; }
+  .qa-scroll::-webkit-scrollbar-thumb { background: #bfdbfe; border-radius: 4px; }
+  .qa-scroll::-webkit-scrollbar-thumb:hover { background: #60a5fa; }
+  .qa-scroll { scrollbar-width: thin; scrollbar-color: #bfdbfe #e2e8f0; }
 
   /* ── Responsive ── */
   @media (max-width: 768px) {
@@ -1115,15 +1383,31 @@ const spinnerCSS = `
     .pd-image-card img {
       height: 280px !important;
     }
+    .price-insights-wrap {
+      padding: 14px !important;
+      border-radius: 14px !important;
+    }
+    .price-chart-box {
+      height: 220px !important;
+    }
   }
   @media (max-width: 480px) {
     .pd-image-card img {
       height: 220px !important;
     }
+    .price-insights-wrap {
+      margin-top: 18px !important;
+    }
+    .price-chart-box {
+      height: 200px !important;
+    }
   }
   @media (max-width: 640px) {
     .also-grid > a {
       flex: 0 0 calc(50% - 8px) !important;
+    }
+    .price-insights-wrap button {
+      padding: 10px 12px !important;
     }
   }
 `;
