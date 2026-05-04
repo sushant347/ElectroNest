@@ -576,7 +576,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
   const [paymentDetails, setPaymentDetails] = useState({
     esewaPhone: '', esewaPin: '',
     khaltiPhone: '', khaltiPin: '',
-    bankName: '', bankMobileId: '', bankAccount: '',
+    bankName: '', bankMobile: '', bankCard: '', bankCvv: '',
   });
   const handlePaymentDetail = (e) => {
     const { name, value } = e.target;
@@ -589,7 +589,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
   const isPaymentFormValid = () => {
     if (paymentMethod === 'esewa') return isPhoneValid(paymentDetails.esewaPhone) && isPinValid(paymentDetails.esewaPin);
     if (paymentMethod === 'khalti') return isPhoneValid(paymentDetails.khaltiPhone) && isPinValid(paymentDetails.khaltiPin);
-    if (paymentMethod === 'bank') return paymentDetails.bankName.trim() && paymentDetails.bankMobileId.trim() && paymentDetails.bankAccount.trim().length >= 6;
+    if (paymentMethod === 'bank') return paymentDetails.bankName.trim() && isPhoneValid(paymentDetails.bankMobile) && paymentDetails.bankCard.replace(/\s/g, '').length >= 16 && paymentDetails.bankCvv.length === 3;
     return true; // COD needs no extra details
   };
 
@@ -1480,46 +1480,75 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                             <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 2 }}>✓ {paymentDetails.bankName}</span>
                           )}
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
                           <div style={s.formGroup}>
-                            <label style={s.label}>Mobile Banking ID *</label>
+                            <label style={s.label}>Mobile Number *</label>
                             <div style={{ position: 'relative' }}>
                               <input
-                                name="bankMobileId"
-                                placeholder="e.g. user123"
-                                value={paymentDetails.bankMobileId}
+                                name="bankMobile"
+                                placeholder="98XXXXXXXX"
+                                value={paymentDetails.bankMobile}
                                 onChange={handlePaymentDetail}
+                                maxLength={10}
                                 style={{
                                   ...s.input,
-                                  borderColor: paymentDetails.bankMobileId.trim() ? '#16a34a' : undefined,
+                                  borderColor: isPhoneValid(paymentDetails.bankMobile) ? '#16a34a' : undefined,
                                 }}
                               />
-                              {paymentDetails.bankMobileId.trim() && (
+                              {isPhoneValid(paymentDetails.bankMobile) && (
                                 <CheckCircle size={16} color="#16a34a" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
                               )}
                             </div>
                           </div>
-                          <div style={s.formGroup}>
-                            <label style={s.label}>Account Number *</label>
-                            <div style={{ position: 'relative' }}>
-                              <input
-                                name="bankAccount"
-                                placeholder="XXXXXXXXXXXX"
-                                value={paymentDetails.bankAccount}
-                                onChange={handlePaymentDetail}
-                                style={{
-                                  ...s.input,
-                                  fontFamily: 'monospace', letterSpacing: '0.05em',
-                                  borderColor: paymentDetails.bankAccount.trim().length >= 6 ? '#16a34a' : undefined,
-                                }}
-                              />
-                              {paymentDetails.bankAccount.trim().length >= 6 && (
-                                <CheckCircle size={16} color="#16a34a" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
-                              )}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 14 }}>
+                            <div style={s.formGroup}>
+                              <label style={s.label}>Credit Card Number *</label>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  name="bankCard"
+                                  placeholder="XXXX XXXX XXXX XXXX"
+                                  value={paymentDetails.bankCard}
+                                  onChange={(e) => {
+                                    let v = e.target.value.replace(/\D/g, '');
+                                    v = v.replace(/(.{4})/g, '$1 ').trim();
+                                    handlePaymentDetail({ target: { name: 'bankCard', value: v } });
+                                  }}
+                                  maxLength={19}
+                                  style={{
+                                    ...s.input,
+                                    fontFamily: 'monospace', letterSpacing: '0.05em',
+                                    borderColor: paymentDetails.bankCard.replace(/\s/g, '').length >= 16 ? '#16a34a' : undefined,
+                                  }}
+                                />
+                                {paymentDetails.bankCard.replace(/\s/g, '').length >= 16 && (
+                                  <CheckCircle size={16} color="#16a34a" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                                )}
+                              </div>
                             </div>
-                            {paymentDetails.bankAccount.length > 0 && paymentDetails.bankAccount.length < 6 && (
-                              <span style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>Minimum 6 characters</span>
-                            )}
+                            <div style={s.formGroup}>
+                              <label style={s.label}>CVV (PIN) *</label>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  name="bankCvv"
+                                  placeholder="123"
+                                  type="password"
+                                  value={paymentDetails.bankCvv}
+                                  onChange={(e) => {
+                                    const v = e.target.value.replace(/\D/g, '');
+                                    handlePaymentDetail({ target: { name: 'bankCvv', value: v } });
+                                  }}
+                                  maxLength={3}
+                                  style={{
+                                    ...s.input,
+                                    letterSpacing: '0.2em', textAlign: 'center',
+                                    borderColor: paymentDetails.bankCvv.length === 3 ? '#16a34a' : undefined,
+                                  }}
+                                />
+                                {paymentDetails.bankCvv.length === 3 && (
+                                  <CheckCircle size={16} color="#16a34a" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>

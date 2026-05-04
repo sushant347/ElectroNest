@@ -8,6 +8,7 @@ import {
 
 import { customerAPI } from '../../services/api';
 import { HeaderSkeleton, CardGridSkeleton, SkeletonText } from '../../components/Common/SkeletonLoader';
+import Plot from 'react-plotly.js';
 
 const formatPrice = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p);
 
@@ -46,8 +47,6 @@ function StarRow({ rating, size = 16, color = '#FBBF24' }) {
     </>
   );
 }
-
-import Plot from 'react-plotly.js';
 
 /* ── Price Comparison Chart ── */
 function PriceComparisonChart({ productId }) {
