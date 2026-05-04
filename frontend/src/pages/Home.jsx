@@ -109,7 +109,6 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   const [selStores, setSelStores] = useState([])
   const allBrands = [...new Set(prods.map(p => (p.brand || p.Brand || '')).filter(Boolean))].sort()
   const allStores = [...new Set(prods.map(p => (p.owner_name || p.OwnerName || '').trim()).filter(Boolean))].sort()
-  const toggleBrand = (b) => setSelBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
   const clearFilters = () => { setMinPrice(''); setMaxPrice(''); setSortBy(''); setSelBrands([]); setSelStores([]) }
   const hasFilters = minPrice || maxPrice || sortBy || selBrands.length > 0 || selStores.length > 0
 

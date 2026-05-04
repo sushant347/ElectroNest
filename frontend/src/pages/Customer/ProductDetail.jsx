@@ -56,6 +56,7 @@ function PriceComparisonChart({ productId }) {
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     customerAPI.getPriceHistory(productId)
       .then(res => { if (!cancelled) setData(res.data); })
