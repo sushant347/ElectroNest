@@ -210,3 +210,51 @@ CREATE TABLE AuditLog (
 	UserID INT NOT NULL,
 	Timestamp DATETIME NOT NULL DEFAULT GETDATE()
 );
+
+GO
+
+/* ── Performance Indexes (SQL Server) ── */
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_products_category' AND object_id = OBJECT_ID('Products'))
+	CREATE INDEX idx_products_category ON Products (CategoryID);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_products_brand' AND object_id = OBJECT_ID('Products'))
+	CREATE INDEX idx_products_brand ON Products (Brand);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_products_owner' AND object_id = OBJECT_ID('Products'))
+	CREATE INDEX idx_products_owner ON Products (OwnerName);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_products_units_sold' AND object_id = OBJECT_ID('Products'))
+	CREATE INDEX idx_products_units_sold ON Products (UnitsSold DESC);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_products_selling_price' AND object_id = OBJECT_ID('Products'))
+	CREATE INDEX idx_products_selling_price ON Products (SellingPrice);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_reviews_product' AND object_id = OBJECT_ID('Reviews'))
+	CREATE INDEX idx_reviews_product ON Reviews (ProductID);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_reviews_customer' AND object_id = OBJECT_ID('Reviews'))
+	CREATE INDEX idx_reviews_customer ON Reviews (CustomerID);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_customer' AND object_id = OBJECT_ID('Orders'))
+	CREATE INDEX idx_orders_customer ON Orders (CustomerID);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_order_date' AND object_id = OBJECT_ID('Orders'))
+	CREATE INDEX idx_orders_order_date ON Orders (OrderDate);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_status' AND object_id = OBJECT_ID('Orders'))
+	CREATE INDEX idx_orders_status ON Orders (OrderStatusID);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orderdetails_order' AND object_id = OBJECT_ID('OrderDetails'))
+	CREATE INDEX idx_orderdetails_order ON OrderDetails (OrderID);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orderdetails_product' AND object_id = OBJECT_ID('OrderDetails'))
+	CREATE INDEX idx_orderdetails_product ON OrderDetails (ProductID);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_cart_customer' AND object_id = OBJECT_ID('Cart'))
+	CREATE INDEX idx_cart_customer ON Cart (CustomerID);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_wishlist_customer' AND object_id = OBJECT_ID('Whishlist'))
+	CREATE INDEX idx_wishlist_customer ON Whishlist (CustomerID);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_payments_order' AND object_id = OBJECT_ID('Payments'))
+	CREATE INDEX idx_payments_order ON Payments (OrderID);
