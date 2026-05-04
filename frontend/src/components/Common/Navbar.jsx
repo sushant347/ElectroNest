@@ -27,6 +27,9 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
   const catRef = useRef(null)
   const debouncRef = useRef(null)
   const catDbRef = useRef(null)
+  const suggReqRef = useRef(0)
+  const catReqRef = useRef(0)
+  const suggListId = 'nav-suggestions'
   const location = useLocation()
   const navigate = useNavigate()
   const { logout } = useAuth()
@@ -42,9 +45,11 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
   useEffect(() => {
     if (!hovCat) return
     if (catDbRef.current) clearTimeout(catDbRef.current)
+    const requestId = ++catReqRef.current
     catDbRef.current = setTimeout(async () => {
       try {
         const res = await customerAPI.getProducts({ category: hovCat.id, page_size: 6 })
+        if (requestId !== catReqRef.current) return
         setCatProds((res.data?.results || res.data || []).slice(0, 6))
       } catch { setCatProds([]) }
     }, 200)
@@ -66,9 +71,11 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
     if (debouncRef.current) clearTimeout(debouncRef.current)
     const trimmed = query.trim()
     if (!trimmed || trimmed.length < 2) { setSuggestions([]); setShowSugg(false); return }
+    const requestId = ++suggReqRef.current
     debouncRef.current = setTimeout(async () => {
       try {
         const res = await customerAPI.getProducts({ search: trimmed, page_size: 10 })
+        if (requestId !== suggReqRef.current) return
         const all = res.data?.results || res.data || []
         // sort: exact name starts-with first, then contains, then rest
         const q = trimmed.toLowerCase()
@@ -162,16 +169,30 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
                 placeholder="Search products, brands and more..."
                 onFocus={() => { setSearchFocused(true); if (suggestions.length > 0) setShowSugg(true) }}
                 onBlur={() => setSearchFocused(false)}
+                role="combobox"
+                aria-label="Search products"
+                aria-autocomplete="list"
+                aria-expanded={showSugg}
+                aria-controls={suggListId}
+                aria-activedescendant={activeSugg >= 0 ? `${suggListId}-${activeSugg}` : undefined}
               />
               {searchVal && (
-                <button type="button" className="nb-srch-clr" onClick={() => { setSearchVal(''); setSuggestions([]); setShowSugg(false) }}>✕</button>
+                <button type="button" className="nb-srch-clr" aria-label="Clear search" onClick={() => { setSearchVal(''); setSuggestions([]); setShowSugg(false) }}>✕</button>
               )}
-              <button type="submit" className="nb-srch-btn"><FiSearch size={18} /></button>
+              <button type="submit" className="nb-srch-btn" aria-label="Search"><FiSearch size={18} /></button>
             </form>
             {showSugg && suggestions.length > 0 && (
-              <div className="nb-suggs">
+              <div className="nb-suggs" id={suggListId} role="listbox" aria-label="Search suggestions">
                 {suggestions.map((p, i) => (
-                  <div key={p.id} className={`nb-sugg${i === activeSugg ? ' hi' : ''}`} onMouseDown={() => onSuggClick(p)} onMouseEnter={() => setActiveSugg(i)}>
+                  <div
+                    key={p.id}
+                    id={`${suggListId}-${i}`}
+                    role="option"
+                    aria-selected={i === activeSugg}
+                    className={`nb-sugg${i === activeSugg ? ' hi' : ''}`}
+                    onMouseDown={() => onSuggClick(p)}
+                    onMouseEnter={() => setActiveSugg(i)}
+                  >
                     <div className="nb-sugg-img">{p.image ? <img src={p.image} alt={p.name} /> : <FiSearch size={13} />}</div>
                     <div className="nb-sugg-info">
                       <span className="nb-sugg-nm">{highlight(p.name, searchVal)}</span>
@@ -194,24 +215,24 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
           {/* Actions */}
           <div className="nb-acts">
             {/* Compare icon — mobile: always visible left of wishlist */}
-            <Link to="/compare" className={`nb-act nb-cmp-mobile${compareCount > 0 ? ' on' : ''}`}>
+            <Link to="/compare" className={`nb-act nb-cmp-mobile${compareCount > 0 ? ' on' : ''}`} aria-label="Compare">
               <FiBarChart2 size={20} />
               {compareCount > 0 && <span className="nb-bdg">{compareCount}</span>}
             </Link>
             {/* Compare — desktop only, logged-in only */}
             {user && (
-              <Link to="/compare" className={`nb-act nb-cmp-desktop${compareCount > 0 ? ' on' : ''}`}>
+              <Link to="/compare" className={`nb-act nb-cmp-desktop${compareCount > 0 ? ' on' : ''}`} aria-label="Compare">
                 <FiBarChart2 size={20} />
                 <span className="nb-act-lbl">Compare</span>
                 {compareCount > 0 && <span className="nb-bdg">{compareCount}</span>}
               </Link>
             )}
-            <Link to="/wishlist" className={`nb-act${wishlistCount > 0 ? ' on' : ''}`}>
+            <Link to="/wishlist" className={`nb-act${wishlistCount > 0 ? ' on' : ''}`} aria-label="Wishlist">
               <FiHeart size={20} style={wishlistCount > 0 ? { fill: '#fff', stroke: '#fff' } : {}} />
               <span className="nb-act-lbl">Wishlist</span>
               {wishlistCount > 0 && <span className="nb-bdg">{wishlistCount}</span>}
             </Link>
-            <Link to="/cart" className="nb-act">
+            <Link to="/cart" className="nb-act" aria-label="Cart">
               <FiShoppingCart size={20} />
               <span className="nb-act-lbl">Cart</span>
               {cartCount > 0 && <span className="nb-bdg">{cartCount}</span>}
@@ -220,12 +241,19 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
             {user ? (
               <>
                 {(user.role === 'owner' || user.role === 'warehouse' || user.role === 'admin') && (
-                  <Link to={user.role === 'owner' ? '/owner/dashboard' : user.role === 'warehouse' ? '/warehouse/dashboard' : '/admin/dashboard'} className="nb-act nb-dash">
+                  <Link to={user.role === 'owner' ? '/owner/dashboard' : user.role === 'warehouse' ? '/warehouse/dashboard' : '/admin/dashboard'} className="nb-act nb-dash" aria-label="Dashboard">
                     <FiGrid size={18} /><span className="nb-act-lbl">Dashboard</span>
                   </Link>
                 )}
                 <div className="nb-prof" ref={profileRef}>
-                  <button className="nb-sign-btn nb-sign-icon" onClick={() => setProfileOpen(p => !p)}>
+                  <button
+                    className="nb-sign-btn nb-sign-icon"
+                    type="button"
+                    aria-label="Open user menu"
+                    aria-haspopup="menu"
+                    aria-expanded={profileOpen}
+                    onClick={() => setProfileOpen(p => !p)}
+                  >
                     <FiUser size={18} />
                   </button>
                   {profileOpen && (
@@ -256,7 +284,13 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
 
           {/* Categories Mega Dropdown */}
           <div className="nb-cat-wrap" ref={catRef} onMouseEnter={() => setCatOpen(true)} onMouseLeave={() => setCatOpen(false)}>
-            <button className={`nb-cat-btn${catOpen ? ' open' : ''}`} onClick={() => setCatOpen(p => !p)}>
+            <button
+              className={`nb-cat-btn${catOpen ? ' open' : ''}`}
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={catOpen}
+              onClick={() => setCatOpen(p => !p)}
+            >
               <FiMenu size={16} />
               <span>Categories</span>
               <FiChevronDown size={13} style={{ transition: 'transform .2s', transform: catOpen ? 'rotate(180deg)' : '' }} />
@@ -281,7 +315,14 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
                     <>
                       <div className="nb-mega-rhdr">
                         <span className="nb-mega-rtitle">{hovCat.name}</span>
-                        <button className="nb-mega-vall" onClick={() => { navigate(`/?cat=${encodeURIComponent(hovCat.name)}`); setCatOpen(false) }}>View All →</button>
+                        <button
+                          className="nb-mega-vall"
+                          type="button"
+                          aria-label={`View all ${hovCat.name} products`}
+                          onClick={() => { navigate(`/?cat=${encodeURIComponent(hovCat.name)}`); setCatOpen(false) }}
+                        >
+                          View All →
+                        </button>
                       </div>
                       <div className="nb-mega-pgrid">
                         {catProds.length > 0 ? catProds.map(p => (

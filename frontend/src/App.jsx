@@ -1,57 +1,60 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { Routes, Route, useLocation, Link, Navigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import './App.css'
 import Navbar from './components/Common/Navbar'
 import Footer from './components/Common/Footer'
 import ProtectedRoute from './components/Common/ProtectedRoute'
+import { CenteredSkeleton } from './components/Common/SkeletonLoader'
+import ErrorBoundary from './components/Common/ErrorBoundary'
 import { useAuth } from './context/AuthContext'
 import { customerAPI } from './services/api'
-import Home from './pages/Home'
-import AboutUs from './pages/AboutUs'
-import Wishlist from './pages/Customer/Wishlist'
-import Cart from './pages/Customer/Cart'
-import Login from './pages/Customer/Login'
-import Checkout from './pages/Customer/Checkout'
-import Compare from './pages/Customer/Compare'
-import Profile from './pages/Customer/Profile'
-import MyOrders from './pages/Customer/MyOrders'
-import MyReviews from './pages/Customer/MyReviews'
-import ProductDetail from './pages/Customer/ProductDetail'
+
+const Home = lazy(() => import('./pages/Home'))
+const AboutUs = lazy(() => import('./pages/AboutUs'))
+const Wishlist = lazy(() => import('./pages/Customer/Wishlist'))
+const Cart = lazy(() => import('./pages/Customer/Cart'))
+const Login = lazy(() => import('./pages/Customer/Login'))
+const Checkout = lazy(() => import('./pages/Customer/Checkout'))
+const Compare = lazy(() => import('./pages/Customer/Compare'))
+const Profile = lazy(() => import('./pages/Customer/Profile'))
+const MyOrders = lazy(() => import('./pages/Customer/MyOrders'))
+const MyReviews = lazy(() => import('./pages/Customer/MyReviews'))
+const ProductDetail = lazy(() => import('./pages/Customer/ProductDetail'))
 
 // Owner Pages
-import OwnerDashboard from './pages/Owner/Dashboard'
-import ProductManagement from './pages/Owner/ProductManagement'
-import OrderManagement from './pages/Owner/OrderManagement'
-import Analytics from './pages/Owner/Analytics'
-import CouponManagement from './pages/Owner/CouponManagement'
-import OwnerLayout from './components/Owner/OwnerLayout'
+const OwnerDashboard = lazy(() => import('./pages/Owner/Dashboard'))
+const ProductManagement = lazy(() => import('./pages/Owner/ProductManagement'))
+const OrderManagement = lazy(() => import('./pages/Owner/OrderManagement'))
+const Analytics = lazy(() => import('./pages/Owner/Analytics'))
+const CouponManagement = lazy(() => import('./pages/Owner/CouponManagement'))
+const OwnerLayout = lazy(() => import('./components/Owner/OwnerLayout'))
 
 // Warehouse Pages
-import WarehouseDashboard from './pages/Warehouse/Dashboard'
-import InventoryManagement from './pages/Warehouse/InventoryManagement'
-import StockMovements from './pages/Warehouse/StockMovements'
-import LowStockAlerts from './pages/Warehouse/LowStockAlerts'
-import WarehouseLayout from './components/warehouse/WarehouseLayout'
+const WarehouseDashboard = lazy(() => import('./pages/Warehouse/Dashboard'))
+const InventoryManagement = lazy(() => import('./pages/Warehouse/InventoryManagement'))
+const StockMovements = lazy(() => import('./pages/Warehouse/StockMovements'))
+const LowStockAlerts = lazy(() => import('./pages/Warehouse/LowStockAlerts'))
+const WarehouseLayout = lazy(() => import('./components/warehouse/WarehouseLayout'))
 
 // Admin Pages
-import AdminDashboard from './pages/Admin/Dashboard'
-import UserManagement from './pages/Admin/UserManagement'
-import StoreManagement from './pages/Admin/StoreManagement'
-import AdminCoupons from './pages/Admin/AdminCoupons'
-import SystemLogs from './pages/Admin/SystemLogs'
-import AnalyticsSummary from './pages/Admin/AnalyticsSummary'
-import UserQueries from './pages/Admin/UserQueries'
-import AdminLayout from './components/admin/AdminLayout'
+const AdminDashboard = lazy(() => import('./pages/Admin/Dashboard'))
+const UserManagement = lazy(() => import('./pages/Admin/UserManagement'))
+const StoreManagement = lazy(() => import('./pages/Admin/StoreManagement'))
+const AdminCoupons = lazy(() => import('./pages/Admin/AdminCoupons'))
+const SystemLogs = lazy(() => import('./pages/Admin/SystemLogs'))
+const AnalyticsSummary = lazy(() => import('./pages/Admin/AnalyticsSummary'))
+const UserQueries = lazy(() => import('./pages/Admin/UserQueries'))
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'))
 
 // Support Pages
-import ContactUs from './pages/Support/ContactUs'
-import FAQ from './pages/Support/FAQ'
-import ShippingInfo from './pages/Support/ShippingInfo'
-import ReturnsExchanges from './pages/Support/ReturnsExchanges'
-import Warranty from './pages/Support/Warranty'
-import PrivacyPolicy from './pages/Support/PrivacyPolicy'
-import TermsOfService from './pages/Support/TermsOfService'
+const ContactUs = lazy(() => import('./pages/Support/ContactUs'))
+const FAQ = lazy(() => import('./pages/Support/FAQ'))
+const ShippingInfo = lazy(() => import('./pages/Support/ShippingInfo'))
+const ReturnsExchanges = lazy(() => import('./pages/Support/ReturnsExchanges'))
+const Warranty = lazy(() => import('./pages/Support/Warranty'))
+const PrivacyPolicy = lazy(() => import('./pages/Support/PrivacyPolicy'))
+const TermsOfService = lazy(() => import('./pages/Support/TermsOfService'))
 
 /** Redirect already-logged-in users away from /login to their role dashboard */
 function LoginRoute() {
@@ -457,65 +460,69 @@ export default function App() {
         <Navbar cartCount={cartItems.reduce((acc, item) => acc + item.quantity, 0)} wishlistCount={wishlistItems.length} compareCount={compareItems.length} user={user} />
       )}
       <main className={hideCustomerChrome ? '' : 'main-content'}>
-        <Routes>
-          {/* Public routes — accessible to everyone (including non-logged-in) */}
-          <Route path="/" element={<HomeRoute addToCart={addToCart} toggleWishlist={toggleWishlist} wishlistItems={wishlistItems} toggleCompare={toggleCompare} compareItems={compareItems} />} />
-          <Route path="/product/:id" element={<ProductDetail addToCart={addToCart} toggleWishlist={toggleWishlist} wishlistItems={wishlistItems} />} />
-          <Route path="/login" element={<LoginRoute />} />
-          <Route path="/about" element={<AboutUs />} />
+        <ErrorBoundary>
+          <Suspense fallback={<CenteredSkeleton minHeight="60vh" />}>
+            <Routes>
+              {/* Public routes — accessible to everyone (including non-logged-in) */}
+              <Route path="/" element={<HomeRoute addToCart={addToCart} toggleWishlist={toggleWishlist} wishlistItems={wishlistItems} toggleCompare={toggleCompare} compareItems={compareItems} />} />
+              <Route path="/product/:id" element={<ProductDetail addToCart={addToCart} toggleWishlist={toggleWishlist} wishlistItems={wishlistItems} />} />
+              <Route path="/login" element={<LoginRoute />} />
+              <Route path="/about" element={<AboutUs />} />
 
-          {/* Customer-only routes */}
-          <Route path="/wishlist" element={<ProtectedRoute allowedRoles={['customer']}><Wishlist items={wishlistItems} removeFromWishlist={removeFromWishlist} addToCart={addToCart} clearWishlist={clearWishlist} moveAllToCart={moveAllToCart} buyNowFromWishlist={buyNowFromWishlist} /></ProtectedRoute>} />
-          <Route path="/cart" element={<ProtectedRoute allowedRoles={['customer']}><Cart cartItems={cartItems} updateCartQuantity={updateCartQuantity} removeFromCart={removeFromCart} clearCart={clearCart} checkoutSelection={checkoutSelection} setCheckoutItems={setCheckoutItems} /></ProtectedRoute>} />
-          <Route path="/compare" element={<ProtectedRoute allowedRoles={['customer']}><Compare items={compareItems} removeFromCompare={removeFromCompare} addToCart={addToCart} /></ProtectedRoute>} />
-          <Route path="/checkout" element={<ProtectedRoute allowedRoles={['customer']}><Checkout cartItems={cartItems} selectedIds={checkoutSelection} onPaymentSuccess={removePurchasedFromCart} /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute allowedRoles={['customer', 'owner', 'warehouse', 'admin']}><Profile /></ProtectedRoute>} />
-          <Route path="/orders" element={<ProtectedRoute allowedRoles={['customer']}><MyOrders /></ProtectedRoute>} />
-          <Route path="/reviews" element={<ProtectedRoute allowedRoles={['customer']}><MyReviews /></ProtectedRoute>} />
+              {/* Customer-only routes */}
+              <Route path="/wishlist" element={<ProtectedRoute allowedRoles={['customer']}><Wishlist items={wishlistItems} removeFromWishlist={removeFromWishlist} addToCart={addToCart} clearWishlist={clearWishlist} moveAllToCart={moveAllToCart} buyNowFromWishlist={buyNowFromWishlist} /></ProtectedRoute>} />
+              <Route path="/cart" element={<ProtectedRoute allowedRoles={['customer']}><Cart cartItems={cartItems} updateCartQuantity={updateCartQuantity} removeFromCart={removeFromCart} clearCart={clearCart} checkoutSelection={checkoutSelection} setCheckoutItems={setCheckoutItems} /></ProtectedRoute>} />
+              <Route path="/compare" element={<ProtectedRoute allowedRoles={['customer']}><Compare items={compareItems} removeFromCompare={removeFromCompare} addToCart={addToCart} /></ProtectedRoute>} />
+              <Route path="/checkout" element={<ProtectedRoute allowedRoles={['customer']}><Checkout cartItems={cartItems} selectedIds={checkoutSelection} onPaymentSuccess={removePurchasedFromCart} /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute allowedRoles={['customer', 'owner', 'warehouse', 'admin']}><Profile /></ProtectedRoute>} />
+              <Route path="/orders" element={<ProtectedRoute allowedRoles={['customer']}><MyOrders /></ProtectedRoute>} />
+              <Route path="/reviews" element={<ProtectedRoute allowedRoles={['customer']}><MyReviews /></ProtectedRoute>} />
 
-          {/* Support Routes */}
-          <Route path="/support/contact" element={<ContactUs />} />
-          <Route path="/support/faq" element={<FAQ />} />
-          <Route path="/support/shipping" element={<ShippingInfo />} />
-          <Route path="/support/returns" element={<ReturnsExchanges />} />
-          <Route path="/support/warranty" element={<Warranty />} />
-          <Route path="/support/privacy" element={<PrivacyPolicy />} />
-          <Route path="/support/terms" element={<TermsOfService />} />
+              {/* Support Routes */}
+              <Route path="/support/contact" element={<ContactUs />} />
+              <Route path="/support/faq" element={<FAQ />} />
+              <Route path="/support/shipping" element={<ShippingInfo />} />
+              <Route path="/support/returns" element={<ReturnsExchanges />} />
+              <Route path="/support/warranty" element={<Warranty />} />
+              <Route path="/support/privacy" element={<PrivacyPolicy />} />
+              <Route path="/support/terms" element={<TermsOfService />} />
 
-          {/* Owner Routes */}
-          <Route path="/owner" element={<ProtectedRoute allowedRoles={['owner']}><OwnerLayout /></ProtectedRoute>}>
-            <Route path="dashboard" element={<OwnerDashboard />} />
-            <Route path="products" element={<ProductManagement />} />
-            <Route path="orders" element={<OrderManagement />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="coupons" element={<CouponManagement />} />
-          </Route>
+              {/* Owner Routes */}
+              <Route path="/owner" element={<ProtectedRoute allowedRoles={['owner']}><OwnerLayout /></ProtectedRoute>}>
+                <Route path="dashboard" element={<OwnerDashboard />} />
+                <Route path="products" element={<ProductManagement />} />
+                <Route path="orders" element={<OrderManagement />} />
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="coupons" element={<CouponManagement />} />
+              </Route>
 
-          {/* Warehouse Routes */}
-          <Route path="/warehouse" element={<ProtectedRoute allowedRoles={['warehouse']}><WarehouseLayout /></ProtectedRoute>}>
-            <Route path="dashboard" element={<WarehouseDashboard />} />
-            <Route path="inventory" element={<InventoryManagement />} />
-            <Route path="stock-movements" element={<StockMovements />} />
-            <Route path="low-stock-alerts" element={<LowStockAlerts />} />
-          </Route>
+              {/* Warehouse Routes */}
+              <Route path="/warehouse" element={<ProtectedRoute allowedRoles={['warehouse']}><WarehouseLayout /></ProtectedRoute>}>
+                <Route path="dashboard" element={<WarehouseDashboard />} />
+                <Route path="inventory" element={<InventoryManagement />} />
+                <Route path="stock-movements" element={<StockMovements />} />
+                <Route path="low-stock-alerts" element={<LowStockAlerts />} />
+              </Route>
 
-          {/* Admin Routes */}
-          <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
-            <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="users" element={<UserManagement />} />
-            <Route path="stores" element={<StoreManagement />} />
-            <Route path="coupons" element={<AdminCoupons />} />
-            <Route path="logs" element={<SystemLogs />} />
-            <Route path="queries" element={<UserQueries />} />
-            <Route path="analytics" element={<AnalyticsSummary />} />
-          </Route>
+              {/* Admin Routes */}
+              <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="users" element={<UserManagement />} />
+                <Route path="stores" element={<StoreManagement />} />
+                <Route path="coupons" element={<AdminCoupons />} />
+                <Route path="logs" element={<SystemLogs />} />
+                <Route path="queries" element={<UserQueries />} />
+                <Route path="analytics" element={<AnalyticsSummary />} />
+              </Route>
 
-          {/* Catch-all — redirect to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+              {/* Catch-all — redirect to home */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </main>
       {!hideCustomerChrome && <Footer />}
-      <div className="toast-container">
+      <div className="toast-container" role="status" aria-live="polite">
         {toasts.map(t => (
           <div key={t.id} className={`toast-message${t.type === 'cart' ? ' toast-cart' : ''}${t.type === 'wishlist-add' || t.type === 'wishlist-remove' ? ' toast-wishlist' : ''}`}>
             {t.type === 'warning' ? (
@@ -530,7 +537,7 @@ export default function App() {
             ) : (
               <>
                 {t.product.image
-                  ? <img src={t.product.image} alt="" className="toast-img" />
+                  ? <img src={t.product.image} alt={t.product.name || 'Product image'} className="toast-img" />
                   : <div className="toast-img toast-img-placeholder" />}
                 <div className="toast-info">
                   <span className="toast-name" title={t.product.name}>{t.product.name}</span>
