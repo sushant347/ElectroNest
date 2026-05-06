@@ -11,7 +11,6 @@ from orders.models import Order, OrderDetail
 from products.models import Product, Category, Customer
 from accounts.models import CustomUser
 
-from .ml_services import get_customer_rfm, get_demand_forecast, get_product_recommendations, get_comprehensive_forecast, get_churn_prediction, get_dynamic_pricing
 from .jobs import enqueue_job, get_job
 
 
@@ -334,6 +333,8 @@ class CustomerSegmentationView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
     def get(self, request):
+        from .ml_services import get_customer_rfm
+
         days = int(request.query_params.get('days', 90))
         include_meta = _wants_meta(request)
         if _wants_async(request):
@@ -347,6 +348,8 @@ class DemandForecastView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
     def get(self, request, product_id):
+        from .ml_services import get_demand_forecast
+
         history = int(request.query_params.get('history', 30))
         forecast = int(request.query_params.get('forecast', 7))
         if _wants_async(request):
@@ -360,6 +363,8 @@ class ProductRecommendationsView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
     def get(self, request, product_id):
+        from .ml_services import get_product_recommendations
+
         limit = int(request.query_params.get('limit', 5))
         include_meta = _wants_meta(request)
         if _wants_async(request):
@@ -374,6 +379,8 @@ class ComprehensiveForecastView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
     def get(self, request, product_id):
+        from .ml_services import get_comprehensive_forecast
+
         days = int(request.query_params.get('days', 30))
         forecast_days = int(request.query_params.get('forecast_days', 7))
         if _wants_async(request):
@@ -460,6 +467,8 @@ class ChurnPredictionView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
     def get(self, request):
+        from .ml_services import get_churn_prediction
+
         days = int(request.query_params.get('days', 90))
         threshold = int(request.query_params.get('threshold', 30))
         if _wants_async(request):
@@ -474,6 +483,8 @@ class DynamicPricingView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
     def get(self, request, product_id):
+        from .ml_services import get_dynamic_pricing
+
         if _wants_async(request):
             job_id = enqueue_job('dynamic_pricing', get_dynamic_pricing, product_id)
             return Response({'job_id': job_id, 'status': 'queued'})

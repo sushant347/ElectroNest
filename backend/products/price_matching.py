@@ -8,8 +8,6 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from rapidfuzz import fuzz
-from sentence_transformers import SentenceTransformer
-from sentence_transformers.util import cos_sim
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +68,10 @@ def extract_features(product_name: str) -> dict[str, str | None]:
     return features.to_dict()
 
 
-def _get_embedding_model() -> SentenceTransformer:
+def _get_embedding_model() -> Any:
     """Lazy-load the transformer model to avoid import-time overhead."""
+    from sentence_transformers import SentenceTransformer
+
     model = cache.get("price_matching_embedding_model")
     if model is None:
         model = SentenceTransformer(EMBEDDING_MODEL_NAME)
@@ -107,6 +107,8 @@ def compute_final_score(
     source_features: dict[str, str | None],
     candidate_features: dict[str, str | None],
 ) -> float:
+    from sentence_transformers.util import cos_sim
+
     source_embedding = get_embedding(source_name)
     candidate_embedding = get_embedding(candidate_name)
     embedding_similarity = float(cos_sim(source_embedding, candidate_embedding).item())
