@@ -151,7 +151,21 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
           ...(searchQ ? { search: searchQ } : {}),
         }
         const allRes = await customerAPI.getProducts(productParams)
-        setProds(getArrayData(allRes.data))
+        let loadedProducts = getArrayData(allRes.data)
+
+        if (!activeCategory && !searchQ) {
+          const priorityCategories = catData.filter(cat => /smart\s*phones?|mobile|laptops?|notebooks?/i.test(cat.name || ''))
+          const priorityResults = await Promise.all(priorityCategories.map(cat =>
+            customerAPI.getProducts({ category: cat.id, page_size: 40 }).then(res => getArrayData(res.data)).catch(() => [])
+          ))
+          const byId = new Map()
+          ;[...loadedProducts, ...priorityResults.flat()].forEach(product => {
+            if (product?.id != null) byId.set(product.id, product)
+          })
+          loadedProducts = [...byId.values()]
+        }
+
+        setProds(loadedProducts)
 
         if (Object.keys(sideImgs).length === 0) {
           const imgs = {}
@@ -259,20 +273,42 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         if (!byStore[store]) byStore[store] = []
         byStore[store].push(p)
       })
+      const priorityOut = []
       const out = []
       const featuredNames = new Set()
-      Object.values(byStore).forEach(g => {
-        const topPerStore = []
-        for (const product of [...g].sort((a, b) => (b.sold - a.sold) || (b.price - a.price))) {
-          const key = productNameKey(product.name)
-          if (!key || featuredNames.has(key)) continue
-          featuredNames.add(key)
-          topPerStore.push(product)
-          if (topPerStore.length === 4) break
-        }
-        out.push(...topPerStore)
+      const perStoreCount = {}
+      const addFeatured = (product, target = out) => {
+        const store = (product.ownerName || '').trim() || 'Unknown Store'
+        const key = productNameKey(product.name)
+        if (!key || featuredNames.has(key) || (perStoreCount[store] || 0) >= 4) return false
+        featuredNames.add(key)
+        perStoreCount[store] = (perStoreCount[store] || 0) + 1
+        target.push(product)
+        return true
+      }
+      const priorityMatchers = [
+        (p) => /smart\s*phones?|mobile/i.test(`${p.category} ${p.name}`),
+        (p) => /laptops?|notebooks?/i.test(`${p.category} ${p.name}`),
+      ]
+      priorityMatchers.forEach(matchesPriority => {
+        const usedStoresForCategory = new Set()
+        ;[...n]
+          .filter(matchesPriority)
+          .sort((a, b) => (b.sold - a.sold) || (b.rating - a.rating) || (b.price - a.price))
+          .forEach(product => {
+            const store = (product.ownerName || '').trim() || 'Unknown Store'
+            if (usedStoresForCategory.has(store)) return
+            if (addFeatured(product, priorityOut)) usedStoresForCategory.add(store)
+          })
       })
-      items = out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price))
+      Object.values(byStore).forEach(g => {
+        for (const product of [...g].sort((a, b) => (b.sold - a.sold) || (b.price - a.price))) {
+          addFeatured(product)
+          const store = (product.ownerName || '').trim() || 'Unknown Store'
+          if ((perStoreCount[store] || 0) === 4) break
+        }
+      })
+      items = [...priorityOut, ...out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price))]
     }
 
     // ── Apply smart filters ──

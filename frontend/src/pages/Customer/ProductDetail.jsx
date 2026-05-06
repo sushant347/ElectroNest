@@ -66,12 +66,17 @@ function PriceComparisonChart({ productId }) {
     return () => { cancelled = true; };
   }, [productId]);
 
-  if (loading || !data || !data.price_history?.length) return null;
+  if (!loading && (!data || !data.price_history?.length)) return null;
 
-  const savings = Number(data.savings_percent || 0);
-  const marketPrice = Number(data.market_price || 0);
-  const yourPrice = Number(data.current_selling_price || 0);
+  const priceHistory = Array.isArray(data?.price_history) ? data.price_history : [];
+  const savings = Number(data?.savings_percent || 0);
+  const marketPrice = Number(data?.market_price || 0);
+  const yourPrice = Number(data?.current_selling_price || 0);
   const spread = Math.max(0, marketPrice - yourPrice);
+  const marketOffers = Array.isArray(data?.market_offers) ? data.market_offers : [];
+  const isLiveMarket = data?.market_source === 'live_market_api';
+  const volatility = Number(data?.market_volatility_percent || 0);
+  const advantage = Number(data?.price_advantage_percent || savings || 0);
 
   return (
     <div className="price-insights-wrap" style={{
@@ -106,7 +111,7 @@ function PriceComparisonChart({ productId }) {
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', textAlign: 'left' }}>Smart Price Insights</div>
             <div style={{ fontSize: 12, color: '#ffedd5', textAlign: 'left' }}>
-              {isOpen ? 'Hide comparison dashboard' : 'Open market trend dashboard'}
+              {loading ? 'Loading live market comparison...' : isOpen ? 'Hide comparison dashboard' : 'Open market trend dashboard'}
             </div>
           </div>
         </div>
@@ -130,6 +135,13 @@ function PriceComparisonChart({ productId }) {
 
       {isOpen && (
         <>
+      {loading ? (
+        <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+          <SkeletonText lines={3} />
+          <div style={{ height: 220, borderRadius: 14, background: 'linear-gradient(90deg,#fff7ed 25%,#ffedd5 37%,#fff7ed 63%)', backgroundSize: '400% 100%', animation: 'pd-shimmer 1.4s ease infinite' }} />
+        </div>
+      ) : (
+        <>
       <div style={{ display: 'grid', gap: 10, marginTop: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         <div style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#9a3412', marginBottom: 4 }}>Your Price</div>
@@ -138,14 +150,15 @@ function PriceComparisonChart({ productId }) {
         <div style={{ background: '#fff', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 4 }}>Market Price</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#dc2626' }}>{formatPrice(marketPrice)}</div>
+          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{isLiveMarket ? 'Fetched from market' : 'Estimated fallback'}</div>
         </div>
         <div style={{ background: '#fff', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#166534', marginBottom: 4 }}>You Save</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#15803d' }}>{formatPrice(spread)}</div>
         </div>
         <div style={{ background: '#fff', border: '1px solid #c7d2fe', borderRadius: 12, padding: '10px 12px' }}>
-          <div style={{ fontSize: 11, color: '#3730a3', marginBottom: 4 }}>Savings Rate</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#4338ca' }}>{Math.max(0, savings)}%</div>
+          <div style={{ fontSize: 11, color: '#3730a3', marginBottom: 4 }}>Price Advantage</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#4338ca' }}>{Math.max(0, advantage).toFixed(1)}%</div>
         </div>
       </div>
 
@@ -153,10 +166,39 @@ function PriceComparisonChart({ productId }) {
         <div>
           <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>Market vs Platform Trend</div>
           <div style={{ fontSize: 12, color: '#64748b' }}>
-            Market moves over time, your listed price stays fixed.
+            {isLiveMarket ? `Using ${marketOffers.length} live market offer${marketOffers.length === 1 ? '' : 's'} with ${volatility.toFixed(1)}% market spread.` : 'Estimated from product pricing until live providers return a match.'}
           </div>
         </div>
       </div>
+
+      {marketOffers.length > 0 && (
+        <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
+          {marketOffers.slice(0, 4).map((offer, idx) => (
+            <a
+              key={`${offer.store}-${offer.name}-${idx}`}
+              href={offer.url || undefined}
+              target={offer.url ? '_blank' : undefined}
+              rel={offer.url ? 'noreferrer' : undefined}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                textDecoration: 'none',
+                color: 'inherit',
+                border: '1px solid #e2e8f0',
+                borderRadius: 10,
+                padding: '8px 10px',
+                background: '#fff',
+              }}
+            >
+              <span style={{ fontSize: 12, color: '#475569', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {offer.store}: {offer.name}
+              </span>
+              <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 800, whiteSpace: 'nowrap' }}>{formatPrice(offer.price)}</span>
+            </a>
+          ))}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -168,18 +210,18 @@ function PriceComparisonChart({ productId }) {
           <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Platform Price</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 12, height: 12, borderRadius: 2, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)' }} />
+          <div style={{ width: 12, height: 12, borderRadius: 2, background: 'rgba(249,115,22,0.18)', border: '1px solid rgba(249,115,22,0.35)' }} />
           <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Market Volatility</span>
         </div>
       </div>
 
       <div className="price-chart-box" style={{ width: '100%', height: 280 }}>
         <ResponsiveContainer>
-          <ComposedChart data={data.price_history} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+          <ComposedChart data={priceHistory} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="marketFillNew" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.18}/>
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.02}/>
+                <stop offset="0%" stopColor="#f97316" stopOpacity={0.28}/>
+                <stop offset="100%" stopColor="#f97316" stopOpacity={0.04}/>
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
@@ -204,12 +246,17 @@ function PriceComparisonChart({ productId }) {
               contentStyle={{ borderRadius: 12, border: '1px solid #fdba74', boxShadow: '0 8px 20px rgba(249,115,22,0.15)' }}
               labelStyle={{ fontWeight: 700, color: '#1e293b', marginBottom: 4 }}
               itemStyle={{ fontSize: 13, fontWeight: 600 }}
-              formatter={(value, name) => [formatPrice(value), name === 'our_price' ? 'Platform Price' : 'Market Price']}
+              formatter={(value, name) => {
+                if (name === 'our_price') return [formatPrice(value), 'Platform Price'];
+                if (name === 'market_band') return [value.map(formatPrice).join(' - '), 'Market Volatility'];
+                return [formatPrice(value), 'Market Price'];
+              }}
               labelFormatter={(label) => {
                 const d = new Date(label);
                 return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`;
               }}
             />
+            <Area type="monotone" dataKey="market_band" fill="url(#marketFillNew)" stroke="none" dot={false} activeDot={false} />
             <Line type="monotone" dataKey="market_price" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 2, fill: '#ef4444' }} activeDot={{ r: 5 }} />
             <Line type="monotone" dataKey="our_price" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 3, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
           </ComposedChart>
@@ -226,12 +273,17 @@ function PriceComparisonChart({ productId }) {
         <div style={{ fontSize: 12, color: '#64748b' }}>
           Market Price: <strong style={{ color: '#ef4444' }}>{formatPrice(data.market_price)}</strong>
         </div>
+        <div style={{ fontSize: 12, color: '#64748b' }}>
+          Volatility: <strong style={{ color: '#f97316' }}>{volatility.toFixed(1)}%</strong>
+        </div>
         {data.current_discount_price && (
           <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700 }}>
             🏷️ Sale: {formatPrice(data.current_discount_price)}
           </div>
         )}
       </div>
+      </>
+      )}
       </>
       )}
     </div>
@@ -1367,6 +1419,7 @@ const s = {
 
 const spinnerCSS = `
   @keyframes pd-spin { to { transform: rotate(360deg); } }
+  @keyframes pd-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
   a[style]:has(> div):hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.10) !important; border-color: #F97316 !important; }
   a[style]:has(> div):hover img { transform: scale(1.06); }
   .also-grid::-webkit-scrollbar { display: none; }

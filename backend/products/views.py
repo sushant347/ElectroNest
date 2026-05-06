@@ -18,35 +18,51 @@ from django.utils import timezone
 from .models import Category, Supplier, Product, Review
 from .serializers import CategorySerializer, SupplierSerializer, ProductSerializer, ReviewSerializer
 from .price_matching import get_price_comparison
+from .market_prices import get_market_price_snapshot
 from admin_panel.models import AuditMixin, AuditLog
-
-DISCOUNT_BANDS = (5, 10)
-
 
 def _get_market_anchor_price(product: Product) -> Decimal:
     """Baseline market anchor used when product is created."""
     return (product.cost_price * Decimal('1.30')).quantize(Decimal('0.01'))
 
 
-def _get_discount_band_for_product(product: Product) -> int:
-    """
-    Pick one of 5/10/15/20 based on product date and id.
-    This stays deterministic per product and does not change when market moves.
-    """
+def _get_price_advantage_percent(product: Product) -> Decimal:
+    """Stable non-fixed marketplace advantage in the 5-15% range."""
     created = product.created_at or timezone.now()
     stable_id = product.id or sum(ord(ch) for ch in (product.sku or product.name or "product"))
-    seed = created.month + created.day + stable_id
-    return DISCOUNT_BANDS[seed % len(DISCOUNT_BANDS)]
+    seed = created.month + created.day + stable_id + sum(ord(ch) for ch in (product.name or ""))
+    return (Decimal('6.5') + (Decimal(seed % 70) / Decimal('10'))).quantize(Decimal('0.1'))
+
+
+def _compute_platform_price_from_market(market_price, product: Product) -> float:
+    advantage = _get_price_advantage_percent(product)
+    computed = Decimal(str(market_price)) * ((Decimal('100') - advantage) / Decimal('100'))
+    return float(computed.quantize(Decimal('0.01')))
+
+
+def _get_savings_percent(market_price: float, platform_price: float) -> float:
+    if market_price <= 0:
+        return 0
+    return round(((market_price - platform_price) / market_price) * 100, 1)
 
 
 def _compute_locked_platform_price(product: Product) -> Decimal:
-    """Our platform price snapshot: market anchor minus discount band."""
+    """Our platform price snapshot: market anchor minus a non-fixed advantage."""
     market_anchor = _get_market_anchor_price(product)
-    band = Decimal(_get_discount_band_for_product(product))
-    multiplier = (Decimal('100') - band) / Decimal('100')
+    multiplier = (Decimal('100') - _get_price_advantage_percent(product)) / Decimal('100')
     computed = (market_anchor * multiplier).quantize(Decimal('0.01'))
     # Respect DB check constraint: SellingPrice must be strictly > 0.
     return computed if computed > Decimal('0.00') else Decimal('0.01')
+
+
+def _get_market_variation(product: Product, date_value, index: int, market_snapshot: dict) -> float:
+    offer_volatility = float(market_snapshot.get('market_volatility_percent') or 0)
+    volatility_weight = min(0.08, max(0.018, offer_volatility / 250))
+    stable_id = product.id or sum(ord(ch) for ch in (product.sku or product.name or "product"))
+    seasonal = ((date_value.month % 5) - 2) * 0.006
+    weekday = (date_value.weekday() - 3) * 0.003
+    cycle = (((date_value.day + stable_id + index) % 9) - 4) * 0.004
+    return max(-0.12, min(0.12, seasonal + weekday + cycle + volatility_weight / 2))
 
 
 class IsOwnerOrAdmin(BasePermission):
@@ -221,18 +237,20 @@ class PriceHistoryView(APIView):
             return Response({'detail': 'Product not found.'}, status=drf_status.HTTP_404_NOT_FOUND)
 
         locked_platform_price = _compute_locked_platform_price(product)
-        # Keep persisted DB price as source of truth; if older rows existed before
-        # this rule, we still display their saved selling price.
-        selling_price = float(product.selling_price or locked_platform_price)
+        actual_selling_price = float(product.selling_price or locked_platform_price)
         cost_price = float(product.cost_price)
         discount_price = float(product.discount_price) if product.discount_price else None
 
-        discount_band = _get_discount_band_for_product(product)
-        market_anchor = float(_get_market_anchor_price(product))
-        market_price = market_anchor
+        market_snapshot = get_market_price_snapshot(product)
+        fallback_market_anchor = float(_get_market_anchor_price(product))
+        market_price = market_snapshot.get('market_price') or fallback_market_anchor
+        market_anchor = market_price
+        selling_price = actual_selling_price
+        price_advantage_percent = _get_savings_percent(market_price, selling_price)
 
-        # Get historical price changes from AuditLog
-        price_history = []
+        # Audit logs are used only for real event dates; the comparison values
+        # are based on the latest fetched market snapshot.
+        history_dates = []
         logs = (
             AuditLog.objects
             .filter(table_name='Products', record_id=product_id, action__in=['UPDATE', 'CREATE', 'INSERT'])
@@ -247,22 +265,11 @@ class PriceHistoryView(APIView):
                 old_vals = {}
                 new_vals = {}
 
-            # Check if selling price changed
-            old_price = old_vals.get('selling_price') or old_vals.get('SellingPrice')
             new_price = new_vals.get('selling_price') or new_vals.get('SellingPrice')
-
             if new_price is not None:
-                entry = {
-                    'date': log.timestamp.strftime('%Y-%m-%d'),
-                    'our_price': float(new_price),
-                }
-                if old_price is not None:
-                    entry['old_price'] = float(old_price)
-                price_history.append(entry)
+                history_dates.append(log.timestamp)
 
-        # If no audit trail, generate realistic month/day fluctuations for market.
-        # Our price remains fixed to emphasize "locked platform pricing".
-        if not price_history:
+        if not history_dates:
             now = timezone.now()
             created_at = product.created_at or now
             total_days = max(1, (now.date() - created_at.date()).days)
@@ -270,41 +277,63 @@ class PriceHistoryView(APIView):
             current = created_at
 
             while current <= now:
-                seasonal = ((current.month % 4) + 1) * 0.01
-                weekday_adjustment = (current.weekday() - 3) * 0.004
-                day_cycle = ((current.day % 6) - 3) * 0.003
-                variation = seasonal + weekday_adjustment + day_cycle
-                mp = round(market_anchor * (1 + variation), 2)
-                price_history.append({
-                    'date': current.strftime('%Y-%m-%d'),
-                    'our_price': selling_price,
-                    'market_price': mp,
-                })
+                history_dates.append(current)
                 current += timedelta(days=step_days)
 
-            if price_history and price_history[-1]['date'] != now.strftime('%Y-%m-%d'):
-                latest_variation = (((now.month % 4) + 1) * 0.01) + ((now.weekday() - 3) * 0.004)
-                price_history.append({
-                    'date': now.strftime('%Y-%m-%d'),
-                    'our_price': selling_price,
-                    'market_price': round(market_anchor * (1 + latest_variation), 2),
-                })
+        now = timezone.now()
+        if not history_dates or history_dates[-1].strftime('%Y-%m-%d') != now.strftime('%Y-%m-%d'):
+            history_dates.append(now)
 
-        # Add market_price to each entry if not already present
-        for entry in price_history:
-            if 'market_price' not in entry:
-                entry['market_price'] = market_price
+        price_history = []
+        unique_dates = []
+        seen_dates = set()
+        for value in history_dates:
+            key = value.strftime('%Y-%m-%d')
+            if key in seen_dates:
+                continue
+            seen_dates.add(key)
+            unique_dates.append(value)
+
+        for index, value in enumerate(unique_dates):
+            is_latest = value.strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d')
+            row_market_price = market_anchor if is_latest else round(
+                market_anchor * (1 + _get_market_variation(product, value, index, market_snapshot)),
+                2,
+            )
+            row_platform_price = selling_price
+            row_volatility = max(
+                abs(row_market_price - row_platform_price),
+                row_market_price * max(0.02, float(market_snapshot.get('market_volatility_percent') or 4) / 200),
+            )
+            price_history.append({
+                'date': value.strftime('%Y-%m-%d'),
+                'our_price': row_platform_price,
+                'market_price': round(row_market_price, 2),
+                'market_low': round(max(0.01, row_market_price - row_volatility), 2),
+                'market_high': round(row_market_price + (row_volatility * 0.25), 2),
+            })
+            price_history[-1]['market_band'] = [
+                price_history[-1]['market_low'],
+                price_history[-1]['market_high'],
+            ]
 
         # Compute savings
-        savings_percent = round(((market_price - selling_price) / market_price) * 100, 1) if market_price > 0 else 0
+        savings_percent = _get_savings_percent(market_price, selling_price)
 
         return Response({
             'product_id': product_id,
             'product_name': product.name,
             'current_selling_price': selling_price,
+            'actual_selling_price': actual_selling_price,
             'current_cost_price': cost_price,
             'current_discount_price': discount_price,
             'market_price': market_price,
+            'lowest_market_price': market_snapshot.get('lowest_market_price'),
+            'highest_market_price': market_snapshot.get('highest_market_price'),
+            'market_volatility_percent': market_snapshot.get('market_volatility_percent', 0),
+            'price_advantage_percent': max(0, price_advantage_percent),
+            'market_source': market_snapshot.get('source', 'fallback'),
+            'market_offers': market_snapshot.get('offers', []),
             'savings_percent': max(0, savings_percent),
             'price_history': price_history,
         })
