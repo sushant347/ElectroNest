@@ -126715,6 +126715,104 @@
       "TrackingNumber": "",
       "CreatedAt": "2026-03-22T05:06:57.543000",
       "UpdatedAt": "2026-03-22T05:06:57.543000"
+    },
+    {
+      "OrderID": 6897,
+      "OrderNumber": "ORD-1A0B8C5B",
+      "CustomerID": 3001,
+      "OrderStatusID": 4,
+      "OrderDate": "2026-05-04T07:32:28.427000",
+      "TotalAmount": "208189.52",
+      "AddressID": 3542,
+      "ShippingCost": "200.00",
+      "EstimatedDeliveryDate": null,
+      "TrackingNumber": "",
+      "CreatedAt": "2026-05-04T07:32:28.427000",
+      "UpdatedAt": "2026-05-04T07:33:41.970000"
+    },
+    {
+      "OrderID": 6898,
+      "OrderNumber": "ORD-F3F8BE5B",
+      "CustomerID": 3001,
+      "OrderStatusID": 1,
+      "OrderDate": "2026-05-04T10:50:56.480000",
+      "TotalAmount": "26419.82",
+      "AddressID": 3509,
+      "ShippingCost": "200.00",
+      "EstimatedDeliveryDate": null,
+      "TrackingNumber": "",
+      "CreatedAt": "2026-05-04T10:50:56.480000",
+      "UpdatedAt": "2026-05-04T10:50:56.480000"
+    },
+    {
+      "OrderID": 6899,
+      "OrderNumber": "ORD-8CFC3537",
+      "CustomerID": 3001,
+      "OrderStatusID": 1,
+      "OrderDate": "2026-05-04T10:50:56.563000",
+      "TotalAmount": "80271.37",
+      "AddressID": 3509,
+      "ShippingCost": "200.00",
+      "EstimatedDeliveryDate": null,
+      "TrackingNumber": "",
+      "CreatedAt": "2026-05-04T10:50:56.563000",
+      "UpdatedAt": "2026-05-04T10:50:56.563000"
+    },
+    {
+      "OrderID": 6900,
+      "OrderNumber": "ORD-68B4A41E",
+      "CustomerID": 3001,
+      "OrderStatusID": 1,
+      "OrderDate": "2026-05-04T10:53:46.080000",
+      "TotalAmount": "50618.99",
+      "AddressID": 3535,
+      "ShippingCost": "200.00",
+      "EstimatedDeliveryDate": null,
+      "TrackingNumber": "",
+      "CreatedAt": "2026-05-04T10:53:46.080000",
+      "UpdatedAt": "2026-05-04T10:53:46.080000"
+    },
+    {
+      "OrderID": 6901,
+      "OrderNumber": "ORD-C5E53DA5",
+      "CustomerID": 3001,
+      "OrderStatusID": 1,
+      "OrderDate": "2026-05-04T10:55:07.880000",
+      "TotalAmount": "50618.99",
+      "AddressID": 3535,
+      "ShippingCost": "200.00",
+      "EstimatedDeliveryDate": null,
+      "TrackingNumber": "",
+      "CreatedAt": "2026-05-04T10:55:07.880000",
+      "UpdatedAt": "2026-05-04T10:55:07.880000"
+    },
+    {
+      "OrderID": 6902,
+      "OrderNumber": "ORD-CE22F336",
+      "CustomerID": 3001,
+      "OrderStatusID": 1,
+      "OrderDate": "2026-05-04T10:55:34.307000",
+      "TotalAmount": "26419.82",
+      "AddressID": 3535,
+      "ShippingCost": "200.00",
+      "EstimatedDeliveryDate": null,
+      "TrackingNumber": "",
+      "CreatedAt": "2026-05-04T10:55:34.307000",
+      "UpdatedAt": "2026-05-04T10:55:34.307000"
+    },
+    {
+      "OrderID": 6903,
+      "OrderNumber": "ORD-2EE53F98",
+      "CustomerID": 3001,
+      "OrderStatusID": 1,
+      "OrderDate": "2026-05-04T10:55:34.373000",
+      "TotalAmount": "50618.99",
+      "AddressID": 3535,
+      "ShippingCost": "200.00",
+      "EstimatedDeliveryDate": null,
+      "TrackingNumber": "",
+      "CreatedAt": "2026-05-04T10:55:34.373000",
+      "UpdatedAt": "2026-05-04T10:55:34.373000"
     }
   ],
   "order_details": [
@@ -157062,6 +157160,55 @@
       "ProductID": 1147,
       "Quantity": 1,
       "UnitPrice": "171928.02"
+    },
+    {
+      "OrderDetailID": 12838,
+      "OrderID": 6897,
+      "ProductID": 1371,
+      "Quantity": 2,
+      "UnitPrice": "104094.76"
+    },
+    {
+      "OrderDetailID": 12839,
+      "OrderID": 6898,
+      "ProductID": 1371,
+      "Quantity": 1,
+      "UnitPrice": "26419.82"
+    },
+    {
+      "OrderDetailID": 12840,
+      "OrderID": 6899,
+      "ProductID": 1310,
+      "Quantity": 1,
+      "UnitPrice": "80271.37"
+    },
+    {
+      "OrderDetailID": 12841,
+      "OrderID": 6900,
+      "ProductID": 1027,
+      "Quantity": 1,
+      "UnitPrice": "50618.99"
+    },
+    {
+      "OrderDetailID": 12842,
+      "OrderID": 6901,
+      "ProductID": 1027,
+      "Quantity": 1,
+      "UnitPrice": "50618.99"
+    },
+    {
+      "OrderDetailID": 12843,
+      "OrderID": 6902,
+      "ProductID": 1371,
+      "Quantity": 1,
+      "UnitPrice": "26419.82"
+    },
+    {
+      "OrderDetailID": 12844,
+      "OrderID": 6903,
+      "ProductID": 1027,
+      "Quantity": 1,
+      "UnitPrice": "50618.99"
     }
   ],
   "payments": [
@@ -204176,6 +204323,62 @@
       "DiscountPercent": "0.00",
       "PayableAmount": "171928.02",
       "PaidAt": "2026-03-22T05:06:57.563000"
+    },
+    {
+      "PaymentID": 6889,
+      "OrderID": 6897,
+      "MethodID": 5,
+      "DiscountPercent": "0.00",
+      "PayableAmount": "208189.52",
+      "PaidAt": "2026-05-04T07:32:28.470000"
+    },
+    {
+      "PaymentID": 6890,
+      "OrderID": 6898,
+      "MethodID": 6,
+      "DiscountPercent": "0.00",
+      "PayableAmount": "26419.82",
+      "PaidAt": "2026-05-04T10:50:56.520000"
+    },
+    {
+      "PaymentID": 6891,
+      "OrderID": 6899,
+      "MethodID": 6,
+      "DiscountPercent": "0.00",
+      "PayableAmount": "80271.37",
+      "PaidAt": "2026-05-04T10:50:56.590000"
+    },
+    {
+      "PaymentID": 6892,
+      "OrderID": 6900,
+      "MethodID": 1,
+      "DiscountPercent": "0.00",
+      "PayableAmount": "50618.99",
+      "PaidAt": "2026-05-04T10:53:46.110000"
+    },
+    {
+      "PaymentID": 6893,
+      "OrderID": 6901,
+      "MethodID": 1,
+      "DiscountPercent": "0.00",
+      "PayableAmount": "50618.99",
+      "PaidAt": "2026-05-04T10:55:07.920000"
+    },
+    {
+      "PaymentID": 6894,
+      "OrderID": 6902,
+      "MethodID": 1,
+      "DiscountPercent": "0.00",
+      "PayableAmount": "26419.82",
+      "PaidAt": "2026-05-04T10:55:34.340000"
+    },
+    {
+      "PaymentID": 6895,
+      "OrderID": 6903,
+      "MethodID": 1,
+      "DiscountPercent": "0.00",
+      "PayableAmount": "50618.99",
+      "PaidAt": "2026-05-04T10:55:34.393000"
     }
   ],
   "reviews": [
@@ -255399,6 +255602,15 @@
       "ExpectedDeliveryDate": null,
       "CreatedAt": "2026-03-22T05:06:57.580000",
       "OrderStatusID": 1
+    },
+    {
+      "PurchaseOrderID": 1011,
+      "SupplierID": 6,
+      "OrderDate": "2026-05-04T10:50:56.613000",
+      "TotalAmount": "64997.06",
+      "ExpectedDeliveryDate": null,
+      "CreatedAt": "2026-05-04T10:50:56.613000",
+      "OrderStatusID": 1
     }
   ],
   "purchase_order_details": [
@@ -255478,6 +255690,13 @@
       "ProductID": 1147,
       "Quantity": 1,
       "UnitCost": "160103.72"
+    },
+    {
+      "PurchaseOrderDetailID": 1011,
+      "PurchaseOrderID": 1011,
+      "ProductID": 1310,
+      "Quantity": 1,
+      "UnitCost": "64997.06"
     }
   ],
   "wishlists": [
@@ -265917,6 +266136,45 @@
       "ProductID": 1030,
       "OrderCount": 2,
       "CreatedAt": "2026-02-21T19:26:45"
+    }
+  ],
+  "product_questions": [
+    {
+      "id": 1,
+      "product_id": 1371,
+      "customer_id": 3001,
+      "question": "does it get affected by rain or not ??",
+      "answer": "no it work fine even if it get wet by rain and come with 1 year warranty",
+      "status": "answered",
+      "is_public": true,
+      "answered_by_id": 12,
+      "asked_at": "2026-05-04T09:57:29.824961",
+      "answered_at": "2026-05-04T10:04:37.183850",
+      "updated_at": "2026-05-04T10:04:37.183850"
+    },
+    {
+      "id": 2,
+      "product_id": 1208,
+      "customer_id": 3001,
+      "question": "hows the sound quality of this is it satisfying or not and support 8d audio or not??",
+      "answer": "",
+      "status": "pending",
+      "is_public": true,
+      "answered_by_id": null,
+      "asked_at": "2026-05-04T10:14:49.277639",
+      "answered_at": null,
+      "updated_at": "2026-05-04T10:14:49.277639"
+    }
+  ],
+  "customer_notifications": [
+    {
+      "id": 1,
+      "customer_id": 3001,
+      "question_id": 1,
+      "title": "Your question was answered: Fitbit Charge 6 (Desert Sand; Sport Band; 41 mm)",
+      "message": "no it work fine even if it get wet by rain and come with 1 year warranty",
+      "is_read": true,
+      "created_at": "2026-05-04T10:04:37.192049"
     }
   ]
 }
