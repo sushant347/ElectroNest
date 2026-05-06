@@ -674,13 +674,13 @@ export default function ProductManagement() {
         .pm-product-img-placeholder { width: 40px; height: 40px; border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #d1d5db; flex-shrink: 0; }
         .pm-product-name { font-weight: 600; color: #1e293b; white-space: nowrap; }
         .pm-cat-badge { font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 5px; background: #EFF6FF; color: #3B82F6; white-space: nowrap; }
-        .pm-brand { color: #6b7280; font-weight: 500; }
+        .pm-brand { color: #6b7280; font-weight: 500; white-space: nowrap; }
         .pm-num { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .pm-price { color: #16a34a; }
         .pm-stock { font-weight: 700; }
         .pm-stock.low { color: #ca8a04; }
         .pm-stock.out { color: #dc2626; }
-        .pm-status-badge { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 20px; }
+        .pm-status-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 76px; white-space: nowrap; font-size: 0.72rem; font-weight: 700; padding: 0.24rem 0.65rem; border-radius: 20px; line-height: 1.15; }
         .pm-status-badge.active { background: #DCFCE7; color: #16A34A; }
         .pm-status-badge.inactive { background: #FEE2E2; color: #DC2626; }
         .pm-actions { display: flex; gap: 0.35rem; }

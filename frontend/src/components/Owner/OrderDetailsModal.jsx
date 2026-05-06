@@ -104,28 +104,36 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onStatusUpda
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item, i) => (
-                      <tr key={i}>
-                        <td style={{ padding: '0.4rem 0.5rem' }}>
-                          <div className="odm-item-img-wrap">
-                            {(item.product_image || item.product_detail?.image_url || item.image) ? (
-                              <img
-                                src={item.product_image || item.product_detail?.image_url || item.image}
-                                alt={item.product_name || ''}
-                                className="odm-item-img"
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                              />
-                            ) : (
-                              <Package size={20} color="#cbd5e1" />
-                            )}
-                          </div>
-                        </td>
-                        <td className="odm-item-name">{item.product_name || `Product #${item.product}`}</td>
-                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{item.quantity}</td>
-                        <td style={{ textAlign: 'right' }}>{fmt(item.unit_price)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(item.total_price || item.unit_price * item.quantity)}</td>
-                      </tr>
-                    ))}
+                    {items.map((item, i) => {
+                      const brand = item.product_detail?.brand || '';
+                      return (
+                        <tr key={i}>
+                          <td style={{ padding: '0.4rem 0.5rem' }}>
+                            <div className="odm-item-img-wrap">
+                              {(item.product_image || item.product_detail?.image_url || item.image) ? (
+                                <img
+                                  src={item.product_image || item.product_detail?.image_url || item.image}
+                                  alt={item.product_name || ''}
+                                  className="odm-item-img"
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <Package size={20} color="#cbd5e1" />
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="odm-item-product">
+                              <span className="odm-item-name">{item.product_name || `Product #${item.product}`}</span>
+                              {brand && <span className="odm-item-brand">{brand}</span>}
+                            </div>
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: 600 }}>{item.quantity}</td>
+                          <td style={{ textAlign: 'right' }}>{fmt(item.unit_price)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(item.total_price || item.unit_price * item.quantity)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -257,7 +265,9 @@ const styles = `
   .odm-items-table tbody tr:hover { background: #FFF7ED; }
   .odm-item-img-wrap { width: 40px; height: 40px; border-radius: 8px; background: #f3f4f6; border: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .odm-item-img { width: 40px; height: 40px; object-fit: cover; }
-  .odm-item-name { font-weight: 600; color: #1e293b; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .odm-item-product { display: flex; flex-direction: column; gap: 3px; min-width: 0; max-width: 280px; }
+  .odm-item-name { display: block; font-weight: 600; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .odm-item-brand { display: inline-block; width: fit-content; max-width: 100%; font-size: 0.68rem; font-weight: 800; color: #2563eb; background: #eff6ff; border-radius: 5px; padding: 2px 7px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0; }
   .odm-action-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
   .odm-action-btn { display: inline-flex; align-items: center; gap: 8px; padding: 0.6rem 1.25rem; border-radius: 10px; font-size: 0.85rem; font-weight: 700; cursor: pointer; font-family: inherit; border: none; transition: all 0.15s; }
   .odm-action-process { background: #dbeafe; color: #1d4ed8; border: 1.5px solid #bfdbfe; }
