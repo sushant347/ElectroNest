@@ -9,7 +9,14 @@ import imgDrone from '../components/images/drone.png'
 import imgGaming from '../components/images/Gaming Console.png'
 
 const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
-const productNameKey = (name = '') => name.trim().replace(/\s+/g, ' ').toLowerCase()
+const getArrayData = (data) => data?.results || data || []
+const productNameKey = (name = '') => name
+  .replace(/\([^)]*\)/g, '')
+  .replace(/\b(color|colour|grade|variant)\s*:\s*[^|,/]+/gi, '')
+  .replace(/\s*[-–—]\s*(phantom silver|desert sand|volcano orange|titanium black|starlight|black|white|silver|gold|blue|red|green|orange|purple|pink|gray|grey)\b.*$/i, '')
+  .trim()
+  .replace(/\s+/g, ' ')
+  .toLowerCase()
 
 const HERO_SLIDES = [
   { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'Gaming', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: imgGaming },
@@ -131,24 +138,36 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     const load = async (attempt = 1) => {
       setLoading(true)
       try {
-        const [catRes, allRes] = await Promise.all([customerAPI.getCategories(), customerAPI.getProducts({ page_size: 80 })])
-        const catData = catRes.data?.results || catRes.data || []
-        const allData = allRes.data?.results || allRes.data || []
+        const catRes = await customerAPI.getCategories()
+        const catData = getArrayData(catRes.data)
         setCats(catData)
-        let filtered = [...allData]
-        if (catParam) { filtered = allData.filter(p => (p.category_name || '') === catParam) }
-        if (searchQ) { const q = searchQ.toLowerCase(); filtered = filtered.filter(p => (p.name || p.ProductName || '').toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q)) }
-        setProds(filtered)
 
-        setSideImgs(prev => {
-          if (Object.keys(prev).length > 0) return prev
+        const activeCategory = catParam
+          ? catData.find(cat => (cat.name || '').toLowerCase() === catParam.toLowerCase())
+          : null
+        const productParams = {
+          page_size: 120,
+          ...(activeCategory ? { category: activeCategory.id } : {}),
+          ...(searchQ ? { search: searchQ } : {}),
+        }
+        const allRes = await customerAPI.getProducts(productParams)
+        setProds(getArrayData(allRes.data))
+
+        if (Object.keys(sideImgs).length === 0) {
           const imgs = {}
-          SIDE.forEach(({ cat }) => {
-            const p = allData.find(x => (x.category_name || '') === cat && (x.image_url || x.ProductImageURL))
-            if (p) imgs[cat] = p.image_url || p.ProductImageURL
-          })
-          return imgs
-        })
+          await Promise.all(SIDE.map(async ({ cat }) => {
+            const sideCategory = catData.find(c => (c.name || '').toLowerCase() === cat.toLowerCase())
+            if (!sideCategory) return
+            try {
+              const res = await customerAPI.getProducts({ category: sideCategory.id, page_size: 1 })
+              const p = getArrayData(res.data).find(x => x.image_url || x.ProductImageURL)
+              if (p) imgs[cat] = p.image_url || p.ProductImageURL
+            } catch {
+              // Side images are decorative; product loading should not fail because of them.
+            }
+          }))
+          setSideImgs(imgs)
+        }
       } catch (e) {
         console.error(e)
         if (attempt === 1) { setTimeout(() => load(2), 3000); return }
@@ -241,15 +260,15 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         byStore[store].push(p)
       })
       const out = []
+      const featuredNames = new Set()
       Object.values(byStore).forEach(g => {
-        const seenNames = new Set()
         const topPerStore = []
         for (const product of [...g].sort((a, b) => (b.sold - a.sold) || (b.price - a.price))) {
           const key = productNameKey(product.name)
-          if (!key || seenNames.has(key)) continue
-          seenNames.add(key)
+          if (!key || featuredNames.has(key)) continue
+          featuredNames.add(key)
           topPerStore.push(product)
-          if (topPerStore.length === 5) break
+          if (topPerStore.length === 4) break
         }
         out.push(...topPerStore)
       })

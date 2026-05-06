@@ -11,15 +11,17 @@
  */
 
 const rawApiUrl = import.meta.env.VITE_API_BASE_URL;
+const productionApiUrl = 'https://electronest-api.onrender.com/api';
+const localApiUrl = 'http://127.0.0.1:8000/api';
 
 if (!rawApiUrl && import.meta.env.PROD) {
   console.error(
-    '[Config] VITE_API_BASE_URL is not set! API calls will target http://localhost:8000/api ' +
-    'and fail in production. Add this env var in your Vercel project settings.'
+    `[Config] VITE_API_BASE_URL is not set! Falling back to ${productionApiUrl}. ` +
+    'Add this env var in your Vercel project settings for explicit configuration.'
   );
 }
 
-export const API_BASE_URL = rawApiUrl || 'http://127.0.0.1:8000/api';
+export const API_BASE_URL = rawApiUrl || (import.meta.env.PROD ? productionApiUrl : localApiUrl);
 export const API_TIMEOUT = 65000; // 65 seconds — covers Render free-tier cold starts (up to ~60s)
 export const AUTH_TOKEN_KEY = 'auth_token';
 export const REFRESH_TOKEN_KEY = 'refresh_token';
