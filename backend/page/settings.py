@@ -46,9 +46,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -145,17 +145,19 @@ STORAGES = {
 }
 
 # ── CORS ──
-# CORS_ORIGINS env var on Render must include the exact Vercel frontend URL,
-# e.g. "https://your-app.vercel.app" (no trailing slash).
-# If not set, all origins are allowed (safe for development / demo deployments).
-# WARNING: If CORS_ORIGINS is set but missing the Vercel URL, the frontend
-# will be blocked by CORS and products / API calls will silently fail.
+# Keep the deployed Vercel app allowed even if Render's CORS_ORIGINS env var is
+# missing or incomplete. Extra origins can still be supplied as comma-separated
+# values in CORS_ORIGINS.
+DEFAULT_CORS_ORIGINS = [
+    'https://electro-nest.vercel.app',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
 _cors_env = os.environ.get('CORS_ORIGINS', '')
-if _cors_env:
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_env.split(',') if o.strip()]
-else:
-    CORS_ALLOW_ALL_ORIGINS = True
+_cors_origins = DEFAULT_CORS_ORIGINS + [o.strip() for o in _cors_env.split(',') if o.strip()]
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_cors_origins))
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
 
 # ── REST Framework ──
 REST_FRAMEWORK = {
