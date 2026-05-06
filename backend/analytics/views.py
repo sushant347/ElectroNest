@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from orders.models import Order, OrderDetail
 from products.models import Product, Category, Customer
+from products.catalog_replacement import display_product_for_detail
 from accounts.models import CustomUser
 
 from .jobs import enqueue_job, get_job
@@ -52,6 +53,33 @@ def safe_profit_expr():
     return F('quantity') * (F('unit_price') - bounded_cost)
 
 
+def _display_detail_totals(qs, store=None):
+    revenue = 0.0
+    profit = 0.0
+    order_ids = set()
+    customer_ids = set()
+    for detail in qs.select_related('order__customer', 'product__category', 'product__supplier'):
+        product = display_product_for_detail(detail)
+        if not product:
+            continue
+        if store and store.lower() not in (product.owner_name or '').lower():
+            continue
+        qty = detail.quantity or 0
+        unit_price = float(product.selling_price or detail.unit_price or 0)
+        cost_price = min(max(float(product.cost_price or 0), 0), unit_price)
+        revenue += qty * unit_price
+        profit += qty * (unit_price - cost_price)
+        order_ids.add(detail.order_id)
+        if getattr(detail, 'order', None):
+            customer_ids.add(detail.order.customer_id)
+    return {
+        'revenue': revenue,
+        'profit': profit,
+        'order_ids': order_ids,
+        'customer_ids': customer_ids,
+    }
+
+
 class SalesOverviewView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
@@ -74,33 +102,17 @@ class SalesOverviewView(APIView):
             .filter(order__order_date__gte=prev_from, order__order_date__lt=from_date)
             .exclude(order__order_status__name='Cancelled')
         )
-        if store:
-            curr_detail_qs = curr_detail_qs.filter(product__owner_name__icontains=store)
-            prev_detail_qs = prev_detail_qs.filter(product__owner_name__icontains=store)
+        curr_totals = _display_detail_totals(curr_detail_qs, store=store)
+        prev_totals = _display_detail_totals(prev_detail_qs, store=store)
 
-        curr_agg = curr_detail_qs.aggregate(
-            revenue=Sum(F('quantity') * F('unit_price')),
-            profit=Sum(safe_profit_expr()),
-        )
-        prev_agg = prev_detail_qs.aggregate(
-            revenue=Sum(F('quantity') * F('unit_price')),
-        )
+        curr_revenue = curr_totals['revenue']
+        curr_profit  = curr_totals['profit']
+        prev_revenue = prev_totals['revenue']
 
-        curr_revenue = float(curr_agg['revenue'] or 0)
-        curr_profit  = float(curr_agg['profit'] or 0)
-        prev_revenue = float(prev_agg['revenue'] or 0)
-
-        # Order counts (distinct orders containing this owner's products)
-        curr_orders_qs = Order.objects.filter(order_date__gte=from_date).exclude(order_status__name='Cancelled')
-        prev_orders_qs = Order.objects.filter(order_date__gte=prev_from, order_date__lt=from_date).exclude(order_status__name='Cancelled')
-        if store:
-            curr_orders_qs = curr_orders_qs.filter(details__product__owner_name__icontains=store).distinct()
-            prev_orders_qs = prev_orders_qs.filter(details__product__owner_name__icontains=store).distinct()
-
-        curr_orders    = curr_orders_qs.count()
-        prev_orders    = prev_orders_qs.count()
-        curr_customers = curr_orders_qs.values('customer').distinct().count()
-        prev_customers = prev_orders_qs.values('customer').distinct().count()
+        curr_orders    = len(curr_totals['order_ids'])
+        prev_orders    = len(prev_totals['order_ids'])
+        curr_customers = len(curr_totals['customer_ids'])
+        prev_customers = len(prev_totals['customer_ids'])
 
         def pct_change(curr, prev):
             if prev == 0:
@@ -148,30 +160,31 @@ class RevenueTrendView(APIView):
             .filter(order__order_date__gte=from_date)
             .exclude(order__order_status__name='Cancelled')
         )
-        if store:
-            detail_qs = detail_qs.filter(product__owner_name__icontains=store)
-
-        data = (
-            detail_qs
-            .annotate(period=trunc('order__order_date'))
-            .values('period')
-            .annotate(
-                revenue=Sum(F('quantity') * F('unit_price')),
-                profit=Sum(safe_profit_expr()),
-                orders=Count('order', distinct=True),
-            )
-            .order_by('period')
-        )
-
         fmt = '%Y-%m-%d' if period == 'daily' else '%Y-%m'
+        buckets = {}
+        for detail in detail_qs.select_related('order', 'product__category', 'product__supplier'):
+            product = display_product_for_detail(detail)
+            if not product:
+                continue
+            if store and store.lower() not in (product.owner_name or '').lower():
+                continue
+            raw_period = detail.order.order_date.date().replace(day=1) if period == 'monthly' else detail.order.order_date.date()
+            if raw_period not in buckets:
+                buckets[raw_period] = {'revenue': 0.0, 'profit': 0.0, 'orders': set()}
+            qty = detail.quantity or 0
+            unit_price = float(product.selling_price or detail.unit_price or 0)
+            cost_price = min(max(float(product.cost_price or 0), 0), unit_price)
+            buckets[raw_period]['revenue'] += qty * unit_price
+            buckets[raw_period]['profit'] += qty * (unit_price - cost_price)
+            buckets[raw_period]['orders'].add(detail.order_id)
 
         return Response([{
-            'period':  item['period'].strftime(fmt),
-            'month':   item['period'].strftime('%b %Y') if period == 'monthly' else item['period'].strftime(fmt),
-            'revenue': float(item['revenue'] or 0),
-            'profit':  float(item['profit'] or 0),
-            'orders':  item['orders'],
-        } for item in data])
+            'period':  key.strftime(fmt),
+            'month':   key.strftime('%b %Y') if period == 'monthly' else key.strftime(fmt),
+            'revenue': round(value['revenue'], 2),
+            'profit':  round(value['profit'], 2),
+            'orders':  len(value['orders']),
+        } for key, value in sorted(buckets.items())])
 
 
 class TopProductsView(APIView):
@@ -189,32 +202,31 @@ class TopProductsView(APIView):
         store = get_owner_store_name(request.user)
         if not store:
             store = request.query_params.get('owner_name', '').strip() or None
-        if store:
-            top_qs = top_qs.filter(product__owner_name__icontains=store)
+        product_map = {}
+        for detail in top_qs.select_related('product__category', 'product__supplier'):
+            product = display_product_for_detail(detail)
+            if not product:
+                continue
+            if store and store.lower() not in (product.owner_name or '').lower():
+                continue
+            key = product.id
+            if key not in product_map:
+                product_map[key] = {
+                    'product_id': product.id,
+                    'name': product.name,
+                    'brand': product.brand,
+                    'category': product.category.name if product.category else '',
+                    'owner_name': product.owner_name,
+                    'description': product.description,
+                    'image_url': product.image_url,
+                    'total_quantity_sold': 0,
+                    'total_revenue': 0.0,
+                }
+            product_map[key]['total_quantity_sold'] += detail.quantity or 0
+            product_map[key]['total_revenue'] += float((detail.quantity or 0) * (product.selling_price or detail.unit_price or 0))
 
-        data = (
-            top_qs
-            .values('product__id', 'product__name', 'product__brand', 'product__category__name',
-                    'product__description', 'product__image_url', 'product__owner_name')
-            .annotate(
-                total_quantity_sold=Sum('quantity'),
-                total_revenue=Sum(F('quantity') * F('unit_price'))
-            )
-            .order_by('-total_revenue')[:50]
-        )
-
-        return Response([{
-            'rank':                idx + 1,
-            'product_id':          item['product__id'],
-            'name':                item['product__name'],
-            'brand':               item['product__brand'],
-            'category':            item['product__category__name'],
-            'owner_name':          item.get('product__owner_name', ''),
-            'description':         item.get('product__description', ''),
-            'image_url':           item.get('product__image_url', ''),
-            'total_quantity_sold': item['total_quantity_sold'],
-            'total_revenue':       float(item['total_revenue'] or 0),
-        } for idx, item in enumerate(data)])
+        data = sorted(product_map.values(), key=lambda item: item['total_revenue'], reverse=True)[:50]
+        return Response([{**item, 'rank': idx + 1} for idx, item in enumerate(data)])
 
 
 class CategoryPerformanceView(APIView):
@@ -236,22 +248,28 @@ class CategoryPerformanceView(APIView):
             if store_name:
                 qs = qs.filter(product__owner_name__icontains=store_name)
 
-        data = (
-            qs
-            .values('product__category__name')
-            .annotate(
-                total_revenue=Sum(F('quantity') * F('unit_price')),
-                total_orders=Count('order', distinct=True),
-                product_count=Count('product', distinct=True)
-            )
-            .order_by('-total_revenue')
-        )
+        category_map = {}
+        for detail in qs.select_related('product__category', 'product__supplier'):
+            product = display_product_for_detail(detail)
+            category = product.category.name if product and product.category else 'Uncategorized'
+            if category not in category_map:
+                category_map[category] = {
+                    'category_name': category,
+                    'total_revenue': 0.0,
+                    'order_ids': set(),
+                    'product_ids': set(),
+                }
+            category_map[category]['total_revenue'] += float((detail.quantity or 0) * (product.selling_price or detail.unit_price or 0))
+            category_map[category]['order_ids'].add(detail.order_id)
+            if product:
+                category_map[category]['product_ids'].add(product.id)
 
+        data = sorted(category_map.values(), key=lambda item: item['total_revenue'], reverse=True)
         return Response([{
-            'category_name': item['product__category__name'] or 'Uncategorized',
-            'total_revenue': float(item['total_revenue'] or 0),
-            'total_orders':  item['total_orders'],
-            'product_count': item['product_count'],
+            'category_name': item['category_name'],
+            'total_revenue': item['total_revenue'],
+            'total_orders': len(item['order_ids']),
+            'product_count': len(item['product_ids']),
         } for item in data])
 
 

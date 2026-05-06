@@ -12,6 +12,7 @@ from datetime import timedelta
 from .models import PurchaseOrder, PurchaseOrderDetail
 from .serializers import PurchaseOrderSerializer, PurchaseOrderDetailSerializer
 from products.models import Product, Supplier
+from products.catalog_replacement import display_product_for_detail, display_product_for_purchase_detail
 from orders.models import Order, OrderStatus, OrderDetail, Payment
 from admin_panel.models import AuditLog
 
@@ -168,12 +169,13 @@ class WarehouseDashboardView(APIView):
     permission_classes = [IsWarehouseOrOwner]
 
     def get(self, request):
-        total_products    = Product.objects.count()
-        total_stock       = Product.objects.aggregate(t=Sum('stock'))['t'] or 0
-        low_stock_count   = Product.objects.filter(stock__lte=F('reorder_level')).count()
+        visible_products  = Product.objects.exclude(category__name='Legacy Catalog')
+        total_products    = visible_products.count()
+        total_stock       = visible_products.aggregate(t=Sum('stock'))['t'] or 0
+        low_stock_count   = visible_products.filter(stock__lte=F('reorder_level')).count()
         pending_pos       = PurchaseOrder.objects.filter(order_status__name='Pending').count()
 
-        low_stock_items = list(Product.objects.filter(
+        low_stock_items = list(visible_products.filter(
             stock__lte=F('reorder_level')
         ).select_related('category')[:10])
 
@@ -205,10 +207,11 @@ class WarehouseDashboardView(APIView):
             items = []
             for d in o.details.select_related('product')[:5]:
                 try:
+                    product = display_product_for_detail(d)
                     items.append({
-                        'product_name': d.product.name,
+                        'product_name': product.name,
                         'quantity': d.quantity,
-                        'product_id': d.product.id,
+                        'product_id': product.id,
                     })
                 except Exception:
                     items.append({
@@ -216,12 +219,16 @@ class WarehouseDashboardView(APIView):
                         'quantity': d.quantity,
                         'product_id': d.product_id,
                     })
+            display_total = sum(
+                float((display_product_for_detail(d).selling_price if display_product_for_detail(d) else d.unit_price) * d.quantity)
+                for d in o.details.select_related('product__category', 'product__supplier').all()
+            )
             recent_customer_orders.append({
                 'id': o.id,
                 'order_number': o.order_number,
                 'status': o.order_status.name if o.order_status else '',
                 'customer_name': f"{o.customer.first_name} {o.customer.last_name}",
-                'total_amount': float(o.total_amount),
+                'total_amount': display_total,
                 'date': o.order_date.isoformat() if o.order_date else '',
                 'items': items,
                 'items_count': o.detail_count,
@@ -241,10 +248,11 @@ class WarehouseDashboardView(APIView):
             items = []
             for d in o.details.select_related('product')[:5]:
                 try:
+                    product = display_product_for_detail(d)
                     items.append({
-                        'product_name': d.product.name,
+                        'product_name': product.name,
                         'quantity': d.quantity,
-                        'product_id': d.product.id,
+                        'product_id': product.id,
                     })
                 except Exception:
                     items.append({
@@ -252,12 +260,16 @@ class WarehouseDashboardView(APIView):
                         'quantity': d.quantity,
                         'product_id': d.product_id,
                     })
+            display_total = sum(
+                float((display_product_for_detail(d).selling_price if display_product_for_detail(d) else d.unit_price) * d.quantity)
+                for d in o.details.select_related('product__category', 'product__supplier').all()
+            )
             ready_to_deliver.append({
                 'id': o.id,
                 'order_number': o.order_number,
                 'status': o.order_status.name if o.order_status else '',
                 'customer_name': f"{o.customer.first_name} {o.customer.last_name}",
-                'total_amount': float(o.total_amount),
+                'total_amount': display_total,
                 'date': o.updated_at.isoformat() if o.updated_at else '',
                 'items': items,
                 'items_count': o.detail_count,
@@ -322,18 +334,19 @@ class StockMovementsView(APIView):
                 items = []
                 for d in o.details.all():
                     try:
-                        product = d.product
+                        product = display_product_for_detail(d)
                     except Product.DoesNotExist:
                         product = None
 
                     product_id = product.id if product else d.product_id
                     product_name = product.name if product else f'Product #{d.product_id}'
                     store_name = _line_item_store_name(product, d.product_id)
+                    unit_price = getattr(product, 'selling_price', d.unit_price) if product else d.unit_price
                     items.append({
                         'product_name': product_name,
                         'quantity': d.quantity,
-                        'unit_price': float(d.unit_price),
-                        'total_price': float(d.quantity * d.unit_price),
+                        'unit_price': float(unit_price),
+                        'total_price': float(d.quantity * unit_price),
                         'product_id': product_id,
                         'store_name': store_name,
                     })
@@ -346,6 +359,7 @@ class StockMovementsView(APIView):
                 store_label = ', '.join(store_names) if store_names else 'No store on line items'
 
                 shipping_cost = float(getattr(o, 'shipping_cost', 200))
+                display_total = sum(i['total_price'] for i in items)
 
                 customer_orders.append({
                     'id': o.id,
@@ -359,8 +373,8 @@ class StockMovementsView(APIView):
                         f"{o.address.province}, {o.address.country}"
                         if o.address else 'N/A'
                     ),
-                    'total_amount': float(o.total_amount),
-                    'grand_total': float(o.total_amount) + float(shipping_cost or 0),
+                    'total_amount': display_total,
+                    'grand_total': display_total + float(shipping_cost or 0),
                     'shipping_cost': shipping_cost,
                     'store_name': store_label,
                     'date': o.updated_at.isoformat() if o.updated_at else '',
@@ -392,16 +406,17 @@ class StockMovementsView(APIView):
             po_items = []
             po_product_ids = []
             for d in po.details.all():
-                po_product_ids.append(d.product.id)
+                product = display_product_for_purchase_detail(d)
+                po_product_ids.append(product.id)
                 po_items.append({
-                    'product_id': d.product.id,
-                    'product_name': d.product.name,
-                    'product_image': d.product.image_url or '',
-                    'product_owner': _line_item_store_name(d.product, d.product_id),
-                    'product_price': float(d.product.selling_price),
+                    'product_id': product.id,
+                    'product_name': product.name,
+                    'product_image': product.image_url or '',
+                    'product_owner': _line_item_store_name(product, d.product_id),
+                    'product_price': float(product.selling_price),
                     'quantity': d.quantity,
-                    'unit_cost': float(d.unit_cost),
-                    'total_cost': float(d.quantity * d.unit_cost),
+                    'unit_cost': float(product.cost_price),
+                    'total_cost': float(d.quantity * product.cost_price),
                 })
 
             # Find originating customer order: Order with same products, created close to PO
@@ -434,7 +449,10 @@ class StockMovementsView(APIView):
                     order_id = candidate.id
                     order_status_name = candidate.order_status.name if candidate.order_status else ''
                     shipping_cost = float(getattr(candidate, 'shipping_cost', 0) or 0)
-                    order_total = float(candidate.total_amount)
+                    order_total = sum(
+                        float((display_product_for_detail(detail).selling_price if display_product_for_detail(detail) else detail.unit_price) * detail.quantity)
+                        for detail in candidate.details.select_related('product__category', 'product__supplier').all()
+                    )
 
             po_status = po.order_status.name if po.order_status else 'Unknown'
             store_names_in_po = list(dict.fromkeys(
@@ -496,7 +514,7 @@ class StockMovementsView(APIView):
                     store_commission[sname][k] = round(store_commission[sname][k], 2)
 
         # 3. Recently updated products (stock changes by owners)
-        recent_products_qs = Product.objects.all()
+        recent_products_qs = Product.objects.exclude(category__name='Legacy Catalog')
         if order_since is not None:
             recent_products_qs = recent_products_qs.filter(updated_at__gte=order_since)
             

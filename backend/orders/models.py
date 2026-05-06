@@ -1,6 +1,6 @@
 from django.db import models
 from accounts.models import CustomUser, CustomerAddress
-from products.models import Product, Customer
+from products.models import Product, ProductVariant, Customer
 
 
 class OrderStatus(models.Model):
@@ -43,6 +43,7 @@ class OrderDetail(models.Model):
     id         = models.AutoField(primary_key=True, db_column='OrderDetailID')
     order      = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='details', db_column='OrderID')
     product    = models.ForeignKey(Product, on_delete=models.PROTECT, db_column='ProductID')
+    variant    = models.ForeignKey(ProductVariant, null=True, blank=True, on_delete=models.SET_NULL, db_column='VariantID', db_constraint=False)
     quantity   = models.IntegerField(db_column='Quantity')
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, db_column='UnitPrice')
 
@@ -63,6 +64,7 @@ class Cart(models.Model):
     id          = models.AutoField(primary_key=True, db_column='CartID')
     customer    = models.ForeignKey(Customer, on_delete=models.CASCADE, db_column='CustomerID')
     product     = models.ForeignKey(Product, on_delete=models.CASCADE, db_column='ProductID')
+    variant     = models.ForeignKey(ProductVariant, null=True, blank=True, on_delete=models.SET_NULL, db_column='VariantID', db_constraint=False)
     order_count = models.IntegerField(default=0, db_column='OrderCount')
     created_at  = models.DateTimeField(auto_now_add=True, db_column='CreatedAt')
 

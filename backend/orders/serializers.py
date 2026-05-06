@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import (Order, OrderDetail, OrderStatus, Cart, Wishlist,
                      Review, PaymentMethod, Payment, Notification, CompareList, Coupon, CouponUsage, ProductQuestion, CustomerNotification)
-from products.serializers import ProductSerializer
+from products.serializers import ProductSerializer, ProductVariantSerializer
+from products.catalog_replacement import display_product_for_detail
 from accounts.serializers import CustomerAddressSerializer
 
 
@@ -12,20 +13,46 @@ class OrderStatusSerializer(serializers.ModelSerializer):
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):
+    product = serializers.SerializerMethodField()
+    unit_price = serializers.SerializerMethodField()
     total_price  = serializers.SerializerMethodField()
-    product_name = serializers.CharField(source='product.name', read_only=True)
-    product_image = serializers.CharField(source='product.image_url', read_only=True, default='')
-    product_detail = ProductSerializer(source='product', read_only=True)
+    product_name = serializers.SerializerMethodField()
+    product_image = serializers.SerializerMethodField()
+    product_detail = serializers.SerializerMethodField()
+    variant_detail = ProductVariantSerializer(source='variant', read_only=True)
 
     class Meta:
         model  = OrderDetail
-        fields = ['id', 'order', 'product', 'product_name', 'product_image', 'product_detail', 'quantity', 'unit_price', 'total_price']
+        fields = ['id', 'order', 'product', 'variant', 'variant_detail', 'product_name', 'product_image', 'product_detail', 'quantity', 'unit_price', 'total_price']
 
     def get_total_price(self, obj):
-        return float(obj.total_price)
+        product = display_product_for_detail(obj)
+        unit_price = getattr(product, 'selling_price', obj.unit_price) if product else obj.unit_price
+        return float((obj.quantity or 0) * unit_price)
+
+    def get_unit_price(self, obj):
+        product = display_product_for_detail(obj)
+        return float(getattr(product, 'selling_price', obj.unit_price) if product else obj.unit_price)
+
+    def get_product(self, obj):
+        product = display_product_for_detail(obj)
+        return product.id if product else obj.product_id
+
+    def get_product_name(self, obj):
+        product = display_product_for_detail(obj)
+        return product.name if product else f'Product #{obj.product_id}'
+
+    def get_product_image(self, obj):
+        product = display_product_for_detail(obj)
+        return getattr(product, 'image_url', '') or ''
+
+    def get_product_detail(self, obj):
+        product = display_product_for_detail(obj)
+        return ProductSerializer(product).data if product else None
 
 
 class OrderSerializer(serializers.ModelSerializer):
+    total_amount     = serializers.SerializerMethodField()
     details          = serializers.SerializerMethodField()
     status_name      = serializers.CharField(source='order_status.name', read_only=True)
     status           = serializers.CharField(source='order_status.name', read_only=True)
@@ -50,7 +77,15 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def get_grand_total(self, obj):
         """True grand total = product subtotal + shipping cost."""
-        return float((obj.total_amount or 0) + (obj.shipping_cost or 0))
+        return float(self.get_total_amount(obj) + float(obj.shipping_cost or 0))
+
+    def get_total_amount(self, obj):
+        total = 0
+        for detail in obj.details.all():
+            product = display_product_for_detail(detail)
+            unit_price = getattr(product, 'selling_price', detail.unit_price) if product else detail.unit_price
+            total += (detail.quantity or 0) * unit_price
+        return float(total)
 
     def get_details(self, obj):
         """Deduplicate order details — keep first row per product_id (handles legacy DB duplicates)."""
@@ -58,7 +93,8 @@ class OrderSerializer(serializers.ModelSerializer):
         seen = set()
         unique = []
         for d in details:
-            pid = d.product_id
+            display_product = display_product_for_detail(d)
+            pid = display_product.id if display_product else d.product_id
             if pid not in seen:
                 seen.add(pid)
                 unique.append(d)
@@ -80,7 +116,11 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def get_items_count(self, obj):
         # Use prefetched details (no extra query)
-        return len(set(d.product_id for d in obj.details.all()))
+        ids = set()
+        for detail in obj.details.all():
+            product = display_product_for_detail(detail)
+            ids.add(product.id if product else detail.product_id)
+        return len(ids)
 
     def get_payment_method(self, obj):
         # Use prefetched payments (no extra query)
@@ -98,10 +138,11 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class CartSerializer(serializers.ModelSerializer):
     product_detail = ProductSerializer(source='product', read_only=True)
+    variant_detail = ProductVariantSerializer(source='variant', read_only=True)
 
     class Meta:
         model  = Cart
-        fields = ['id', 'product', 'product_detail', 'order_count', 'created_at']
+        fields = ['id', 'product', 'variant', 'product_detail', 'variant_detail', 'order_count', 'created_at']
 
 
 class WishlistSerializer(serializers.ModelSerializer):

@@ -15,6 +15,7 @@ from .serializers import (AuditLogSerializer, AdminUserSerializer,
 from .permissions import IsAdminRole
 from accounts.models import CustomUser
 from products.models import Supplier, Customer
+from products.catalog_replacement import display_product_for_detail
 from orders.models import Order
 from rest_framework import serializers as drf_serializers
 
@@ -162,9 +163,7 @@ class AdminDashboardView(APIView):
 
         total_users      = CustomUser.objects.count()
         total_orders     = Order.objects.count()
-        total_revenue    = Order.objects.exclude(
-            order_status__name='Cancelled'
-        ).aggregate(t=Sum('total_amount'))['t'] or 0
+        total_revenue    = 0
         active_suppliers = Supplier.objects.filter(is_active=True).count()
 
         # ── Customer data from legacy Customers table ──
@@ -185,34 +184,49 @@ class AdminDashboardView(APIView):
         )
 
         # ── Product & Category stats ──
-        total_products = Product.objects.count()
-        total_categories = Category.objects.count()
+        visible_products = Product.objects.exclude(category__name='Legacy Catalog')
+        total_products = visible_products.count()
+        total_categories = Category.objects.exclude(name='Legacy Catalog').count()
         category_product_counts = list(
-            Product.objects.values('category__name')
+            visible_products.values('category__name')
             .annotate(count=Count('id'))
             .order_by('-count')
         )
 
-        # ── Top products by revenue ──
-        top_products = list(
+        # ── Top products/category revenue, with retired order items displayed as new catalog products ──
+        detail_rows = (
             OrderDetail.objects
             .exclude(order__order_status__name='Cancelled')
-            .values('product__name', 'product__brand', 'product__category__name')
-            .annotate(
-                total_revenue=Sum(F('quantity') * F('unit_price')),
-                total_sold=Sum('quantity')
-            )
-            .order_by('-total_revenue')[:5]
+            .select_related('product__category', 'product__supplier')
         )
+        top_map = {}
+        category_map = {}
+        for detail in detail_rows:
+            product = display_product_for_detail(detail)
+            if not product:
+                continue
+            revenue = float((detail.quantity or 0) * (product.selling_price or detail.unit_price or 0))
+            total_revenue += revenue
+            key = product.id
+            if key not in top_map:
+                top_map[key] = {
+                    'name': product.name,
+                    'brand': product.brand or '',
+                    'category': product.category.name if product.category else '',
+                    'revenue': 0.0,
+                    'units_sold': 0,
+                }
+            top_map[key]['revenue'] += revenue
+            top_map[key]['units_sold'] += detail.quantity or 0
 
-        # ── Category revenue ──
-        category_revenue = list(
-            OrderDetail.objects
-            .exclude(order__order_status__name='Cancelled')
-            .values('product__category__name')
-            .annotate(total_revenue=Sum(F('quantity') * F('unit_price')))
-            .order_by('-total_revenue')
-        )
+            category = product.category.name if product.category else 'Uncategorized'
+            category_map[category] = category_map.get(category, 0.0) + revenue
+
+        top_products = sorted(top_map.values(), key=lambda item: item['revenue'], reverse=True)[:5]
+        category_revenue = [
+            {'category': category, 'revenue': revenue}
+            for category, revenue in sorted(category_map.items(), key=lambda item: item[1], reverse=True)
+        ]
 
         role_dist = (
             CustomUser.objects.values('role')
@@ -255,17 +269,8 @@ class AdminDashboardView(APIView):
                 'category': item['category__name'] or 'Uncategorized',
                 'count':    item['count'],
             } for item in category_product_counts],
-            'top_products': [{
-                'name':       item['product__name'],
-                'brand':      item['product__brand'] or '',
-                'category':   item['product__category__name'] or '',
-                'revenue':    float(item['total_revenue'] or 0),
-                'units_sold': item['total_sold'] or 0,
-            } for item in top_products],
-            'category_revenue': [{
-                'category': item['product__category__name'] or 'Uncategorized',
-                'revenue':  float(item['total_revenue'] or 0),
-            } for item in category_revenue],
+            'top_products': top_products,
+            'category_revenue': category_revenue,
             'role_distribution': list(role_dist),
             'registration_trend': [{
                 'date':  item['date'].strftime('%Y-%m-%d'),

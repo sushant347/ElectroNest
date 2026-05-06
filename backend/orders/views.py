@@ -18,7 +18,7 @@ from .serializers import (OrderSerializer, CartSerializer,
                           PaymentMethodSerializer, PaymentSerializer,
                           NotificationSerializer, OrderStatusSerializer,
                           CompareListSerializer, CouponSerializer, CouponUsageSerializer, ProductQuestionSerializer, CustomerNotificationSerializer)
-from products.models import Product, Customer
+from products.models import Product, ProductVariant, Customer
 from accounts.models import CustomUser
 from accounts.models import CustomerAddress
 from admin_panel.models import AuditMixin, AuditLog
@@ -297,20 +297,22 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
 
             if items_data and isinstance(items_data, list) and len(items_data) > 0:
                 # Create order from provided items list
-                # First merge duplicate product_ids (sum quantities)
+                # First merge duplicate product+variant selections (sum quantities)
                 from collections import defaultdict
                 merged = {}
                 for item_data in items_data:
                     pid = item_data.get('product_id') or item_data.get('id')
+                    vid = item_data.get('variant_id') or item_data.get('variant')
                     qty = int(item_data.get('quantity', 1))
-                    if pid in merged:
-                        merged[pid] += qty
+                    key = (pid, vid or None)
+                    if key in merged:
+                        merged[key] += qty
                     else:
-                        merged[pid] = qty
+                        merged[key] = qty
 
                 # Validate all products and group by store
                 items_by_store = defaultdict(list)
-                for product_id, quantity in merged.items():
+                for (product_id, variant_id), quantity in merged.items():
                     try:
                         product = Product.objects.get(id=product_id)
                     except Product.DoesNotExist:
@@ -318,14 +320,24 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                             {'detail': f'Product {product_id} not found'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
-                    if product.stock < quantity:
+                    variant = None
+                    available_stock = product.stock
+                    if variant_id:
+                        variant = ProductVariant.objects.filter(id=variant_id, product=product, is_active=True).first()
+                        if not variant:
+                            return Response(
+                                {'detail': f'Selected variant for {product.name} is not available'},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                        available_stock = min(product.stock, variant.stock)
+                    if available_stock < quantity:
                         return Response(
-                            {'detail': f'Not enough stock for {product.name}'},
+                            {'detail': f'Not enough stock for {product.name}{f" ({variant.title})" if variant else ""}'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
                     # Group by owner_name (store)
                     store_key = (product.owner_name or 'Unknown Store').strip()
-                    items_by_store[store_key].append((product, quantity))
+                    items_by_store[store_key].append((product, variant, quantity))
 
                 pending_status, _ = OrderStatus.objects.get_or_create(name='Pending')
                 method_id = request.data.get('method_id')
@@ -333,7 +345,7 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
 
                 # Create one order per store
                 for store_name, order_items in items_by_store.items():
-                    store_total = sum(p.selling_price * q for p, q in order_items)
+                    store_total = sum((v.discount_price if v and v.discount_price and v.discount_price > 0 and v.discount_price < v.price else v.price) * q if v else p.selling_price * q for p, v, q in order_items)
 
                     # Calculate discount before creating the order so total_amount is correct
                     coupon_applies = (
@@ -365,17 +377,28 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
 
                     order_items_log = []
                     restock_needed_store = []
-                    for product, quantity in order_items:
+                    for product, variant, quantity in order_items:
                         old_stock = product.stock
+                        old_variant_stock = variant.stock if variant else None
+                        unit_price = (
+                            variant.discount_price
+                            if variant and variant.discount_price and variant.discount_price > 0 and variant.discount_price < variant.price
+                            else variant.price
+                            if variant else product.selling_price
+                        )
                         OrderDetail.objects.create(
                             order      = order,
                             product    = product,
+                            variant    = variant,
                             quantity   = quantity,
-                            unit_price = product.selling_price,
+                            unit_price = unit_price,
                         )
                         product.stock      -= quantity
                         product.units_sold += quantity
                         product.save()
+                        if variant:
+                            variant.stock = max(0, variant.stock - quantity)
+                            variant.save(update_fields=['stock', 'updated_at'])
                         # Always add to restock list — auto-PO created for every customer purchase
                         restock_needed_store.append(product)
                         AuditLog.log_action(
@@ -384,10 +407,14 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                             record_id=product.id,
                             old_values={'stock': old_stock, 'product': product.name},
                             new_values={'stock': product.stock, 'product': product.name,
-                                        'deducted': quantity, 'source': f'Order #{order.order_number}'},
+                                        'deducted': quantity, 'variant': variant.title if variant else '',
+                                        'variant_stock_before': old_variant_stock,
+                                        'variant_stock_after': variant.stock if variant else None,
+                                        'source': f'Order #{order.order_number}'},
                         )
                         order_items_log.append({'product': product.name, 'quantity': quantity,
-                                                'unit_price': str(product.selling_price)})
+                                                'variant': variant.title if variant else '',
+                                                'unit_price': str(unit_price)})
 
                     AuditLog.log_action(
                         action='INSERT',
@@ -430,30 +457,37 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                     )
 
                 # Clear cart for these products
-                all_products = [p for items in items_by_store.values() for p, q in items]
-                Cart.objects.filter(
-                    customer=customer,
-                    product__in=all_products
-                ).delete()
+                for product, variant, _quantity in [item for items in items_by_store.values() for item in items]:
+                    Cart.objects.filter(customer=customer, product=product, variant=variant).delete()
 
                 # Return the first order (or could return all orders)
                 return Response(OrderSerializer(created_orders[0] if created_orders else None).data, status=status.HTTP_201_CREATED)
 
             # Fall back to cart-based checkout
-            cart_items = Cart.objects.filter(customer=customer).select_related('product')
+            cart_items = Cart.objects.filter(customer=customer).select_related('product', 'variant')
             if not cart_items.exists():
                 return Response({'detail': 'Cart is empty. Please add items to your cart first.'}, status=status.HTTP_400_BAD_REQUEST)
 
             # Check stock
             for item in cart_items:
-                if item.product.stock < item.order_count:
+                available_stock = item.product.stock
+                if item.variant:
+                    available_stock = min(item.product.stock, item.variant.stock)
+                if available_stock < item.order_count:
                     return Response(
-                        {'detail': f'Not enough stock for {item.product.name}'},
+                        {'detail': f'Not enough stock for {item.product.name}{f" ({item.variant.title})" if item.variant else ""}'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
             # Calculate total
-            total_amount = sum(item.product.selling_price * item.order_count for item in cart_items)
+            def cart_unit_price(item):
+                if item.variant:
+                    if item.variant.discount_price and item.variant.discount_price > 0 and item.variant.discount_price < item.variant.price:
+                        return item.variant.discount_price
+                    return item.variant.price
+                return item.product.selling_price
+
+            total_amount = sum(cart_unit_price(item) * item.order_count for item in cart_items)
 
             # Calculate discount before creating the order so total_amount is correct
             discount = Decimal(str(coupon.discount_percent)) if coupon else Decimal('0')
@@ -483,16 +517,22 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
             restock_needed_cart = []
             for item in cart_items:
                 old_stock = item.product.stock
+                old_variant_stock = item.variant.stock if item.variant else None
+                unit_price = cart_unit_price(item)
                 OrderDetail.objects.create(
                     order      = order,
                     product    = item.product,
+                    variant    = item.variant,
                     quantity   = item.order_count,
-                    unit_price = item.product.selling_price,
+                    unit_price = unit_price,
                 )
                 # Deduct stock & update units_sold
                 item.product.stock      -= item.order_count
                 item.product.units_sold += item.order_count
                 item.product.save()
+                if item.variant:
+                    item.variant.stock = max(0, item.variant.stock - item.order_count)
+                    item.variant.save(update_fields=['stock', 'updated_at'])
                 # Always add to restock list — auto-PO created for every customer purchase
                 restock_needed_cart.append(item.product)
                 AuditLog.log_action(
@@ -501,10 +541,14 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                     record_id=item.product.id,
                     old_values={'stock': old_stock, 'product': item.product.name},
                     new_values={'stock': item.product.stock, 'product': item.product.name,
-                                'deducted': item.order_count, 'source': f'Order #{order.order_number}'},
+                                'deducted': item.order_count, 'variant': item.variant.title if item.variant else '',
+                                'variant_stock_before': old_variant_stock,
+                                'variant_stock_after': item.variant.stock if item.variant else None,
+                                'source': f'Order #{order.order_number}'},
                 )
                 cart_items_log.append({'product': item.product.name, 'quantity': item.order_count,
-                                       'unit_price': str(item.product.selling_price)})
+                                       'variant': item.variant.title if item.variant else '',
+                                       'unit_price': str(unit_price)})
 
             AuditLog.log_action(
                 action='INSERT',
@@ -642,17 +686,23 @@ class CartViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Cart.objects.filter(customer=self.request.user).select_related('product')
+        return Cart.objects.filter(customer=self.request.user).select_related('product', 'variant')
 
     def perform_create(self, serializer):
         serializer.save(customer=self.request.user)
 
     def create(self, request, *args, **kwargs):
         product_id  = request.data.get('product')
+        variant_id  = request.data.get('variant')
         order_count = int(request.data.get('order_count', 1))
         MAX_QTY = 6
+        variant = None
+        if variant_id:
+            variant = ProductVariant.objects.filter(id=variant_id, product_id=product_id, is_active=True).first()
+            if not variant:
+                return Response({'detail': 'Selected variant is not available for this product.'}, status=status.HTTP_400_BAD_REQUEST)
         # Use filter().first() to safely handle any duplicate entries
-        existing = Cart.objects.filter(customer=request.user, product_id=product_id)
+        existing = Cart.objects.filter(customer=request.user, product_id=product_id, variant_id=variant.id if variant else None)
         item = existing.first()
         if item:
             # Delete extra duplicates if any exist
@@ -663,6 +713,7 @@ class CartViewSet(viewsets.ModelViewSet):
         # Clamp new item quantity
         data = request.data.copy()
         data['order_count'] = min(order_count, MAX_QTY)
+        data['variant'] = variant.id if variant else None
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -693,7 +744,7 @@ class CompareListViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         annotated_products = Product.objects.annotate(
             average_rating=Avg('reviews__rating'),
-            review_count=Count('reviews'),
+            review_count=Count('reviews', distinct=True),
         )
         return CompareList.objects.filter(
             customer=self.request.user
