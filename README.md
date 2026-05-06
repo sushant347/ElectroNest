@@ -138,6 +138,7 @@ ElectroNest supports end-to-end e-commerce workflows:
 6. Optional seed data:
    - python manage.py seed_products
    - python manage.py seed_all_data
+   - python manage.py seed_deployment_catalog --skip-migrate
 7. Run server:
    - python manage.py runserver 8000
 
