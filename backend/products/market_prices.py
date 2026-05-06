@@ -15,7 +15,7 @@ from .price_matching import normalize_product_name
 logger = logging.getLogger(__name__)
 
 CACHE_TTL_SECONDS = 60 * 60
-MATCH_VERSION = "v3"
+MATCH_VERSION = "v6"
 MIN_MATCH_SCORE = 72
 STRICT_CORE_SCORE = 90
 PROVIDER_TIMEOUT_SECONDS = float(os.environ.get("MARKET_PRICE_PROVIDER_TIMEOUT", "6"))
@@ -34,10 +34,17 @@ DEFAULT_GADGETBYTE_URLS = (
     "https://www.gadgetbytenepal.com/category/mobile-price-in-nepal/,"
     "https://www.gadgetbytenepal.com/category/laptop-price-in-nepal/"
 )
+GADGETBYTE_MOBILE_URL = "https://www.gadgetbytenepal.com/category/mobile-price-in-nepal/"
+GADGETBYTE_LAPTOP_URL = "https://www.gadgetbytenepal.com/category/laptop-price-in-nepal/"
 
 
 def _clean_name(name: str) -> str:
     return re.sub(r"\s*\([^)]*\)\s*$", "", unescape(name or "")).strip()
+
+
+def _variant_text(name: str) -> str:
+    parts = re.findall(r"\(([^)]*)\)", unescape(name or ""))
+    return " ".join(parts)
 
 
 def _core_product_name(name: str) -> str:
@@ -76,15 +83,83 @@ def _spec_tokens(name: str) -> set[str]:
     return specs
 
 
+def _search_specs(name: str) -> list[str]:
+    text = f"{unescape(name or '')} {_variant_text(name)}".lower()
+    specs = []
+    patterns = [
+        r"\b\d+\s*(?:gb|tb)?\s*/\s*\d+\s*(?:gb|tb)?\b",
+        r"\b\d+\s*\+\s*\d+\s*(?:gb|tb)?\b",
+        r"\b\d+\s*(?:gb|tb)\b",
+        r"\b(?:i[3579]|ryzen\s?[3579]|ultra\s?[3579]|rtx\s?\d{3,4}|gtx\s?\d{3,4})\b",
+    ]
+    for pattern in patterns:
+        for match in re.findall(pattern, text):
+            value = match if isinstance(match, str) else " ".join(match)
+            normalized = re.sub(r"\s+", "", value).upper()
+            if any(existing.endswith(f"/{normalized}") or existing.endswith(f"+{normalized}") for existing in specs):
+                continue
+            if normalized and normalized not in specs:
+                specs.append(normalized)
+    return specs[:4]
+
+
+def _market_search_query(name: str) -> str:
+    core = _core_product_name(name)
+    specs = _search_specs(name)
+    return " ".join([core, *specs]).strip() or _clean_name(name)
+
+
+def _storage_values(name: str) -> tuple[int | None, int | None]:
+    text = unescape(name or "").lower()
+    match = re.search(r"\b(\d+)\s*(?:gb|tb)?\s*/\s*(\d+)\s*(gb|tb)?\b", text)
+    if not match:
+        match = re.search(r"\b(\d+)\s*\+\s*(\d+)\s*(gb|tb)?\b", text)
+    if not match:
+        return None, None
+    ram = int(match.group(1))
+    storage = int(match.group(2))
+    unit = match.group(3) or "gb"
+    if unit == "tb":
+        storage *= 1024
+    return ram, storage
+
+
+def _nearest_storage_score(source_name: str, candidate_name: str) -> float:
+    source_ram, source_storage = _storage_values(source_name)
+    candidate_ram, candidate_storage = _storage_values(candidate_name)
+    if source_ram is None or source_storage is None:
+        return 1
+    if candidate_ram is None or candidate_storage is None:
+        return 0
+    ram_gap = abs(candidate_ram - source_ram) / max(source_ram, candidate_ram, 1)
+    storage_gap = abs(candidate_storage - source_storage) / max(source_storage, candidate_storage, 1)
+    return max(0, 1 - ((ram_gap * 0.45) + (storage_gap * 0.55)))
+
+
+def _is_close_spec_variant(source_name: str, candidate_name: str) -> bool:
+    source_ram, source_storage = _storage_values(source_name)
+    candidate_ram, candidate_storage = _storage_values(candidate_name)
+    if source_ram is None or source_storage is None:
+        return True
+    if candidate_ram is None or candidate_storage is None:
+        return False
+    return (
+        abs(candidate_ram - source_ram) <= max(4, source_ram * 0.5)
+        and abs(candidate_storage - source_storage) <= max(128, source_storage)
+    )
+
+
 def _spec_match_score(source_name: str, candidate_name: str) -> float:
     source_specs = _spec_tokens(source_name)
     candidate_specs = _spec_tokens(candidate_name)
+    storage_score = _nearest_storage_score(source_name, candidate_name)
     if not source_specs:
-        return 1
+        return storage_score
     if not candidate_specs:
-        return 0
+        return storage_score * 0.8
     overlap = len(source_specs & candidate_specs)
-    return overlap / len(source_specs)
+    token_score = overlap / len(source_specs)
+    return max(token_score, storage_score * 0.95)
 
 
 def _has_same_core_product(source_name: str, candidate_name: str) -> bool:
@@ -344,15 +419,40 @@ def _fetch_daraz_apify(query: str) -> list[dict[str, Any]]:
 def _strip_tags(html: str) -> str:
     text = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>", " ", html, flags=re.I)
     text = re.sub(r"<[^>]+>", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
+    return re.sub(r"\s+", " ", unescape(text)).strip()
 
 
-def _fetch_gadgetbyte(query: str) -> list[dict[str, Any]]:
-    urls = [
+def _display_offer_name(name: str) -> str:
+    text = unescape(name or "")
+    text = re.sub(r"&#x27;|&quot;|&amp;", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _is_phone_product(text: str) -> bool:
+    hay = normalize_product_name(text)
+    return any(word in hay.split() for word in ("phone", "smartphone", "iphone", "galaxy", "redmi", "xiaomi", "oneplus", "realme", "vivo", "oppo", "honor"))
+
+
+def _is_laptop_product(text: str) -> bool:
+    hay = normalize_product_name(text)
+    return any(word in hay.split() for word in ("laptop", "notebook", "swift", "aspire", "vivobook", "zenbook", "thinkpad", "ideapad", "macbook", "victus", "loq"))
+
+
+def _gadgetbyte_urls_for_query(query: str) -> list[str]:
+    if _is_phone_product(query):
+        return [os.environ.get("GADGETBYTE_MOBILE_PRICE_URL", GADGETBYTE_MOBILE_URL)]
+    if _is_laptop_product(query):
+        return [os.environ.get("GADGETBYTE_LAPTOP_PRICE_URL", GADGETBYTE_LAPTOP_URL)]
+    return [
         item.strip()
         for item in os.environ.get("GADGETBYTE_PRICE_URLS", DEFAULT_GADGETBYTE_URLS).split(",")
         if item.strip()
     ]
+
+
+def _fetch_gadgetbyte(query: str) -> list[dict[str, Any]]:
+    urls = _gadgetbyte_urls_for_query(query)
     offers: list[dict[str, Any]] = []
     headers = {"User-Agent": "ElectroNest price comparison bot/1.0"}
     for url in urls:
@@ -381,7 +481,7 @@ def _fetch_gadgetbyte(query: str) -> list[dict[str, Any]]:
                 offer_name = f"{current_product_heading} {text}"
             if not _has_same_core_product(query, offer_name):
                 continue
-            offer = _offer(offer_name, price_match.group(1), "GadgetByte Nepal", url)
+            offer = _offer(_display_offer_name(offer_name), price_match.group(1), "GadgetByte Nepal", url)
             if offer:
                 offers.append(offer)
     return offers
@@ -437,14 +537,21 @@ def _build_snapshot(offers: list[dict[str, Any]], source: str) -> dict[str, Any]
 
 
 def get_market_price_snapshot(product) -> dict[str, Any]:
-    query = _clean_name(product.name)
+    query = _market_search_query(product.name)
     cache_key = f"market_price_snapshot:{MATCH_VERSION}:{product.id}:{normalize_product_name(query)}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
     nepal_fetchers = (_fetch_custom_market_url, _fetch_daraz_apify, _fetch_gadgetbyte)
-    nepal_matches = _match_offers(product.name, _fetch_offers(query, nepal_fetchers), allow_nearest_spec=False)
+    nepal_offers = _fetch_offers(query, nepal_fetchers)
+    nepal_matches = _match_offers(product.name, nepal_offers, allow_nearest_spec=False)
+    if not nepal_matches:
+        nepal_matches = _match_offers(product.name, nepal_offers, allow_nearest_spec=True)
+        nepal_matches = [
+            offer for offer in nepal_matches
+            if offer.get("spec_match_score", 0) >= 0.65 and _is_close_spec_variant(product.name, offer["name"])
+        ]
     snapshot = _build_snapshot(nepal_matches, "live_market_api")
 
     if snapshot["market_price"] is None:

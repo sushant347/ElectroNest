@@ -15,10 +15,9 @@ from django.db.models import Avg, Count
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import Category, Supplier, Product, Review
+from .models import Category, Supplier, Product, Review, MarketPriceSnapshot
 from .serializers import CategorySerializer, SupplierSerializer, ProductSerializer, ReviewSerializer
 from .price_matching import get_price_comparison
-from .market_prices import get_market_price_snapshot
 from admin_panel.models import AuditMixin, AuditLog
 
 def _get_market_anchor_price(product: Product) -> Decimal:
@@ -34,12 +33,6 @@ def _get_price_advantage_percent(product: Product) -> Decimal:
     return (Decimal('6.5') + (Decimal(seed % 70) / Decimal('10'))).quantize(Decimal('0.1'))
 
 
-def _compute_platform_price_from_market(market_price, product: Product) -> float:
-    advantage = _get_price_advantage_percent(product)
-    computed = Decimal(str(market_price)) * ((Decimal('100') - advantage) / Decimal('100'))
-    return float(computed.quantize(Decimal('0.01')))
-
-
 def _get_savings_percent(market_price: float, platform_price: float) -> float:
     if market_price <= 0:
         return 0
@@ -53,16 +46,6 @@ def _compute_locked_platform_price(product: Product) -> Decimal:
     computed = (market_anchor * multiplier).quantize(Decimal('0.01'))
     # Respect DB check constraint: SellingPrice must be strictly > 0.
     return computed if computed > Decimal('0.00') else Decimal('0.01')
-
-
-def _get_market_variation(product: Product, date_value, index: int, market_snapshot: dict) -> float:
-    offer_volatility = float(market_snapshot.get('market_volatility_percent') or 0)
-    volatility_weight = min(0.08, max(0.018, offer_volatility / 250))
-    stable_id = product.id or sum(ord(ch) for ch in (product.sku or product.name or "product"))
-    seasonal = ((date_value.month % 5) - 2) * 0.006
-    weekday = (date_value.weekday() - 3) * 0.003
-    cycle = (((date_value.day + stable_id + index) % 9) - 4) * 0.004
-    return max(-0.12, min(0.12, seasonal + weekday + cycle + volatility_weight / 2))
 
 
 def _get_fallback_volatility_percent(product: Product) -> float:
@@ -89,7 +72,7 @@ class IsOwnerOrAdmin(BasePermission):
 
 
 class CategoryViewSet(AuditMixin, viewsets.ModelViewSet):
-    queryset         = Category.objects.all()
+    queryset         = Category.objects.exclude(name='Legacy Catalog')
     serializer_class = CategorySerializer
 
     def get_permissions(self):
@@ -111,7 +94,7 @@ class SupplierViewSet(AuditMixin, viewsets.ModelViewSet):
 
 
 class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
-    queryset         = Product.objects.select_related('category', 'supplier')
+    queryset         = Product.objects.select_related('category', 'supplier').prefetch_related('variants')
     serializer_class = ProductSerializer
     filter_backends  = [filters.SearchFilter, filters.OrderingFilter]
     search_fields    = ['name', 'sku', 'brand']
@@ -184,6 +167,8 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs       = super().get_queryset()
+        if getattr(self, 'action', None) == 'list':
+            qs = qs.exclude(category__name='Legacy Catalog')
         category = self.request.query_params.get('category')
         brand    = self.request.query_params.get('brand')
         owner    = self.request.query_params.get('owner')
@@ -250,14 +235,16 @@ class PriceHistoryView(APIView):
         except Product.DoesNotExist:
             return Response({'detail': 'Product not found.'}, status=drf_status.HTTP_404_NOT_FOUND)
 
-        locked_platform_price = _compute_locked_platform_price(product)
-        actual_selling_price = float(product.selling_price or locked_platform_price)
+        actual_selling_price = float(product.selling_price or 0)
         cost_price = float(product.cost_price)
         discount_price = float(product.discount_price) if product.discount_price else None
 
-        market_snapshot = get_market_price_snapshot(product)
-        market_price = market_snapshot.get('market_price')
-        if market_price is None:
+        snapshots = list(
+            MarketPriceSnapshot.objects
+            .filter(product=product, market_price__isnull=False)
+            .order_by('month')
+        )
+        if not snapshots:
             return Response({
                 'product_id': product_id,
                 'product_name': product.name,
@@ -275,71 +262,24 @@ class PriceHistoryView(APIView):
                 'market_offers': [],
                 'savings_percent': None,
                 'price_history': [],
-                'detail': 'No same-product live market offer was found.',
+                'detail': 'No stored market price snapshots found. Run python manage.py import_gadgetbyte_catalog or refresh_market_prices.',
             })
-        market_anchor = market_price
+
+        latest_snapshot = snapshots[-1]
+        market_price = float(latest_snapshot.market_price)
         selling_price = actual_selling_price
         price_advantage_percent = _get_savings_percent(market_price, selling_price)
 
-        # Audit logs are used only for real event dates; the comparison values
-        # are based on the latest fetched market snapshot.
-        history_dates = []
-        logs = (
-            AuditLog.objects
-            .filter(table_name='Products', record_id=product_id, action__in=['UPDATE', 'CREATE', 'INSERT'])
-            .order_by('timestamp')
-        )
-
-        for log in logs:
-            try:
-                old_vals = json.loads(log.old_values) if log.old_values else {}
-                new_vals = json.loads(log.new_values) if log.new_values else {}
-            except (json.JSONDecodeError, TypeError):
-                old_vals = {}
-                new_vals = {}
-
-            new_price = new_vals.get('selling_price') or new_vals.get('SellingPrice')
-            if new_price is not None:
-                history_dates.append(log.timestamp)
-
-        if not history_dates:
-            now = timezone.now()
-            created_at = product.created_at or now
-            total_days = max(1, (now.date() - created_at.date()).days)
-            step_days = max(1, total_days // 8)
-            current = created_at
-
-            while current <= now:
-                history_dates.append(current)
-                current += timedelta(days=step_days)
-
-        now = timezone.now()
-        if not history_dates or history_dates[-1].strftime('%Y-%m-%d') != now.strftime('%Y-%m-%d'):
-            history_dates.append(now)
-
         price_history = []
-        unique_dates = []
-        seen_dates = set()
-        for value in history_dates:
-            key = value.strftime('%Y-%m-%d')
-            if key in seen_dates:
-                continue
-            seen_dates.add(key)
-            unique_dates.append(value)
-
-        for index, value in enumerate(unique_dates):
-            is_latest = value.strftime('%Y-%m-%d') == now.strftime('%Y-%m-%d')
-            row_market_price = market_anchor if is_latest else round(
-                market_anchor * (1 + _get_market_variation(product, value, index, market_snapshot)),
-                2,
-            )
+        for snapshot in snapshots:
+            row_market_price = float(snapshot.market_price)
             row_platform_price = selling_price
             row_volatility = max(
                 abs(row_market_price - row_platform_price),
-                row_market_price * max(0.02, float(market_snapshot.get('market_volatility_percent') or 4) / 200),
+                row_market_price * max(0.02, float(snapshot.volatility_percent or 4) / 200),
             )
             price_history.append({
-                'date': value.strftime('%Y-%m-%d'),
+                'date': snapshot.month.strftime('%Y-%m-%d'),
                 'our_price': row_platform_price,
                 'market_price': round(row_market_price, 2),
                 'market_low': round(max(0.01, row_market_price - row_volatility), 2),
@@ -353,9 +293,13 @@ class PriceHistoryView(APIView):
         # Compute savings
         savings_percent = _get_savings_percent(market_price, selling_price)
         trend_volatility_percent = max(
-            float(market_snapshot.get('market_volatility_percent') or 0),
+            float(latest_snapshot.volatility_percent or 0),
             _get_trend_volatility_percent(price_history, product),
         )
+        try:
+            market_offers = json.loads(latest_snapshot.offers_json or '[]')
+        except (json.JSONDecodeError, TypeError):
+            market_offers = []
 
         return Response({
             'product_id': product_id,
@@ -365,13 +309,13 @@ class PriceHistoryView(APIView):
             'current_cost_price': cost_price,
             'current_discount_price': discount_price,
             'market_price': market_price,
-            'lowest_market_price': market_snapshot.get('lowest_market_price'),
-            'highest_market_price': market_snapshot.get('highest_market_price'),
+            'lowest_market_price': float(latest_snapshot.lowest_market_price) if latest_snapshot.lowest_market_price is not None else None,
+            'highest_market_price': float(latest_snapshot.highest_market_price) if latest_snapshot.highest_market_price is not None else None,
             'market_volatility_percent': round(trend_volatility_percent, 1),
             'price_advantage_percent': max(0, price_advantage_percent),
-            'market_source': market_snapshot.get('source', 'fallback'),
-            'market_currency_note': market_snapshot.get('currency_note', ''),
-            'market_offers': market_snapshot.get('offers', []),
+            'market_source': latest_snapshot.source,
+            'market_currency_note': latest_snapshot.currency_note,
+            'market_offers': market_offers,
             'savings_percent': max(0, savings_percent),
             'price_history': price_history,
         })

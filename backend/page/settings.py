@@ -54,7 +54,7 @@ INSTALLED_APPS = [
 
     # Custom apps
     'accounts.apps.AccountsConfig',
-    'products',
+    'products.apps.ProductsConfig',
     'orders',
     'analytics',
     'warehouse',

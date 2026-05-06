@@ -64,6 +64,53 @@ class Product(models.Model):
         return self.name
 
 
+class ProductVariant(models.Model):
+    id = models.BigAutoField(primary_key=True, db_column='VariantID')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants', db_column='ProductID')
+    title = models.CharField(max_length=120, db_column='VariantTitle')
+    sku = models.CharField(max_length=80, blank=True, default='', db_column='VariantSKU')
+    color = models.CharField(max_length=60, blank=True, default='', db_column='VariantColor')
+    specs = models.CharField(max_length=500, blank=True, default='', db_column='VariantSpecs')
+    price = models.DecimalField(max_digits=12, decimal_places=2, db_column='VariantPrice')
+    discount_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, db_column='VariantDiscountPrice')
+    stock = models.IntegerField(default=0, db_column='VariantStock')
+    source_id = models.CharField(max_length=80, blank=True, default='', db_column='SourceVariantID')
+    is_default = models.BooleanField(default=False, db_column='IsDefault')
+    is_active = models.BooleanField(default=True, db_column='IsActive')
+    created_at = models.DateTimeField(auto_now_add=True, db_column='CreatedAt')
+    updated_at = models.DateTimeField(auto_now=True, db_column='UpdatedAt')
+
+    class Meta:
+        db_table = 'ProductVariants'
+        ordering = ['product_id', '-is_default', 'price', 'id']
+        unique_together = [('product', 'title')]
+
+    def __str__(self):
+        return f"{self.product.name} - {self.title}"
+
+
+class MarketPriceSnapshot(models.Model):
+    id = models.BigAutoField(primary_key=True, db_column='SnapshotID')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='market_price_snapshots', db_column='ProductID')
+    month = models.DateField(db_column='SnapshotMonth')
+    market_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, db_column='MarketPrice')
+    lowest_market_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, db_column='LowestMarketPrice')
+    highest_market_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, db_column='HighestMarketPrice')
+    volatility_percent = models.DecimalField(max_digits=6, decimal_places=2, default=0, db_column='VolatilityPercent')
+    source = models.CharField(max_length=50, db_column='Source')
+    currency_note = models.CharField(max_length=255, blank=True, default='', db_column='CurrencyNote')
+    offers_json = models.TextField(blank=True, default='[]', db_column='OffersJSON')
+    fetched_at = models.DateTimeField(auto_now=True, db_column='FetchedAt')
+
+    class Meta:
+        db_table = 'MarketPriceSnapshots'
+        ordering = ['month']
+        unique_together = [('product', 'month')]
+
+    def __str__(self):
+        return f"{self.product_id} {self.month} {self.source}"
+
+
 class Customer(models.Model):
     """Legacy Customers table with 1,611 pre-existing customer records."""
     id                = models.AutoField(primary_key=True, db_column='CustomerID')
