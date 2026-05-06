@@ -1,0 +1,10 @@
+frontend/src/components/images/Gaming[[:space:]]Console.png filter=lfs diff=lfs merge=lfs -text
+frontend/src/components/images/camera.png filter=lfs diff=lfs merge=lfs -text
+frontend/src/components/images/drone.png filter=lfs diff=lfs merge=lfs -text
+frontend/src/components/images/headphones.png filter=lfs diff=lfs merge=lfs -text
+frontend/src/components/images/laptops.png filter=lfs diff=lfs merge=lfs -text
+frontend/src/components/images/monitors.png filter=lfs diff=lfs merge=lfs -text
+frontend/src/components/images/smart[[:space:]]watches.png filter=lfs diff=lfs merge=lfs -text
+frontend/src/components/images/smartphones.png filter=lfs diff=lfs merge=lfs -text
+frontend/src/components/images/speakers.png filter=lfs diff=lfs merge=lfs -text
+frontend/src/components/images/tablets.png filter=lfs diff=lfs merge=lfs -text
