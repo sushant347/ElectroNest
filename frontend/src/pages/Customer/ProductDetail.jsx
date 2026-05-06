@@ -66,9 +66,10 @@ function PriceComparisonChart({ productId }) {
     return () => { cancelled = true; };
   }, [productId]);
 
-  if (!loading && (!data || !data.price_history?.length)) return null;
+  if (!loading && !data) return null;
 
   const priceHistory = Array.isArray(data?.price_history) ? data.price_history : [];
+  const hasLiveMarketData = data?.market_source === 'live_market_api' && priceHistory.length > 0;
   const savings = Number(data?.savings_percent || 0);
   const marketPrice = Number(data?.market_price || 0);
   const yourPrice = Number(data?.current_selling_price || 0);
@@ -139,6 +140,19 @@ function PriceComparisonChart({ productId }) {
         <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
           <SkeletonText lines={3} />
           <div style={{ height: 220, borderRadius: 14, background: 'linear-gradient(90deg,#fff7ed 25%,#ffedd5 37%,#fff7ed 63%)', backgroundSize: '400% 100%', animation: 'pd-shimmer 1.4s ease infinite' }} />
+        </div>
+      ) : !hasLiveMarketData ? (
+        <div style={{
+          marginTop: 14,
+          padding: '14px 16px',
+          border: '1px solid #e2e8f0',
+          borderRadius: 12,
+          background: '#f8fafc',
+          color: '#475569',
+          fontSize: 13,
+          fontWeight: 600,
+        }}>
+          Live market price is unavailable for this exact product name right now.
         </div>
       ) : (
         <>

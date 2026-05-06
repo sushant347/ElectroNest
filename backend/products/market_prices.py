@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from html import unescape
 from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from statistics import mean
 from typing import Any
@@ -14,9 +15,20 @@ from .price_matching import normalize_product_name
 logger = logging.getLogger(__name__)
 
 CACHE_TTL_SECONDS = 60 * 60
-MIN_MATCH_SCORE = 58
+MATCH_VERSION = "v2"
+MIN_MATCH_SCORE = 72
+STRICT_CORE_SCORE = 90
 PROVIDER_TIMEOUT_SECONDS = float(os.environ.get("MARKET_PRICE_PROVIDER_TIMEOUT", "6"))
 TOTAL_TIMEOUT_SECONDS = float(os.environ.get("MARKET_PRICE_TOTAL_TIMEOUT", "12"))
+COLOR_WORDS = {
+    "black", "white", "silver", "gold", "blue", "red", "green", "orange", "purple", "pink",
+    "gray", "grey", "yellow", "midnight", "starlight", "titanium", "graphite", "cream",
+    "alpine", "volcano", "desert", "phantom", "natural", "space",
+}
+NON_MODEL_WORDS = {
+    "price", "in", "nepal", "china", "expected", "new", "official", "latest", "with",
+    "and", "or", "rs", "npr", "cny", "gb", "tb", "ram", "rom",
+}
 DEFAULT_GADGETBYTE_URLS = (
     "https://www.gadgetbytenepal.com/category/mobile-price-in-nepal/,"
     "https://www.gadgetbytenepal.com/category/laptop-price-in-nepal/"
@@ -24,7 +36,51 @@ DEFAULT_GADGETBYTE_URLS = (
 
 
 def _clean_name(name: str) -> str:
-    return re.sub(r"\s*\([^)]*\)\s*$", "", name or "").strip()
+    return re.sub(r"\s*\([^)]*\)\s*$", "", unescape(name or "")).strip()
+
+
+def _core_product_name(name: str) -> str:
+    text = unescape(name or "").lower()
+    text = re.sub(r"\([^)]*\)", " ", text)
+    text = re.sub(r"\b\d+\s*(?:gb|tb)\s*/\s*\d+\s*(?:gb|tb)?\b", " ", text)
+    text = re.sub(r"\b\d+\s*/\s*\d+\s*(?:gb|tb)?\b", " ", text)
+    text = re.sub(r"\b\d+\s*(?:gb|tb|mm|inch|hz|mah|w)\b", " ", text)
+    text = re.sub(r"\b\d+\+\d+\s*(?:gb|tb)?\b", " ", text)
+    text = re.sub(r"\b(?:rs|npr|cny)\s*[\d,]+(?:\.\d+)?\b", " ", text)
+    text = re.sub(r"[^a-z0-9\s+-]", " ", text)
+    words = []
+    for word in re.sub(r"\s+", " ", text).strip().split():
+        cleaned = word.strip("+-")
+        if not cleaned or cleaned in COLOR_WORDS or cleaned in NON_MODEL_WORDS:
+            continue
+        words.append(cleaned)
+    return " ".join(words)
+
+
+def _core_tokens(name: str) -> set[str]:
+    return {token for token in _core_product_name(name).split() if token}
+
+
+def _has_same_core_product(source_name: str, candidate_name: str) -> bool:
+    source_core = _core_product_name(source_name)
+    candidate_core = _core_product_name(candidate_name)
+    source_tokens = _core_tokens(source_name)
+    candidate_tokens = _core_tokens(candidate_name)
+    if not source_core or not candidate_core or not source_tokens:
+        return False
+
+    # Same model numbers must stay the same. This prevents Xiaomi 14 Ultra
+    # from matching Xiaomi 17 Ultra while still allowing storage/color variants.
+    source_numbers = {token for token in source_tokens if token.isdigit()}
+    candidate_numbers = {token for token in candidate_tokens if token.isdigit()}
+    if source_numbers and not source_numbers.issubset(candidate_numbers):
+        return False
+
+    required_text_tokens = {token for token in source_tokens if not token.isdigit()}
+    if required_text_tokens and not required_text_tokens.issubset(candidate_tokens):
+        return False
+
+    return fuzz.token_set_ratio(source_core, candidate_core) >= STRICT_CORE_SCORE
 
 
 def _price_to_float(value: Any) -> float | None:
@@ -77,6 +133,8 @@ def _match_offers(product_name: str, offers: list[dict[str, Any]]) -> list[dict[
     source = normalize_product_name(_clean_name(product_name))
     matched = []
     for offer in offers:
+        if not _has_same_core_product(product_name, offer["name"]):
+            continue
         candidate = normalize_product_name(_clean_name(offer["name"]))
         score = fuzz.token_set_ratio(source, candidate)
         if score >= MIN_MATCH_SCORE:
@@ -158,17 +216,24 @@ def _fetch_gadgetbyte(query: str) -> list[dict[str, Any]]:
             continue
 
         rows = re.findall(r"<tr[\s\S]*?</tr>", response.text, flags=re.I)
+        current_product_heading = ""
         for row in rows:
             text = _strip_tags(row)
             if "Rs" not in text:
+                if _has_same_core_product(query, text):
+                    current_product_heading = text
                 continue
             price_match = re.search(r"Rs\.?\s*([\d,]+(?:\.\d+)?)", text, flags=re.I)
             if not price_match:
                 continue
-            score = fuzz.token_set_ratio(normalize_product_name(query), normalize_product_name(text))
-            if score < MIN_MATCH_SCORE:
+            offer_name = text
+            if not _has_same_core_product(query, offer_name):
+                if not current_product_heading or not _has_same_core_product(query, current_product_heading):
+                    continue
+                offer_name = f"{current_product_heading} {text}"
+            if not _has_same_core_product(query, offer_name):
                 continue
-            offer = _offer(text, price_match.group(1), "GadgetByte Nepal", url)
+            offer = _offer(offer_name, price_match.group(1), "GadgetByte Nepal", url)
             if offer:
                 offers.append(offer)
     return offers
@@ -176,7 +241,7 @@ def _fetch_gadgetbyte(query: str) -> list[dict[str, Any]]:
 
 def get_market_price_snapshot(product) -> dict[str, Any]:
     query = _clean_name(product.name)
-    cache_key = f"market_price_snapshot:{product.id}:{normalize_product_name(query)}"
+    cache_key = f"market_price_snapshot:{MATCH_VERSION}:{product.id}:{normalize_product_name(query)}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached

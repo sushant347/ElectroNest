@@ -256,8 +256,26 @@ class PriceHistoryView(APIView):
         discount_price = float(product.discount_price) if product.discount_price else None
 
         market_snapshot = get_market_price_snapshot(product)
-        fallback_market_anchor = float(_get_market_anchor_price(product))
-        market_price = market_snapshot.get('market_price') or fallback_market_anchor
+        market_price = market_snapshot.get('market_price')
+        if market_price is None:
+            return Response({
+                'product_id': product_id,
+                'product_name': product.name,
+                'current_selling_price': actual_selling_price,
+                'actual_selling_price': actual_selling_price,
+                'current_cost_price': cost_price,
+                'current_discount_price': discount_price,
+                'market_price': None,
+                'lowest_market_price': None,
+                'highest_market_price': None,
+                'market_volatility_percent': 0,
+                'price_advantage_percent': None,
+                'market_source': 'no_live_market_data',
+                'market_offers': [],
+                'savings_percent': None,
+                'price_history': [],
+                'detail': 'No same-product live market offer was found.',
+            })
         market_anchor = market_price
         selling_price = actual_selling_price
         price_advantage_percent = _get_savings_percent(market_price, selling_price)
