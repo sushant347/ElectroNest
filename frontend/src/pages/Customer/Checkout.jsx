@@ -637,7 +637,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
 
   /* -- cart calculations -- */
   const checkoutItems = selectedIds.length > 0
-    ? cartItems.filter((item) => selectedIds.includes(item.id))
+    ? cartItems.filter((item) => selectedIds.includes(item.cartKey || item.id))
     : cartItems;
   const subtotal = checkoutItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const totalItems = checkoutItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -878,6 +878,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
       const orderData = {
         items: checkoutItems.map((item) => ({
           product_id: item.id,
+          variant_id: item.variantId || null,
           quantity: item.quantity,
         })),
         // Customer contact info (backend will update customer record)
@@ -1586,6 +1587,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                           <img src={item.image} alt={item.name} style={s.summaryItemImg} />
                           <div style={s.summaryItemInfo}>
                             <div style={s.summaryItemName}>{item.name}</div>
+                            {item.variantLabel && <div style={s.summaryItemQty}>Variant: {item.variantLabel}</div>}
                             <div style={s.summaryItemQty}>Qty: {item.quantity}</div>
                           </div>
                           <div style={s.summaryItemPrice}>{formatPrice(item.price * item.quantity)}</div>
@@ -1647,8 +1649,9 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
                       <div key={item.id} style={s.summaryItem}>
                         <img src={item.image} alt={item.name} style={s.summaryItemImg} />
                         <div style={s.summaryItemInfo}>
-                          <div style={s.summaryItemName}>{item.name}</div>
-                          <div style={s.summaryItemQty}>Qty: {item.quantity}</div>
+                        <div style={s.summaryItemName}>{item.name}</div>
+                        {item.variantLabel && <div style={s.summaryItemQty}>Variant: {item.variantLabel}</div>}
+                        <div style={s.summaryItemQty}>Qty: {item.quantity}</div>
                         </div>
                         <div style={s.summaryItemPrice}>{formatPrice(item.price * item.quantity)}</div>
                       </div>

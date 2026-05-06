@@ -113,20 +113,27 @@ export default function App() {
   /* ── Normalize backend cart item to frontend format ── */
   const normalizeCartItem = (item) => {
     const p = item.product_detail || item.product || {}
+    const v = item.variant_detail || null
     const selling = parseFloat(p.selling_price || 0)
     const disc = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null
-    const onSale = disc !== null && disc > 0 && disc < selling
+    const variantPrice = v ? parseFloat(v.price || 0) : selling
+    const variantDisc = v && v.discount_price != null && v.discount_price !== '' ? parseFloat(v.discount_price) : null
+    const onSale = v ? (variantDisc !== null && variantDisc > 0 && variantDisc < variantPrice) : (disc !== null && disc > 0 && disc < selling)
+    const variantId = v?.id || item.variant || null
     return {
       id: p.id || item.product,
+      cartKey: `${p.id || item.product}:${variantId || 'base'}`,
       cartItemId: item.id,
       name: p.name || p.ProductName || '',
+      variantId,
+      variantLabel: v?.title || '',
       category: p.category_name || '',
-      price: onSale ? disc : selling,
-      origPrice: onSale ? selling : null,
+      price: v ? (onSale ? variantDisc : variantPrice) : (onSale ? disc : selling),
+      origPrice: onSale ? (v ? variantPrice : selling) : null,
       onSale,
       image: p.image_url || '',
       brand: p.brand || '',
-      stock: p.stock || 0,
+      stock: v ? Math.min(p.stock || 0, v.stock || 0) : (p.stock || 0),
       quantity: item.order_count || 1,
       owner_name: p.owner_name || '',
     }
@@ -158,18 +165,31 @@ export default function App() {
   /* ── Normalize backend compare item to frontend format ── */
   const normalizeCompareItem = (item) => {
     const p = item.product_detail || item.product || {}
+    const selling = parseFloat(p.selling_price || 0)
+    const disc = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null
+    const onSale = disc !== null && disc > 0 && disc < selling
+    const rating = Number(p.average_rating ?? p.rating ?? 0)
+    const ratingCount = Number(p.rating_count ?? p.review_count ?? 0)
+    const unitsSold = Number(p.units_sold ?? p.sold ?? 0)
     return {
       id: p.id || item.product,
       compareItemId: item.id,
       name: p.name || p.ProductName || '',
       category: p.category_name || '',
-      price: parseFloat(p.selling_price || 0),
+      price: onSale ? disc : selling,
+      origPrice: onSale ? selling : null,
+      onSale,
       image: p.image_url || '',
       brand: p.brand || '',
       stock: p.stock || 0,
       specifications: p.specifications || '',
-      rating: parseFloat(p.average_rating || 0) || 4.5,
-      reviewCount: Number(p.review_count ?? 0),
+      rating,
+      averageRating: rating,
+      reviewCount: ratingCount,
+      ratingCount,
+      actualReviewCount: Number(p.review_count ?? 0),
+      sold: unitsSold,
+      unitsSold,
       inStock: (p.stock || 0) > 0,
     }
   }
@@ -185,12 +205,13 @@ export default function App() {
       const merged = []
       const seen = new Map()
       for (const item of normalized) {
-        if (seen.has(item.id)) {
+        const key = item.cartKey || item.id
+        if (seen.has(key)) {
           // Keep earliest entry; accumulate quantity (capped at 6)
-          const existing = merged[seen.get(item.id)]
+          const existing = merged[seen.get(key)]
           existing.quantity = Math.min(6, existing.quantity + item.quantity)
         } else {
-          seen.set(item.id, merged.length)
+          seen.set(key, merged.length)
           merged.push({ ...item, quantity: Math.min(6, item.quantity) })
         }
       }
@@ -250,23 +271,24 @@ export default function App() {
 
   const addToCart = async (product) => {
     const qty = Math.min(product.quantity || 1, 6)
+    const cartKey = product.cartKey || `${product.id}:${product.variantId || 'base'}`
     // Optimistic local update
     setCartItems(prev => {
-      const existing = prev.find(item => item.id === product.id)
+      const existing = prev.find(item => (item.cartKey || `${item.id}:${item.variantId || 'base'}`) === cartKey)
       if (existing) {
         return prev.map(item =>
-          item.id === product.id
+          (item.cartKey || `${item.id}:${item.variantId || 'base'}`) === cartKey
             ? { ...item, quantity: Math.min(item.quantity + qty, 6) }
             : item
         )
       }
-      return [...prev, { ...product, quantity: qty }]
+      return [...prev, { ...product, cartKey, quantity: qty }]
     })
     addToast({ type: 'cart', product })
     // Sync with backend
     if (user && user.role === 'customer') {
       try {
-        await customerAPI.addToCart(product.id, qty)
+        await customerAPI.addToCart(product.id, qty, product.variantId || null)
         await loadCartFromAPI()
       } catch (err) {
         console.error('Failed to add to cart:', err)
@@ -275,8 +297,8 @@ export default function App() {
   }
 
   const removeFromCart = async (id) => {
-    const item = cartItems.find(i => i.id === id)
-    setCartItems(prev => prev.filter(item => item.id !== id))
+    const item = cartItems.find(i => (i.cartKey || i.id) === id)
+    setCartItems(prev => prev.filter(item => (item.cartKey || item.id) !== id))
     setCheckoutSelection(prev => prev.filter(itemId => itemId !== id))
     setPendingWishlistCheckoutIds(prev => prev.filter(itemId => itemId !== id))
     if (user && user.role === 'customer' && item?.cartItemId) {
@@ -291,8 +313,8 @@ export default function App() {
   const updateCartQuantity = async (id, quantity) => {
     if (quantity < 1) return
     const clampedQty = Math.min(quantity, 6)
-    const item = cartItems.find(i => i.id === id)
-    setCartItems(prev => prev.map(item => item.id === id ? { ...item, quantity: clampedQty } : item))
+    const item = cartItems.find(i => (i.cartKey || i.id) === id)
+    setCartItems(prev => prev.map(item => (item.cartKey || item.id) === id ? { ...item, quantity: clampedQty } : item))
     if (user && user.role === 'customer' && item?.cartItemId) {
       try {
         await customerAPI.updateCartItem(item.cartItemId, clampedQty)
@@ -425,7 +447,20 @@ export default function App() {
       if (compareItems.length >= 3) {
         addToast({ type: 'warning', message: "You can compare up to 3 products only." })
       } else {
-        setCompareItems(prev => [...prev, { ...product, specifications: product.specifications || '', rating: product.rating || 4.5, inStock: true }])
+        const rating = Number(product.averageRating ?? product.rating ?? 0)
+        const ratingCount = Number(product.ratingCount ?? product.reviewCount ?? product.reviews ?? 0)
+        const unitsSold = Number(product.unitsSold ?? product.sold ?? product.units_sold ?? 0)
+        setCompareItems(prev => [...prev, {
+          ...product,
+          specifications: product.specifications || '',
+          rating,
+          averageRating: rating,
+          reviewCount: ratingCount,
+          ratingCount,
+          sold: unitsSold,
+          unitsSold,
+          inStock: Number(product.stock ?? 0) > 0,
+        }])
         addToast({ type: 'add', product })
         if (user && user.role === 'customer') {
           try {

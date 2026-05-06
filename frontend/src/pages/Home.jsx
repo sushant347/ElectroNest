@@ -3,6 +3,12 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FiHeart, FiBarChart2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { customerAPI } from '../services/api'
 import { HeaderSkeleton, CardGridSkeleton } from '../components/Common/SkeletonLoader'
+import imgHeadphones from '../components/images/headphones.png'
+import imgLaptops from '../components/images/laptops.png'
+import imgMonitors from '../components/images/monitors.png'
+import imgSmartphones from '../components/images/smartphones.png'
+import imgSpeakers from '../components/images/speakers.png'
+import imgTablets from '../components/images/tablets.png'
 import imgWatch from '../components/images/smart watches.png'
 import imgCamera from '../components/images/camera.png'
 import imgDrone from '../components/images/drone.png'
@@ -10,6 +16,15 @@ import imgGaming from '../components/images/Gaming Console.png'
 
 const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
 const getArrayData = (data) => data?.results || data || []
+const uniqueByName = (items) => {
+  const seen = new Set()
+  return items.filter(item => {
+    const key = (item.name || '').trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
 const productNameKey = (name = '') => name
   .replace(/\([^)]*\)/g, '')
   .replace(/\b(color|colour|grade|variant)\s*:\s*[^|,/]+/gi, '')
@@ -18,24 +33,35 @@ const productNameKey = (name = '') => name
   .replace(/\s+/g, ' ')
   .toLowerCase()
 
+const CATALOG_CATEGORIES = [
+  'Smartphones', 'Laptops', 'Monitors', 'Tablets', 'Drones', 'Smartwatches', 'PC Builds', 'Speakers', 'Earbuds', 'Headphones',
+  'Cameras', 'Gaming Consoles',
+]
+
 const HERO_SLIDES = [
-  { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'Gaming', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: imgGaming },
-  { badge: '⌚ Most Popular', title: 'Wear the Future on Your Wrist', sub: 'Smart watches for fitness, work and everyday style', cat: 'Smart Watches', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', img: imgWatch },
+  { badge: '💻 Work Ready', title: 'Power Through With Laptops', sub: 'Portable performance for study, creative work and business', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', img: imgLaptops },
+  { badge: '📱 Fresh Picks', title: 'Find Your Next Smartphone', sub: 'Flagship cameras, smooth displays and all-day batteries', cat: 'Smartphones', bg: 'linear-gradient(135deg,#f0f9ff,#e0f2fe)', img: imgSmartphones },
+  { badge: '🖥️ Desk Upgrade', title: 'Sharper Monitors For Every Setup', sub: 'Gaming, creator and office displays with crisp detail', cat: 'Monitors', bg: 'linear-gradient(135deg,#f8fafc,#e2e8f0)', img: imgMonitors },
+  { badge: '📟 Portable Screens', title: 'Tablets For Work And Play', sub: 'Lightweight tablets for notes, streaming and multitasking', cat: 'Tablets', bg: 'linear-gradient(135deg,#ecfeff,#cffafe)', img: imgTablets },
+  { badge: '🔊 Room-Filling Sound', title: 'Speakers That Bring The Bass', sub: 'Compact, wireless and smart speakers for every room', cat: 'Speakers', bg: 'linear-gradient(135deg,#fff7ed,#fed7aa)', img: imgSpeakers },
+  { badge: '🎧 Audio Essentials', title: 'Headphones Built For Focus', sub: 'Comfortable sound for music, calls and long sessions', cat: 'Headphones', bg: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', img: imgHeadphones },
+  { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'PC Builds', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: imgGaming },
+  { badge: '⌚ Most Popular', title: 'Wear the Future on Your Wrist', sub: 'Smart watches for fitness, work and everyday style', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', img: imgWatch },
   { badge: '📷 New Arrival', title: 'Capture Every Moment', sub: 'Professional cameras & lenses for every photographer', cat: 'Cameras', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', img: imgCamera },
-  { badge: '🚁 Trending Now', title: 'Take Flight With Drones', sub: 'Aerial photography & racing drones at best prices', cat: 'Drones', bg: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', img: imgDrone },
+  { badge: '🚁 Trending Now', title: 'Take Flight With Drones', sub: 'Aerial cameras and compact drones', cat: 'Drones', bg: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', img: imgDrone },
 ]
 
 const SIDE = [
   { eyebrow: 'Trend Devices', title: 'Latest Laptops', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', emoji: '💻', img: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=600&auto=format' },
-  { eyebrow: 'Best', title: 'Gaming Console', cat: 'Gaming', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', ec: '#16a34a', emoji: '🎮' },
-  { eyebrow: 'Most Popular', title: 'Popular Watches', cat: 'Smart Watches', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', ec: '#F97316', emoji: '⌚' },
+  { eyebrow: 'Desk Ready', title: 'Monitors', cat: 'Monitors', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', ec: '#16a34a', emoji: '🖥️' },
+  { eyebrow: 'Most Popular', title: 'Popular Watches', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', ec: '#F97316', emoji: '⌚' },
 ]
 
-function getCatEmoji(n) { return { Smartphones: '📱', Laptops: '💻', Gaming: '🎮', Tablets: '📟', 'Smart Home': '🏠', Headphones: '🎧', Display: '🖥️', Cameras: '📷', Drones: '🚁', 'Smart Watches': '⌚', Speakers: '🔊', Accessories: '🔌' }[n] || '📦' }
+function getCatEmoji(n) { return { Smartphones: '📱', Laptops: '💻', Monitors: '🖥️', Tablets: '📟', Drones: '🚁', Smartwatches: '⌚', 'PC Builds': '🧩', Speakers: '🔊', Earbuds: '🎧', Headphones: '🎧', Cameras: '📷', 'Gaming Consoles': '🎮' }[n] || '📦' }
 
 function shouldUseContainInCard(categoryName = '', productName = '') {
-  return /smartphones|headphones/i.test(categoryName)
-    || /headphone|headset|earbud|earphone|arctis|airpod|buds|apple watch ultra|fenix 7x|amazfit active edge|benq/i.test(productName)
+  return /smartphones|headphones|earbuds|smartwatches|tablets|pc builds|speakers/i.test(categoryName)
+    || /phone|headphone|headset|earbud|earphone|airpod|buds|watch|fenix|amazfit/i.test(productName)
 }
 
 function cardObjectPosition(categoryName = '', productName = '') {
@@ -46,16 +72,16 @@ function cardObjectPosition(categoryName = '', productName = '') {
 const CAT_IMGS = {
   Smartphones:    'https://applefun.com.ua/upload/2025-09/0-apple-iphone-17-pro-max-256gb-cosmic-orange-11757497912.webp',
   Laptops:        'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=600&auto=format',
-  Gaming:         'https://images.unsplash.com/photo-1606318801954-d46d46d3360a?w=600&auto=format',
+  Monitors:       'https://media.us.lg.com/transform/ecomm-PDPGallery-1100x730/e64bb88d-49a1-4f54-a9dc-de6dd1b33714/md08003935-DZ-07-jpg',
   Tablets:        'https://static1.anpoimages.com/wordpress/wp-content/uploads/2023/08/samsung-galaxy-tab-s9-ultra-plants.jpg',
-  'Smart Home':   'https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/leap-petite-global/products/ec/527e/variants/sco/gallery-images/HP09-variant-gallery-02.jpg?&cropPathE=desktop&fit=stretch,1&fmt=pjpeg&wid=1920',
-  Headphones:     'https://i0.wp.com/boingboing.net/wp-content/uploads/2025/08/AirPodMax-e1767030905267.jpg?fit=600%2C340&quality=60&ssl=1',
-  Display:        'https://media.us.lg.com/transform/ecomm-PDPGallery-1100x730/e64bb88d-49a1-4f54-a9dc-de6dd1b33714/md08003935-DZ-07-jpg',
-  Cameras:        'https://images.unsplash.com/photo-1617005082133-548c4dd27f35?w=600&auto=format',
   Drones:         'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTuLYKV8ecGw76FaI258F0yz1VSIe2e4b_H2w&s',
-  'Smart Watches':'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQmhDiLgjN7ncyoUlQlnhYuS2BLjDl72u_xVQ&s',
+  Smartwatches:   'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQmhDiLgjN7ncyoUlQlnhYuS2BLjDl72u_xVQ&s',
+  'PC Builds':    'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=600&auto=format',
   Speakers:       'https://www.apple.com/newsroom/images/2024/07/apple-introduces-homepod-mini-in-midnight/article/Apple-HomePod-mini-midnight_inline.jpg.large_2x.jpg',
-  Accessories:    'https://www.macworld.com/wp-content/uploads/2023/09/Twelve-South-HiRise-3-Deluxe-charger-3.jpg?quality=50&strip=all&w=1024',
+  Earbuds:         'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=600&auto=format',
+  Headphones:      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format',
+  Cameras:         'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format',
+  'Gaming Consoles': 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=600&auto=format',
 }
 
 /* Star rating — SVG-based filled / half / empty stars */
@@ -81,7 +107,7 @@ function HmStar({ fill = 0, size = 14, color = '#F97316' }) {
     </svg>
   )
 }
-function Stars({ rating, count }) {
+function Stars({ rating, count, sold }) {
   if (!rating || rating <= 0) return null
   return (
     <div className="hm-stars">
@@ -89,7 +115,11 @@ function Stars({ rating, count }) {
         const fill = rating >= n ? 1 : rating >= n - 0.5 ? 0.5 : 0
         return <HmStar key={n} fill={fill} size={14} />
       })}
-      {count > 0 && <span className="hm-star-ct">{rating.toFixed(1)} ({count})</span>}
+      <span className="hm-star-ct">
+        {rating.toFixed(1)} /5
+        {count > 0 ? ` (${count})` : ''}
+        {Number(sold || 0) > 0 ? ` ${Number(sold).toLocaleString('en-NP')} sold` : ''}
+      </span>
     </div>
   )
 }
@@ -98,6 +128,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   const [cats, setCats] = useState([])
   const [prods, setProds] = useState([])
   const [sideImgs, setSideImgs] = useState({})
+  const [compactImages, setCompactImages] = useState({})
   const [loading, setLoading] = useState(true)
   const [selCat, setSelCat] = useState(null)
   const [slide, setSlide] = useState(0)
@@ -139,27 +170,27 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
       setLoading(true)
       try {
         const catRes = await customerAPI.getCategories()
-        const catData = getArrayData(catRes.data)
+        const catData = uniqueByName(getArrayData(catRes.data).filter(cat => CATALOG_CATEGORIES.includes(cat.name)))
         setCats(catData)
 
         const activeCategory = catParam
           ? catData.find(cat => (cat.name || '').toLowerCase() === catParam.toLowerCase())
           : null
-        const productParams = {
-          page_size: 120,
-          ...(activeCategory ? { category: activeCategory.id } : {}),
-          ...(searchQ ? { search: searchQ } : {}),
-        }
-        const allRes = await customerAPI.getProducts(productParams)
-        let loadedProducts = getArrayData(allRes.data)
-
-        if (!activeCategory && !searchQ) {
-          const priorityCategories = catData.filter(cat => /smart\s*phones?|mobile|laptops?|notebooks?/i.test(cat.name || ''))
-          const priorityResults = await Promise.all(priorityCategories.map(cat =>
+        let loadedProducts
+        if (activeCategory || searchQ) {
+          const productParams = {
+            page_size: 120,
+            ...(activeCategory ? { category: activeCategory.id } : {}),
+            ...(searchQ ? { search: searchQ } : {}),
+          }
+          const allRes = await customerAPI.getProducts(productParams)
+          loadedProducts = getArrayData(allRes.data)
+        } else {
+          const categoryResults = await Promise.all(catData.map(cat =>
             customerAPI.getProducts({ category: cat.id, page_size: 40 }).then(res => getArrayData(res.data)).catch(() => [])
           ))
           const byId = new Map()
-          ;[...loadedProducts, ...priorityResults.flat()].forEach(product => {
+          categoryResults.flat().forEach(product => {
             if (product?.id != null) byId.set(product.id, product)
           })
           loadedProducts = [...byId.values()]
@@ -241,6 +272,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
       sold:          parseInt(p.units_sold || p.UnitsSold || 0),
       rating:        parseFloat(p.average_rating || 0),
       reviews:       parseInt(p.review_count || 0),
+      ratingCount:   parseInt(p.rating_count || p.review_count || 0),
     }
   }
 
@@ -273,42 +305,40 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         if (!byStore[store]) byStore[store] = []
         byStore[store].push(p)
       })
-      const priorityOut = []
       const out = []
       const featuredNames = new Set()
-      const perStoreCount = {}
-      const addFeatured = (product, target = out) => {
-        const store = (product.ownerName || '').trim() || 'Unknown Store'
-        const key = productNameKey(product.name)
-        if (!key || featuredNames.has(key) || (perStoreCount[store] || 0) >= 4) return false
-        featuredNames.add(key)
-        perStoreCount[store] = (perStoreCount[store] || 0) + 1
-        target.push(product)
-        return true
-      }
-      const priorityMatchers = [
-        (p) => /smart\s*phones?|mobile/i.test(`${p.category} ${p.name}`),
-        (p) => /laptops?|notebooks?/i.test(`${p.category} ${p.name}`),
-      ]
-      priorityMatchers.forEach(matchesPriority => {
-        const usedStoresForCategory = new Set()
-        ;[...n]
-          .filter(matchesPriority)
-          .sort((a, b) => (b.sold - a.sold) || (b.rating - a.rating) || (b.price - a.price))
-          .forEach(product => {
-            const store = (product.ownerName || '').trim() || 'Unknown Store'
-            if (usedStoresForCategory.has(store)) return
-            if (addFeatured(product, priorityOut)) usedStoresForCategory.add(store)
-          })
-      })
-      Object.values(byStore).forEach(g => {
-        for (const product of [...g].sort((a, b) => (b.sold - a.sold) || (b.price - a.price))) {
-          addFeatured(product)
-          const store = (product.ownerName || '').trim() || 'Unknown Store'
-          if ((perStoreCount[store] || 0) === 4) break
-        }
-      })
-      items = [...priorityOut, ...out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price))]
+      Object.values(byStore)
+        .sort((a, b) => ((a[0]?.ownerName || '').localeCompare(b[0]?.ownerName || '')))
+        .forEach(group => {
+          const storeName = (group[0]?.ownerName || '').trim()
+          const usedCategories = new Set()
+          let storeCount = 0
+          const sortedGroup = [...group].sort((a, b) => (b.sold - a.sold) || (b.rating - a.rating) || (b.price - a.price))
+          const addFeatured = (product) => {
+            const key = productNameKey(product.name)
+            if (!key || featuredNames.has(key) || out.length >= 50 || storeCount >= 5) return false
+            featuredNames.add(key)
+            out.push(product)
+            storeCount += 1
+            return true
+          }
+
+          for (const product of sortedGroup) {
+            if (usedCategories.has(product.category)) continue
+            if (addFeatured(product)) {
+              usedCategories.add(product.category)
+              if (usedCategories.size >= 5) break
+            }
+          }
+
+          if (usedCategories.size < 5) {
+            for (const product of sortedGroup) {
+              addFeatured(product)
+              if (storeCount >= 5) break
+            }
+          }
+        })
+      items = out
     }
 
     // ── Apply smart filters ──
@@ -324,6 +354,18 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
     return applyImgVariants(items)
   })()
+
+  const markCompactIfOverflowing = (event, productId) => {
+    const img = event.currentTarget
+    if (!img?.naturalWidth || !img?.naturalHeight) return
+    const ratio = img.naturalHeight / img.naturalWidth
+    const category = img.dataset.category || ''
+    const categoryNeedsCare = /tablets|pc builds|speakers/i.test(category)
+    const shouldCompact = ratio > (categoryNeedsCare ? 1.08 : 1.28)
+    if (shouldCompact) {
+      setCompactImages(prev => prev[productId] ? prev : { ...prev, [productId]: true })
+    }
+  }
 
   const handleCat = (name) => { suppressScrollRef.current = true; if (selCat === name) { setSelCat(null); nav('/') } else { setSelCat(name); nav(`/?cat=${encodeURIComponent(name)}`) } }
   const s = HERO_SLIDES[slide]
@@ -501,18 +543,20 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
                 <div key={product.id} className="hm-card">
 
                   {/* ── Image area (contains all overlays) ── */}
-                  <div className="hm-card-img">
+                  <div className={`hm-card-img${compactImages[product.id] ? ' compact' : ''}`}>
                     <Link to={`/product/${product.id}`} className="hm-img-link">
                       <img
                         src={product.image || product.fallbackImage}
                         alt={product.name}
-                        className="hm-pimg"
+                        className={`hm-pimg${compactImages[product.id] ? ' compact' : ''}`}
                         style={{
-                          objectFit: shouldUseContainInCard(product.category, product.name) ? 'contain' : 'cover',
+                          objectFit: compactImages[product.id] || shouldUseContainInCard(product.category, product.name) ? 'contain' : 'cover',
                           objectPosition: cardObjectPosition(product.category, product.name),
                         }}
                         loading="lazy"
                         referrerPolicy="no-referrer"
+                        data-category={product.category}
+                        onLoad={e => markCompactIfOverflowing(e, product.id)}
                         onError={e => {
                           if (e.currentTarget.dataset.fb === '1') {
                             e.currentTarget.style.display = 'none'
@@ -554,7 +598,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
                     </Link>
 
                     {/* Stars */}
-                    <Stars rating={product.rating} count={product.reviews} />
+                    <Stars rating={product.rating} count={product.ratingCount} sold={product.sold} />
 
                     {/* Store */}
                     {product.ownerName && <span className="hm-pown">{product.ownerName}</span>}
@@ -695,10 +739,13 @@ const STYLES = `
 .hm-card:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(0,0,0,.12);}
 
 /* ── IMAGE WRAPPER (all overlays inside) ── */
-.hm-card-img{position:relative;height:210px;background:#f8fafc;overflow:hidden;flex-shrink:0;}
+.hm-card-img{position:relative;height:210px;background:#f8fafc;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;box-sizing:border-box;}
+.hm-card-img.compact{background:#fff;padding:14px;}
 .hm-img-link{display:block;width:100%;height:100%;}
-.hm-pimg{width:100%;height:100%;object-fit:contain;background:#fff;transition:transform .35s ease;}
-.hm-card:hover .hm-pimg{transform:scale(1.04);}
+.hm-pimg{width:100%;height:100%;max-width:100%;max-height:100%;background:#fff;transition:transform .35s ease;display:block;}
+.hm-pimg.compact{transform:scale(.88);}
+.hm-card:hover .hm-pimg{transform:scale(1.025);}
+.hm-card:hover .hm-pimg.compact{transform:scale(.92);}
 
 /* ON SALE — large, top-left of image */
 .hm-on-sale{position:absolute;top:0;left:0;background:#F97316;color:#fff;font-size:.88rem;font-weight:900;padding:6px 14px;border-radius:0 0 8px 0;letter-spacing:.06em;text-transform:uppercase;box-shadow:2px 2px 8px rgba(249,115,22,.4);z-index:3;line-height:1.2;}
@@ -778,5 +825,5 @@ const STYLES = `
 /* RESPONSIVE */
 @media(max-width:1024px){.hm-layout{grid-template-columns:1fr 300px;}.hm-grid{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:768px){.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:row;}.hm-side-lg{flex:2;}.hm-side-row{flex:1;flex-direction:column;gap:.85rem;}.hm-side-sm{min-height:0;flex:1;}.hm-grid{grid-template-columns:repeat(3,1fr);}.hm-prods-sec{padding:1.25rem 1.5rem;}.hm-card-img{height:185px;}}
-@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-controls{display:none;}.hm-banner-cta{bottom:.6rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1rem .85rem;}.hm-grid{grid-template-columns:repeat(2,1fr);gap:.75rem;}.hm-card-img{height:155px;}.hm-on-sale{font-size:.72rem;padding:5px 10px;}.hm-pnm{font-size:.85rem;}.hm-pimg{object-fit:cover;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}.hm-ticket{padding:9px 11px 10px;}.hm-ticket-price{font-size:1.25rem;}.hm-ticket-icon{font-size:1.1rem;}.hm-ticket-save{font-size:.72rem;}.hm-ticket-ltd{display:none;}.hm-icon-btn{width:32px;height:32px;}}
+@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-controls{display:none;}.hm-banner-cta{bottom:.6rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1rem .85rem;}.hm-grid{grid-template-columns:repeat(2,1fr);gap:.75rem;}.hm-card-img{height:155px;}.hm-card-img.compact{padding:10px;}.hm-on-sale{font-size:.72rem;padding:5px 10px;}.hm-pnm{font-size:.85rem;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}.hm-ticket{padding:9px 11px 10px;}.hm-ticket-price{font-size:1.25rem;}.hm-ticket-icon{font-size:1.1rem;}.hm-ticket-save{font-size:.72rem;}.hm-ticket-ltd{display:none;}.hm-icon-btn{width:32px;height:32px;}}
 `

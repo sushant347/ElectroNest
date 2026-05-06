@@ -352,14 +352,14 @@ const styles = {
 const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, checkoutSelection = [], setCheckoutItems }) => {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState(
-    checkoutSelection.length > 0 ? checkoutSelection : cartItems.map((item) => item.id)
+    checkoutSelection.length > 0 ? checkoutSelection : cartItems.map((item) => item.cartKey || item.id)
   );
 
   useEffect(() => {
     setSelectedIds((prev) => {
-      const validIds = prev.filter((id) => cartItems.some((item) => item.id === id));
+      const validIds = prev.filter((id) => cartItems.some((item) => (item.cartKey || item.id) === id));
       if (validIds.length === 0 && cartItems.length > 0) {
-        return cartItems.map((item) => item.id);
+        return cartItems.map((item) => item.cartKey || item.id);
       }
       return validIds;
     });
@@ -367,7 +367,7 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
 
   useEffect(() => {
     if (checkoutSelection.length > 0) {
-      const valid = checkoutSelection.filter((id) => cartItems.some((item) => item.id === id));
+      const valid = checkoutSelection.filter((id) => cartItems.some((item) => (item.cartKey || item.id) === id));
       if (valid.length > 0) setSelectedIds(valid);
     }
   }, [checkoutSelection, cartItems]);
@@ -379,14 +379,14 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
   };
 
   const selectAll = () => {
-    setSelectedIds(cartItems.map((item) => item.id));
+    setSelectedIds(cartItems.map((item) => item.cartKey || item.id));
   };
 
   const clearSelection = () => {
     setSelectedIds([]);
   };
 
-  const selectedItems = cartItems.filter((item) => selectedIds.includes(item.id));
+  const selectedItems = cartItems.filter((item) => selectedIds.includes(item.cartKey || item.id));
   const totalItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
   const subtotal = selectedItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const total = subtotal;
@@ -463,18 +463,18 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
                 </button>
               </div>
               {cartItems.map((item) => (
-                <div key={item.id} style={styles.cartItem}>
+                <div key={item.cartKey || item.id} style={styles.cartItem}>
                   <div style={styles.itemSelectWrap}>
                     <button
-                      onClick={() => toggleSelect(item.id)}
+                      onClick={() => toggleSelect(item.cartKey || item.id)}
                       style={{
                         ...styles.itemSelectBtn,
-                        borderColor: selectedIds.includes(item.id) ? "#F97316" : "#cbd5e1",
-                        background: selectedIds.includes(item.id) ? "#fff7ed" : "#fff",
+                        borderColor: selectedIds.includes(item.cartKey || item.id) ? "#F97316" : "#cbd5e1",
+                        background: selectedIds.includes(item.cartKey || item.id) ? "#fff7ed" : "#fff",
                       }}
-                      title={selectedIds.includes(item.id) ? "Selected for checkout" : "Select for checkout"}
+                      title={selectedIds.includes(item.cartKey || item.id) ? "Selected for checkout" : "Select for checkout"}
                     >
-                      {selectedIds.includes(item.id) && <Check size={14} color="#F97316" />}
+                      {selectedIds.includes(item.cartKey || item.id) && <Check size={14} color="#F97316" />}
                     </button>
                   </div>
                   <Link to={`/product/${item.id}`}>
@@ -486,6 +486,11 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
                       <Link to={`/product/${item.id}`} style={styles.itemName}>
                         {item.name}
                       </Link>
+                      {item.variantLabel && (
+                        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 4 }}>
+                          Variant: {item.variantLabel}
+                        </div>
+                      )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={styles.itemPrice}>{formatPrice(item.price)}</span>
                         {item.onSale && item.origPrice && (
@@ -499,7 +504,7 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
                     <div style={styles.itemActions}>
                       <div style={styles.qtyWrap}>
                         <button
-                          onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                          onClick={() => updateCartQuantity(item.cartKey || item.id, item.quantity - 1)}
                           style={styles.qtyBtn}
                           disabled={item.quantity <= 1}
                         >
@@ -507,7 +512,7 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
                         </button>
                         <span style={styles.qtyVal}>{item.quantity}</span>
                         <button
-                          onClick={() => updateCartQuantity(item.id, Math.min(6, item.quantity + 1))}
+                          onClick={() => updateCartQuantity(item.cartKey || item.id, Math.min(6, item.quantity + 1))}
                           style={{ ...styles.qtyBtn, ...(item.quantity >= 6 ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
                           disabled={item.quantity >= 6}
                         >
@@ -518,7 +523,7 @@ const Cart = ({ cartItems = [], updateCartQuantity, removeFromCart, clearCart, c
                         <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>Max 6 per order</span>
                       )}
                       <button
-                        onClick={() => removeFromCart(item.id)}
+                        onClick={() => removeFromCart(item.cartKey || item.id)}
                         style={styles.removeBtn}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "#fef2f2")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}

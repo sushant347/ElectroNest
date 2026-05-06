@@ -22,6 +22,8 @@ const formatPrice = (price) =>
     maximumFractionDigits: 0,
   }).format(price);
 
+const formatCount = (value) => Number(value || 0).toLocaleString("en-IN");
+
 function StarRating({ rating }) {
   const safeRating = Number(rating || 0);
   return (
@@ -477,6 +479,11 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
                   {items.map((item) => (
                     <td key={item.id} style={styles.td}>
                       <span style={styles.price}>{formatPrice(item.price)}</span>
+                      {item.onSale && item.origPrice ? (
+                        <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", textDecoration: "line-through" }}>
+                          {formatPrice(item.origPrice)}
+                        </div>
+                      ) : null}
                     </td>
                   ))}
                   {[...Array(3 - items.length)].map((_, i) => <td key={`ep-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
@@ -513,13 +520,37 @@ const Compare = ({ items = [], removeFromCompare, addToCart }) => {
                       <th style={styles.th}>Rating</th>
                       {items.map((item) => (
                         <td key={item.id} style={styles.td}>
-                          <StarRating rating={item.averageRating ?? item.rating ?? 0} />
-                          <div style={{ marginTop: 4, fontSize: 11, color: '#94a3b8' }}>
-                            ({Number(item.reviewCount ?? item.review_count ?? 0)} reviews)
-                          </div>
+                          {(() => {
+                            const rating = Number(item.averageRating ?? item.rating ?? 0);
+                            const ratingCount = Number(item.ratingCount ?? item.reviewCount ?? item.rating_count ?? item.review_count ?? 0);
+                            const sold = Number(item.unitsSold ?? item.sold ?? item.units_sold ?? 0);
+                            return (
+                              <>
+                                <StarRating rating={rating} />
+                                <div style={{ marginTop: 4, fontSize: 11, color: '#64748b', lineHeight: 1.5 }}>
+                                  {rating.toFixed(1)} /5 · {formatCount(ratingCount)} ratings
+                                </div>
+                                <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                                  {formatCount(sold)} solds
+                                </div>
+                              </>
+                            );
+                          })()}
                         </td>
                       ))}
                       {[...Array(3 - items.length)].map((_, i) => <td key={`er-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
+                    </tr>
+                    <tr>
+                      <th style={styles.th}>Reviews</th>
+                      {items.map((item) => (
+                        <td key={item.id} style={styles.td}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                            {formatCount(item.actualReviewCount ?? item.actual_review_count ?? item.review_count ?? 0)}
+                          </div>
+                          <div style={{ marginTop: 2, fontSize: 11, color: '#94a3b8' }}>customer reviews</div>
+                        </td>
+                      ))}
+                      {[...Array(3 - items.length)].map((_, i) => <td key={`erv-${i}`} className="cmp-empty-col" style={{ ...styles.td, background: "#f8fafc" }}></td>)}
                     </tr>
                     <tr>
                       <th style={styles.th}>Availability</th>

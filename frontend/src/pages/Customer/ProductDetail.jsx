@@ -4,6 +4,7 @@ import {
   ArrowLeft, ShoppingCart, Heart, Truck, ShieldCheck,
   RotateCcw, Package, Cpu, ChevronLeft, ChevronRight, Tag,
   Percent, Clock, Zap, ChevronDown, ChevronUp, MessageSquare, Send, Bell,
+  X,
 } from 'lucide-react';
 
 import { customerAPI } from '../../services/api';
@@ -69,7 +70,7 @@ function PriceComparisonChart({ productId }) {
   if (!loading && !data) return null;
 
   const priceHistory = Array.isArray(data?.price_history) ? data.price_history : [];
-  const hasLiveMarketData = ['live_market_api', 'international_market_api'].includes(data?.market_source) && priceHistory.length > 0;
+  const hasLiveMarketData = ['gadgetbyte_api', 'live_market_api', 'international_market_api'].includes(data?.market_source) && priceHistory.length > 0;
   const savings = Number(data?.savings_percent || 0);
   const marketPrice = Number(data?.market_price || 0);
   const yourPrice = Number(data?.current_selling_price || 0);
@@ -77,6 +78,7 @@ function PriceComparisonChart({ productId }) {
   const marketOffers = Array.isArray(data?.market_offers) ? data.market_offers : [];
   const isLiveMarket = data?.market_source === 'live_market_api';
   const isInternationalMarket = data?.market_source === 'international_market_api';
+  const isGadgetByteMarket = data?.market_source === 'gadgetbyte_api';
   const volatility = Number(data?.market_volatility_percent || 0);
   const advantage = Number(data?.price_advantage_percent || savings || 0);
 
@@ -165,7 +167,7 @@ function PriceComparisonChart({ productId }) {
         <div style={{ background: '#fff', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 4 }}>Market Price</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#dc2626' }}>{formatPrice(marketPrice)}</div>
-          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{isInternationalMarket ? 'International market converted' : isLiveMarket ? 'Fetched from Nepal market' : 'Live data unavailable'}</div>
+          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{isGadgetByteMarket ? 'Fetched from GadgetByte' : isInternationalMarket ? 'International market converted' : isLiveMarket ? 'Fetched from Nepal market' : 'Live data unavailable'}</div>
         </div>
         <div style={{ background: '#fff', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#166534', marginBottom: 4 }}>You Save</div>
@@ -181,7 +183,9 @@ function PriceComparisonChart({ productId }) {
         <div>
           <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>Market vs Platform Trend</div>
           <div style={{ fontSize: 12, color: '#64748b' }}>
-            {isInternationalMarket
+            {isGadgetByteMarket
+              ? `Using GadgetByte Nepal as the 3-month market baseline with ${volatility.toFixed(1)}% market spread.`
+              : isInternationalMarket
               ? `Using nearest international offer${marketOffers.length === 1 ? '' : 's'} converted at $1 = NPR 140.`
               : isLiveMarket
                 ? `Using ${marketOffers.length} Nepal market offer${marketOffers.length === 1 ? '' : 's'} with ${volatility.toFixed(1)}% market spread.`
@@ -449,6 +453,13 @@ const normalize = (p) => {
   const selling = parseFloat(p.selling_price || 0);
   const disc = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null;
   const onSale = disc !== null && disc > 0 && disc < selling;
+  let fullDescription = '';
+  try {
+    const parsedSpecs = typeof p.specifications === 'string' ? JSON.parse(p.specifications) : p.specifications;
+    fullDescription = parsedSpecs?._full_description || '';
+  } catch {
+    fullDescription = '';
+  }
   return {
     id: p.id,
     name: p.name || p.ProductName || '',
@@ -460,18 +471,41 @@ const normalize = (p) => {
     image: p.image_url || '',
     rating: Number(p.average_rating ?? p.rating ?? 0),
     reviewCount: Number(p.review_count ?? 0),
+    ratingCount: Number(p.rating_count ?? p.review_count ?? 0),
     brand: p.brand || '',
     ownerName: p.owner_name || '',
     stock: p.stock || 0,
     description: p.description || '',
+    fullDescription,
     specifications: p.specifications || '',
     sku: p.sku || '',
     reorderLevel: p.reorder_level || 10,
     unitsSold: p.units_sold || 0,
+    variants: Array.isArray(p.variants) ? p.variants.map(v => {
+      const vPrice = parseFloat(v.price || 0);
+      const vDisc = v.discount_price != null && v.discount_price !== '' ? parseFloat(v.discount_price) : null;
+      const vOnSale = vDisc !== null && vDisc > 0 && vDisc < vPrice;
+      return {
+        id: v.id,
+        title: v.title || 'Standard',
+        sku: v.sku || '',
+        color: v.color || '',
+        specs: v.specs || '',
+        price: vOnSale ? vDisc : vPrice,
+        origPrice: vOnSale ? vPrice : null,
+        onSale: vOnSale,
+        stock: Number(v.stock || 0),
+        isDefault: Boolean(v.is_default),
+      };
+    }) : [],
   };
 };
 
-const shouldFillContainerImage = (categoryName = '') => /laptop|camera|display|tablet/i.test(categoryName);
+const shouldFillContainerImage = (categoryName = '', productName = '') => {
+  const hay = `${categoryName} ${productName}`.toLowerCase();
+  return /dji\s+mavic\s+3\s+pro/.test(hay)
+    || /\b(cameras?|gaming consoles?)\b/.test(hay);
+};
 
 /* ── Coupon Carousel ─────────────────────────────────────────────── */
 const PALETTE = [
@@ -762,6 +796,7 @@ function CouponCarousel({ coupons, storeName }) {
 export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems = [] }) {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [loading, setLoading] = useState(true);
   const MAX_QTY = 6;
   const [qty, setQty] = useState(1);
@@ -771,7 +806,10 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
   const [isMobileSpecs, setIsMobileSpecs] = useState(false);
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [cartModalOpen, setCartModalOpen] = useState(false);
   const alsoRef = useRef(null);
+  const descriptionRef = useRef(null);
   const [alsoIndex, setAlsoIndex] = useState(0);
 
   const scrollAlso = (dir) => {
@@ -787,6 +825,13 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   };
 
   useEffect(() => { setAlsoIndex(0); }, [relatedProducts]);
+
+  const openDescription = () => {
+    setIsDescriptionOpen(true);
+    setTimeout(() => {
+      descriptionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
 
   useEffect(() => {
     const syncSpecsPanel = () => {
@@ -808,7 +853,9 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
           customerAPI.getProduct(id),
           customerAPI.getReviews(id),
         ]);
-        setProduct(normalize(productRes.data));
+        const normalized = normalize(productRes.data);
+        setProduct(normalized);
+        setSelectedVariantId((normalized.variants.find(v => v.isDefault) || normalized.variants[0] || null)?.id || null);
         setReviews(reviewsRes.data?.results || reviewsRes.data || []);
       } catch (err) {
         console.error('Failed to load product:', err);
@@ -874,7 +921,25 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   }
 
   const isInWishlist = wishlistItems.some(i => i.id === product.id);
-  const fillMainImage = shouldFillContainerImage(product.category);
+  const fillMainImage = shouldFillContainerImage(product.category, product.name);
+  const selectedVariant = product.variants.find(v => v.id === selectedVariantId) || product.variants[0] || null;
+  const activePrice = selectedVariant ? selectedVariant.price : product.price;
+  const activeOrigPrice = selectedVariant ? selectedVariant.origPrice : product.origPrice;
+  const activeOnSale = selectedVariant ? selectedVariant.onSale : product.onSale;
+  const activeStock = selectedVariant ? Math.min(product.stock, selectedVariant.stock) : product.stock;
+  const activeSku = selectedVariant?.sku || product.sku;
+  const displayDescription = product.fullDescription || product.description;
+  const cartProduct = {
+    ...product,
+    cartKey: `${product.id}:${selectedVariant?.id || 'base'}`,
+    variantId: selectedVariant?.id || null,
+    variantLabel: selectedVariant?.title || '',
+    price: activePrice,
+    origPrice: activeOrigPrice,
+    onSale: activeOnSale,
+    stock: activeStock,
+    sku: activeSku,
+  };
 
   // Parse specifications — supports JSON objects or pipe-delimited plain text
   let specEntries = [];
@@ -884,6 +949,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
       const flatten = (obj, prefix = '') => {
         const entries = [];
         for (const [key, value] of Object.entries(obj)) {
+          if (key === '_full_description') continue;
           const label = prefix ? `${prefix} - ${key}` : key;
           if (value && typeof value === 'object' && !Array.isArray(value)) {
             entries.push(...flatten(value, label));
@@ -951,51 +1017,59 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
             {/* Rating */}
             <div style={s.ratingRow}>
               <StarRow rating={product.rating} size={16} />
-              <span style={{ marginLeft: 8, fontSize: 14, color: '#64748b' }}>{product.rating} / 5</span>
-              {product.unitsSold > 0 && <span style={{ marginLeft: 12, fontSize: 13, color: '#9CA3AF' }}>({product.unitsSold} sold)</span>}
+              <span style={{ marginLeft: 8, fontSize: 14, color: '#64748b' }}>
+                {product.rating.toFixed(1)} /5
+                {product.ratingCount > 0 ? ` (${product.ratingCount})` : ''}
+                {Number(product.unitsSold || 0) > 0 ? ` ${Number(product.unitsSold).toLocaleString('en-NP')} solds` : ''}
+              </span>
             </div>
 
             {/* Price */}
             <div style={s.priceRow}>
-              <span style={s.price}>{formatPrice(product.price)}</span>
-              {product.onSale && product.origPrice && (
+              <span style={s.price}>{formatPrice(activePrice)}</span>
+              {activeOnSale && activeOrigPrice && (
                 <span style={{ fontSize: 16, color: '#9ca3af', textDecoration: 'line-through', fontWeight: 500 }}>
-                  {formatPrice(product.origPrice)}
+                  {formatPrice(activeOrigPrice)}
                 </span>
               )}
-              {product.onSale && product.origPrice && (
+              {activeOnSale && activeOrigPrice && (
                 <span style={{ fontSize: 13, fontWeight: 700, background: '#fff7ed', color: '#F97316', border: '1px solid #fed7aa', borderRadius: 6, padding: '2px 8px' }}>
-                  Save {formatPrice(product.origPrice - product.price)}
+                  Save {formatPrice(activeOrigPrice - activePrice)}
                 </span>
               )}
             </div>
 
             {/* Stock */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: product.stock > 0 ? '#16A34A' : '#EF4444' }}>
-                {product.stock > 0 ? `✓ In Stock (${product.stock} units)` : '✕ Out of Stock'}
+              <span style={{ fontSize: 13, fontWeight: 600, color: activeStock > 0 ? '#16A34A' : '#EF4444' }}>
+                {activeStock > 0 ? '✓ Available' : '✕ Out of Stock'}
               </span>
-              {product.sku && <span style={{ fontSize: 12, color: '#9CA3AF' }}>SKU: {product.sku}</span>}
+              {activeSku && <span style={{ fontSize: 12, color: '#9CA3AF' }}>SKU: {activeSku}</span>}
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 <StarRow rating={product.rating} size={14} />
                 <span style={{ fontSize: 12, color: '#64748b', marginLeft: 4 }}>
-                  {product.rating.toFixed(1)} ({product.reviewCount})
+                  {product.rating.toFixed(1)} /5
+                  {Number(product.unitsSold || 0) > 0 ? ` ${Number(product.unitsSold).toLocaleString('en-NP')} solds` : ''}
                 </span>
               </div>
             </div>
 
-            {product.description && <p style={s.desc}>{product.description}</p>}
+            {displayDescription && (
+              <button type="button" style={s.descriptionBtn} onClick={openDescription}>
+                View Full Description <ChevronDown size={16} />
+              </button>
+            )}
 
             {/* Quantity + Actions */}
             <div style={s.actionsRow}>
               <div style={s.qtyWrap}>
                 <button style={s.qtyBtn} onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
                 <span style={s.qtyVal}>{qty}</span>
-                <button style={{ ...s.qtyBtn, ...(qty >= MAX_QTY || qty >= product.stock ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={() => setQty(q => Math.min(Math.min(product.stock, MAX_QTY), q + 1))} disabled={qty >= MAX_QTY || qty >= product.stock}>+</button>
+                <button style={{ ...s.qtyBtn, ...(qty >= MAX_QTY || qty >= activeStock ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={() => setQty(q => Math.min(Math.min(activeStock, MAX_QTY), q + 1))} disabled={qty >= MAX_QTY || qty >= activeStock}>+</button>
               </div>
               {qty >= MAX_QTY && <span style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>Max 6 per order</span>}
-              <button style={{ ...s.cartBtn, ...(product.stock <= 0 ? { background: '#d1d5db', cursor: 'not-allowed' } : {}) }} onClick={() => { if (product.stock > 0) addToCart({ ...product, quantity: qty }); }} disabled={product.stock <= 0}>
-                <ShoppingCart size={18} /> {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
+              <button style={{ ...s.cartBtn, ...(activeStock <= 0 ? { background: '#d1d5db', cursor: 'not-allowed' } : {}) }} onClick={() => { if (activeStock > 0) setCartModalOpen(true); }} disabled={activeStock <= 0}>
+                <ShoppingCart size={18} /> {activeStock > 0 ? 'Add to Cart' : 'Out of Stock'}
               </button>
               <button style={{ ...s.wishBtn, ...(isInWishlist ? { background: '#fef2f2', borderColor: '#fecaca', color: '#ef4444' } : {}) }} onClick={() => toggleWishlist(product)}>
                 <Heart size={18} fill={isInWishlist ? '#ef4444' : 'none'} />
@@ -1016,6 +1090,21 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
 
         {/* ── Price Comparison Graph ── */}
         <PriceComparisonChart productId={product.id} />
+
+        {displayDescription && isDescriptionOpen && (
+          <section ref={descriptionRef} style={s.descriptionBanner}>
+            <div style={s.descriptionBannerHeader}>
+              <div>
+                <span style={s.descriptionEyebrow}>Product Description</span>
+                <h2 style={s.descriptionTitle}>{product.name}</h2>
+              </div>
+              <button type="button" style={s.descriptionCloseBtn} onClick={() => setIsDescriptionOpen(false)}>
+                <ChevronUp size={16} /> Collapse
+              </button>
+            </div>
+            <p style={s.descriptionFullText}>{displayDescription}</p>
+          </section>
+        )}
 
         <ProductQASection productId={product.id} ownerName={product.ownerName} />
 
@@ -1125,7 +1214,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
                         <img
                           src={p.image}
                           alt={p.name}
-                          style={{ ...s.alsoImg, objectFit: shouldFillContainerImage(p.category) ? 'cover' : 'contain' }}
+                          style={{ ...s.alsoImg, objectFit: shouldFillContainerImage(p.category, p.name) ? 'cover' : 'contain' }}
                           loading="lazy"
                           referrerPolicy="no-referrer"
                           onError={(e) => {
@@ -1165,6 +1254,95 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
           </div>
         )}
       </div>
+
+      {cartModalOpen && (
+        <div style={s.cartModalOverlay} onClick={() => setCartModalOpen(false)}>
+          <div className="pd-cart-modal" style={s.cartModal} onClick={(e) => e.stopPropagation()}>
+            <button type="button" style={s.cartModalClose} onClick={() => setCartModalOpen(false)}>
+              <X size={18} />
+            </button>
+            <div className="pd-cart-modal-top" style={s.cartModalTop}>
+              <div style={s.cartModalImgWrap}>
+                {product.image ? (
+                  <img src={product.image} alt={product.name} style={{ ...s.cartModalImg, objectFit: fillMainImage ? 'cover' : 'contain' }} referrerPolicy="no-referrer" />
+                ) : (
+                  <Package size={42} color="#94a3b8" />
+                )}
+              </div>
+              <div style={s.cartModalInfo}>
+                {product.brand && <span style={s.cartModalBrand}>{product.brand}</span>}
+                <h3 style={s.cartModalTitle}>{product.name}</h3>
+                <div style={s.cartModalPriceRow}>
+                  <span style={s.cartModalPrice}>{formatPrice(activePrice)}</span>
+                  {activeOnSale && activeOrigPrice && <span style={s.cartModalOrig}>{formatPrice(activeOrigPrice)}</span>}
+                </div>
+                <div style={s.cartModalMeta}>
+                  <span style={s.cartModalStars}><StarRow rating={product.rating} size={14} /></span>
+                  <span>
+                    {product.rating.toFixed(1)} /5
+                    {product.ratingCount > 0 ? ` (${product.ratingCount})` : ''}
+                  </span>
+                  {Number(product.unitsSold || 0) > 0 && (
+                    <span>{Number(product.unitsSold || 0).toLocaleString('en-NP')} solds</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={s.cartModalConfig}>
+              <div style={s.variantHead}>
+                <span>Choose configuration</span>
+                {selectedVariant && <strong>{formatPrice(activePrice)}</strong>}
+              </div>
+              {product.variants.length > 0 ? (
+                <div style={s.variantGrid}>
+                  {product.variants.map((variant) => {
+                    const active = variant.id === selectedVariant?.id;
+                    return (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        onClick={() => { setSelectedVariantId(variant.id); setQty(1); }}
+                        style={{
+                          ...s.variantBtn,
+                          ...(active ? s.variantBtnActive : {}),
+                          ...(variant.stock <= 0 ? s.variantBtnDisabled : {}),
+                        }}
+                        disabled={variant.stock <= 0}
+                      >
+                        <span style={s.variantTitle}>{variant.title}</span>
+                        {variant.specs && <span style={s.variantSpecs}>{variant.specs}</span>}
+                        <span style={s.variantMeta}>{variant.stock > 0 ? 'Available' : 'Out of stock'} · {formatPrice(variant.price)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={s.singleConfig}>Standard configuration · {activeStock > 0 ? 'Available' : 'Out of stock'}</div>
+              )}
+            </div>
+
+            <div className="pd-cart-modal-footer" style={s.cartModalFooter}>
+              <div style={s.qtyWrap}>
+                <button style={s.qtyBtn} onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
+                <span style={s.qtyVal}>{qty}</span>
+                <button style={{ ...s.qtyBtn, ...(qty >= MAX_QTY || qty >= activeStock ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} onClick={() => setQty(q => Math.min(Math.min(activeStock, MAX_QTY), q + 1))} disabled={qty >= MAX_QTY || qty >= activeStock}>+</button>
+              </div>
+              <button
+                type="button"
+                style={{ ...s.cartBtn, justifyContent: 'center', flex: 1, ...(activeStock <= 0 ? { background: '#d1d5db', cursor: 'not-allowed' } : {}) }}
+                disabled={activeStock <= 0}
+                onClick={() => {
+                  addToCart({ ...cartProduct, quantity: qty });
+                  setCartModalOpen(false);
+                }}
+              >
+                <ShoppingCart size={18} /> Add Selected Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <style>{spinnerCSS}</style>
     </div>
   );
@@ -1335,20 +1513,52 @@ const s = {
   page: { minHeight: '100vh', background: 'linear-gradient(180deg, #fff7ed 0%, #ffffff 35%)', padding: '32px 24px 64px', overflowX: 'hidden' },
   container: { maxWidth: 1100, margin: '0 auto', width: '100%' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'start' },
-  imageCard: { position: 'relative', background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' },
-  img: { width: '100%', height: 420, objectFit: 'contain', display: 'block', background: '#fff' },
+  imageCard: { position: 'relative', background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', height: 420, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18, boxSizing: 'border-box' },
+  img: { width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', background: '#fff' },
   infoCol: { display: 'flex', flexDirection: 'column', gap: 16 },
   category: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94a3b8' },
   title: { fontSize: 28, fontWeight: 800, color: '#1e293b', lineHeight: 1.2, margin: 0 },
   ratingRow: { display: 'flex', alignItems: 'center' },
   priceRow: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   price: { fontSize: 28, fontWeight: 800, color: '#16a34a' },
-  desc: { fontSize: 15, color: '#475569', lineHeight: 1.7 },
+  descriptionBtn: { width: 'fit-content', display: 'inline-flex', alignItems: 'center', gap: 7, border: '1.5px solid #fed7aa', background: '#fff7ed', color: '#c2410c', borderRadius: 10, padding: '9px 13px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' },
+  descriptionBanner: { scrollMarginTop: 18, marginTop: 28, borderRadius: 16, border: '1.5px solid #fed7aa', background: 'linear-gradient(135deg,#fff7ed 0%,#ffffff 70%)', padding: '24px 28px', boxShadow: '0 8px 28px rgba(249,115,22,0.10)' },
+  descriptionBannerHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 14 },
+  descriptionEyebrow: { display: 'block', fontSize: 11, fontWeight: 900, color: '#F97316', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 },
+  descriptionTitle: { fontSize: 20, lineHeight: 1.25, fontWeight: 800, color: '#1e293b', margin: 0 },
+  descriptionCloseBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', borderRadius: 9, padding: '8px 11px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  descriptionFullText: { margin: 0, fontSize: 15, color: '#475569', lineHeight: 1.8, whiteSpace: 'pre-line' },
+  variantBox: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc', display: 'grid', gap: 12 },
+  variantHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, fontSize: 13, fontWeight: 800, color: '#334155' },
+  variantGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 },
+  variantBtn: { border: '1.5px solid #cbd5e1', background: '#fff', borderRadius: 10, padding: '10px 12px', textAlign: 'left', cursor: 'pointer', display: 'grid', gap: 4, minHeight: 76, fontFamily: 'inherit' },
+  variantBtnActive: { borderColor: '#F97316', boxShadow: '0 0 0 3px rgba(249,115,22,0.12)', background: '#fff7ed' },
+  variantBtnDisabled: { opacity: 0.45, cursor: 'not-allowed' },
+  variantTitle: { fontSize: 13, color: '#1e293b', fontWeight: 800 },
+  variantSpecs: { fontSize: 11, color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  variantMeta: { fontSize: 11, color: '#F97316', fontWeight: 700 },
   actionsRow: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 4 },
   qtyWrap: { display: 'flex', alignItems: 'center', gap: 0, border: '1.5px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' },
   qtyBtn: { width: 36, height: 38, background: '#f8fafc', border: 'none', fontSize: 18, cursor: 'pointer', color: '#334155', fontWeight: 600 },
   qtyVal: { width: 40, textAlign: 'center', fontSize: 15, fontWeight: 600, color: '#1e293b' },
   cartBtn: { display: 'flex', alignItems: 'center', gap: 8, background: '#F97316', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', transition: 'background .2s' },
+  cartModalOverlay: { position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18, backdropFilter: 'blur(2px)' },
+  cartModal: { position: 'relative', width: 'min(760px, 100%)', maxHeight: '90vh', overflowY: 'auto', background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 24px 70px rgba(15,23,42,0.28)', padding: 20 },
+  cartModalClose: { position: 'absolute', top: 12, right: 12, width: 34, height: 34, borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
+  cartModalTop: { display: 'grid', gridTemplateColumns: '210px 1fr', gap: 18, alignItems: 'center', paddingRight: 28 },
+  cartModalImgWrap: { height: 190, borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12, overflow: 'hidden' },
+  cartModalImg: { width: '100%', height: '100%', objectFit: 'contain', display: 'block' },
+  cartModalInfo: { minWidth: 0, display: 'grid', gap: 8 },
+  cartModalBrand: { width: 'fit-content', fontSize: 11, fontWeight: 900, color: '#2563eb', background: '#eff6ff', borderRadius: 5, padding: '3px 8px', textTransform: 'uppercase' },
+  cartModalTitle: { fontSize: 20, lineHeight: 1.25, color: '#1e293b', margin: 0, fontWeight: 800 },
+  cartModalPriceRow: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  cartModalPrice: { fontSize: 24, fontWeight: 900, color: '#16a34a' },
+  cartModalOrig: { fontSize: 14, color: '#94a3b8', textDecoration: 'line-through', fontWeight: 700 },
+  cartModalMeta: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12, color: '#64748b', fontWeight: 700 },
+  cartModalStars: { display: 'inline-flex', alignItems: 'center', gap: 2 },
+  cartModalConfig: { marginTop: 18, borderTop: '1px solid #f1f5f9', paddingTop: 16, display: 'grid', gap: 12 },
+  singleConfig: { border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc', color: '#334155', padding: '12px 14px', fontSize: 13, fontWeight: 700 },
+  cartModalFooter: { marginTop: 18, display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid #f1f5f9', paddingTop: 16 },
   wishBtn: { width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', color: '#64748b', transition: 'all .2s' },
   trustRow: { display: 'flex', gap: 20, marginTop: 8, flexWrap: 'wrap' },
   trustItem: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#475569', fontWeight: 500 },
@@ -1427,8 +1637,8 @@ const s = {
     border: '1.5px solid #e2e8f0', background: '#fff',
     color: '#374151', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
   },
-  alsoImgWrap: { width: '100%', height: 200, overflow: 'hidden', background: '#f8fafc', position: 'relative' },
-  alsoImg: { width: '100%', height: '100%', objectFit: 'contain', display: 'block', transition: 'transform .3s ease', background: '#fff' },
+  alsoImgWrap: { width: '100%', height: 200, overflow: 'hidden', background: '#fff', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12, boxSizing: 'border-box' },
+  alsoImg: { width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', transition: 'transform .3s ease', background: '#fff' },
   alsoBody: { padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 5, flex: 1 },
   alsoBrand: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#F97316' },
   alsoName: { fontSize: 15, fontWeight: 600, color: '#1e293b', margin: 0, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
@@ -1463,8 +1673,14 @@ const spinnerCSS = `
       grid-template-columns: 1fr !important;
       gap: 20px !important;
     }
+    .pd-image-card {
+      height: 300px !important;
+      padding: 14px !important;
+    }
     .pd-image-card img {
-      height: 280px !important;
+      height: 100% !important;
+      width: 100% !important;
+      object-fit: contain !important;
     }
     .price-insights-wrap {
       padding: 14px !important;
@@ -1475,8 +1691,14 @@ const spinnerCSS = `
     }
   }
   @media (max-width: 480px) {
+    .pd-image-card {
+      height: 240px !important;
+      padding: 10px !important;
+    }
     .pd-image-card img {
-      height: 220px !important;
+      height: 100% !important;
+      width: 100% !important;
+      object-fit: contain !important;
     }
     .price-insights-wrap {
       margin-top: 18px !important;
@@ -1488,6 +1710,17 @@ const spinnerCSS = `
   @media (max-width: 640px) {
     .also-grid > a {
       flex: 0 0 calc(50% - 8px) !important;
+    }
+    .pd-cart-modal {
+      padding: 16px !important;
+    }
+    .pd-cart-modal-top {
+      grid-template-columns: 1fr !important;
+      padding-right: 0 !important;
+    }
+    .pd-cart-modal-footer {
+      flex-direction: column !important;
+      align-items: stretch !important;
     }
     .price-insights-wrap button {
       padding: 10px 12px !important;

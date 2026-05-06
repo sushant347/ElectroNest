@@ -10,6 +10,19 @@ const NAV_LINKS = [
   { label: 'About Us', path: '/about' },
   { label: 'Contact Us', path: '/support/contact' },
 ]
+const CATALOG_CATEGORIES = [
+  'Smartphones', 'Laptops', 'Monitors', 'Tablets', 'Drones', 'Smartwatches', 'PC Builds', 'Speakers',
+  'Earbuds', 'Headphones', 'Cameras', 'Gaming Consoles',
+]
+const uniqueByName = (items) => {
+  const seen = new Set()
+  return items.filter(item => {
+    const key = (item.name || '').trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
 
 export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount = 0, user = null }) {
   const [searchFocused, setSearchFocused] = useState(false)
@@ -37,8 +50,9 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
   useEffect(() => {
     customerAPI.getCategories().then(res => {
       const data = res.data?.results || res.data || []
-      setCategories(data)
-      if (data.length > 0) setHovCat(data[0])
+      const visible = uniqueByName(data.filter(cat => CATALOG_CATEGORIES.includes(cat.name)))
+      setCategories(visible)
+      if (visible.length > 0) setHovCat(visible[0])
     }).catch(() => { })
   }, [])
 

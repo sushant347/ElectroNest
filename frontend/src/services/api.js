@@ -241,7 +241,7 @@ export const customerAPI = {
 
   // Cart
   getCart: () => api.get('/cart/'),
-  addToCart: (productId, orderCount = 1) => api.post('/cart/', { product: productId, order_count: orderCount }),
+  addToCart: (productId, orderCount = 1, variantId = null) => api.post('/cart/', { product: productId, variant: variantId, order_count: orderCount }),
   updateCartItem: (itemId, orderCount) => api.patch(`/cart/${itemId}/`, { order_count: orderCount }),
   removeCartItem: (itemId) => api.delete(`/cart/${itemId}/`),
   clearCart: () => api.delete('/cart/clear/'),
