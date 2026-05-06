@@ -52,25 +52,45 @@ class Command(BaseCommand):
             f'Suppliers: {len(new_sups)} created, {len(existing_sup_ids)} skipped'
         ))
 
-        # ── Products — bulk insert, skip existing SKUs ──
-        existing_skus = set(Product.objects.values_list('sku', flat=True))
-        new_products = [
-            Product(
-                id=p['id'], sku=p['sku'], name=p['name'],
-                category=cat_map.get(p['category_id']),
-                brand=p['brand'], owner_name=p['owner_name'],
-                supplier=sup_map.get(p['supplier_id']),
-                selling_price=p['selling_price'], cost_price=p['cost_price'],
-                stock=p['stock'], reorder_level=p['reorder_level'],
-                description=p['description'], image_url=p['image_url'],
-                specifications=p['specifications'], units_sold=p['units_sold'],
-            )
-            for p in data['products']
-            if p['sku'] not in existing_skus
+        # ── Products — insert missing rows and refresh existing rows ──
+        existing_by_sku = {p.sku: p for p in Product.objects.all()}
+        new_products = []
+        products_to_update = []
+        update_fields = [
+            'name', 'category', 'brand', 'owner_name', 'supplier',
+            'selling_price', 'cost_price', 'stock', 'reorder_level',
+            'description', 'image_url', 'specifications', 'units_sold',
         ]
+
+        for p in data['products']:
+            values = {
+                'name': p['name'],
+                'category': cat_map.get(p['category_id']),
+                'brand': p['brand'],
+                'owner_name': p['owner_name'],
+                'supplier': sup_map.get(p['supplier_id']),
+                'selling_price': p['selling_price'],
+                'cost_price': p['cost_price'],
+                'stock': p['stock'],
+                'reorder_level': p['reorder_level'],
+                'description': p['description'],
+                'image_url': p['image_url'],
+                'specifications': p['specifications'],
+                'units_sold': p['units_sold'],
+            }
+            existing = existing_by_sku.get(p['sku'])
+            if existing:
+                for field, value in values.items():
+                    setattr(existing, field, value)
+                products_to_update.append(existing)
+            else:
+                new_products.append(Product(id=p['id'], sku=p['sku'], **values))
+
         Product.objects.bulk_create(new_products, ignore_conflicts=True)
+        if products_to_update:
+            Product.objects.bulk_update(products_to_update, update_fields, batch_size=200)
         self.stdout.write(self.style.SUCCESS(
-            f'Products: {len(new_products)} created, {len(existing_skus)} skipped'
+            f'Products: {len(new_products)} created, {len(products_to_update)} updated'
         ))
 
         # ── OrderStatus ──
