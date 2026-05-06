@@ -65,6 +65,20 @@ def _get_market_variation(product: Product, date_value, index: int, market_snaps
     return max(-0.12, min(0.12, seasonal + weekday + cycle + volatility_weight / 2))
 
 
+def _get_fallback_volatility_percent(product: Product) -> float:
+    stable_id = product.id or sum(ord(ch) for ch in (product.sku or product.name or "product"))
+    return round(2.8 + ((stable_id % 37) / 10), 1)
+
+
+def _get_trend_volatility_percent(price_history: list[dict], product: Product) -> float:
+    prices = [float(row.get('market_price') or 0) for row in price_history if row.get('market_price')]
+    if len(prices) > 1:
+        average_price = sum(prices) / len(prices)
+        if average_price:
+            return round(max(((max(prices) - min(prices)) / average_price) * 100, 0.1), 1)
+    return _get_fallback_volatility_percent(product)
+
+
 class IsOwnerOrAdmin(BasePermission):
     def has_permission(self, request, view):
         return bool(
@@ -319,6 +333,10 @@ class PriceHistoryView(APIView):
 
         # Compute savings
         savings_percent = _get_savings_percent(market_price, selling_price)
+        trend_volatility_percent = max(
+            float(market_snapshot.get('market_volatility_percent') or 0),
+            _get_trend_volatility_percent(price_history, product),
+        )
 
         return Response({
             'product_id': product_id,
@@ -330,7 +348,7 @@ class PriceHistoryView(APIView):
             'market_price': market_price,
             'lowest_market_price': market_snapshot.get('lowest_market_price'),
             'highest_market_price': market_snapshot.get('highest_market_price'),
-            'market_volatility_percent': market_snapshot.get('market_volatility_percent', 0),
+            'market_volatility_percent': round(trend_volatility_percent, 1),
             'price_advantage_percent': max(0, price_advantage_percent),
             'market_source': market_snapshot.get('source', 'fallback'),
             'market_offers': market_snapshot.get('offers', []),
