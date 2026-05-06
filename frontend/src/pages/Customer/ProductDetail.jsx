@@ -69,13 +69,14 @@ function PriceComparisonChart({ productId }) {
   if (!loading && !data) return null;
 
   const priceHistory = Array.isArray(data?.price_history) ? data.price_history : [];
-  const hasLiveMarketData = data?.market_source === 'live_market_api' && priceHistory.length > 0;
+  const hasLiveMarketData = ['live_market_api', 'international_market_api'].includes(data?.market_source) && priceHistory.length > 0;
   const savings = Number(data?.savings_percent || 0);
   const marketPrice = Number(data?.market_price || 0);
   const yourPrice = Number(data?.current_selling_price || 0);
   const spread = Math.max(0, marketPrice - yourPrice);
   const marketOffers = Array.isArray(data?.market_offers) ? data.market_offers : [];
   const isLiveMarket = data?.market_source === 'live_market_api';
+  const isInternationalMarket = data?.market_source === 'international_market_api';
   const volatility = Number(data?.market_volatility_percent || 0);
   const advantage = Number(data?.price_advantage_percent || savings || 0);
 
@@ -152,7 +153,7 @@ function PriceComparisonChart({ productId }) {
           fontSize: 13,
           fontWeight: 600,
         }}>
-          Live market price is unavailable for this exact product name right now.
+          Live market price is unavailable for this product right now.
         </div>
       ) : (
         <>
@@ -164,7 +165,7 @@ function PriceComparisonChart({ productId }) {
         <div style={{ background: '#fff', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 4 }}>Market Price</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#dc2626' }}>{formatPrice(marketPrice)}</div>
-          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{isLiveMarket ? 'Fetched from market' : 'Estimated fallback'}</div>
+          <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{isInternationalMarket ? 'International market converted' : isLiveMarket ? 'Fetched from Nepal market' : 'Live data unavailable'}</div>
         </div>
         <div style={{ background: '#fff', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#166534', marginBottom: 4 }}>You Save</div>
@@ -180,8 +181,13 @@ function PriceComparisonChart({ productId }) {
         <div>
           <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>Market vs Platform Trend</div>
           <div style={{ fontSize: 12, color: '#64748b' }}>
-            {isLiveMarket ? `Using ${marketOffers.length} live market offer${marketOffers.length === 1 ? '' : 's'} with ${volatility.toFixed(1)}% market spread.` : 'Estimated from product pricing until live providers return a match.'}
+            {isInternationalMarket
+              ? `Using nearest international offer${marketOffers.length === 1 ? '' : 's'} converted at $1 = NPR 140.`
+              : isLiveMarket
+                ? `Using ${marketOffers.length} Nepal market offer${marketOffers.length === 1 ? '' : 's'} with ${volatility.toFixed(1)}% market spread.`
+                : 'Live market providers did not return a same-product match.'}
           </div>
+          {data?.market_currency_note && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{data.market_currency_note}</div>}
         </div>
       </div>
 
@@ -208,7 +214,10 @@ function PriceComparisonChart({ productId }) {
               <span style={{ fontSize: 12, color: '#475569', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {offer.store}: {offer.name}
               </span>
-              <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 800, whiteSpace: 'nowrap' }}>{formatPrice(offer.price)}</span>
+              <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                {formatPrice(offer.price)}
+                {offer.currency === 'USD' && offer.original_price ? ` ($${Number(offer.original_price).toLocaleString()})` : ''}
+              </span>
             </a>
           ))}
         </div>

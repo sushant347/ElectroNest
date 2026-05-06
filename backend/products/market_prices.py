@@ -15,11 +15,12 @@ from .price_matching import normalize_product_name
 logger = logging.getLogger(__name__)
 
 CACHE_TTL_SECONDS = 60 * 60
-MATCH_VERSION = "v2"
+MATCH_VERSION = "v3"
 MIN_MATCH_SCORE = 72
 STRICT_CORE_SCORE = 90
 PROVIDER_TIMEOUT_SECONDS = float(os.environ.get("MARKET_PRICE_PROVIDER_TIMEOUT", "6"))
 TOTAL_TIMEOUT_SECONDS = float(os.environ.get("MARKET_PRICE_TOTAL_TIMEOUT", "12"))
+USD_TO_NPR_RATE = float(os.environ.get("USD_TO_NPR_RATE", "140"))
 COLOR_WORDS = {
     "black", "white", "silver", "gold", "blue", "red", "green", "orange", "purple", "pink",
     "gray", "grey", "yellow", "midnight", "starlight", "titanium", "graphite", "cream",
@@ -61,6 +62,31 @@ def _core_tokens(name: str) -> set[str]:
     return {token for token in _core_product_name(name).split() if token}
 
 
+def _spec_tokens(name: str) -> set[str]:
+    text = unescape(name or "").lower()
+    specs = set()
+    for match in re.findall(r"\b\d+\s*(?:gb|tb|mm|inch|hz|mah|w)\b", text):
+        specs.add(re.sub(r"\s+", "", match))
+    for match in re.findall(r"\b\d+\s*/\s*\d+\s*(?:gb|tb)?\b", text):
+        specs.add(re.sub(r"\s+", "", match))
+    for match in re.findall(r"\b\d+\+\d+\s*(?:gb|tb)?\b", text):
+        specs.add(re.sub(r"\s+", "", match))
+    for match in re.findall(r"\b(?:i[3579]|ryzen\s?[3579]|ultra\s?[3579]|rtx\s?\d{3,4}|gtx\s?\d{3,4})\b", text):
+        specs.add(re.sub(r"\s+", "", match))
+    return specs
+
+
+def _spec_match_score(source_name: str, candidate_name: str) -> float:
+    source_specs = _spec_tokens(source_name)
+    candidate_specs = _spec_tokens(candidate_name)
+    if not source_specs:
+        return 1
+    if not candidate_specs:
+        return 0
+    overlap = len(source_specs & candidate_specs)
+    return overlap / len(source_specs)
+
+
 def _has_same_core_product(source_name: str, candidate_name: str) -> bool:
     source_core = _core_product_name(source_name)
     candidate_core = _core_product_name(candidate_name)
@@ -87,7 +113,7 @@ def _price_to_float(value: Any) -> float | None:
     if value in (None, ""):
         return None
     text = str(value)
-    match = re.search(r"(\d[\d,]*(?:\.\d+)?)", text.replace("NPR", "").replace("Rs.", ""))
+    match = re.search(r"(\d[\d,]*(?:\.\d+)?)", text.replace("NPR", "").replace("USD", "").replace("Rs.", ""))
     if not match:
         return None
     try:
@@ -96,40 +122,84 @@ def _price_to_float(value: Any) -> float | None:
         return None
 
 
-def _offer(name: str, price: Any, store: str, url: str = "") -> dict[str, Any] | None:
+def _detect_currency(value: Any, fallback: str = "NPR") -> str:
+    text = str(value or "").lower()
+    if "$" in text or "usd" in text:
+        return "USD"
+    if "npr" in text or "rs" in text:
+        return "NPR"
+    return fallback
+
+
+def _offer(
+    name: str,
+    price: Any,
+    store: str,
+    url: str = "",
+    currency: str | None = None,
+    default_currency: str = "NPR",
+) -> dict[str, Any] | None:
     parsed_price = _price_to_float(price)
     if not name or parsed_price is None or parsed_price <= 0:
         return None
+    detected_currency = currency or _detect_currency(price, default_currency)
+    original_price = round(parsed_price, 2)
+    if detected_currency.upper() == "USD":
+        parsed_price = parsed_price * USD_TO_NPR_RATE
     return {
         "name": str(name).strip(),
         "price": round(parsed_price, 2),
+        "original_price": original_price,
+        "currency": detected_currency.upper(),
+        "conversion_rate": USD_TO_NPR_RATE if detected_currency.upper() == "USD" else None,
         "store": store,
         "url": url,
     }
 
 
-def _extract_offers(payload: Any, store: str) -> list[dict[str, Any]]:
+def _extract_offers(payload: Any, store: str, default_currency: str = "NPR") -> list[dict[str, Any]]:
     if isinstance(payload, dict):
         for key in ("offers", "results", "items", "products", "data"):
             if key in payload:
-                return _extract_offers(payload[key], store)
+                return _extract_offers(payload[key], store, default_currency)
         name = payload.get("name") or payload.get("title") or payload.get("productName")
         price = payload.get("price") or payload.get("selling_price") or payload.get("salePrice")
+        currency = payload.get("currency") or payload.get("priceCurrency")
         url = payload.get("url") or payload.get("link") or payload.get("productUrl") or ""
         item_store = payload.get("store") or payload.get("merchant") or payload.get("seller") or store
-        offer = _offer(name, price, item_store, url)
+        offer = _offer(name, price, item_store, url, currency=currency, default_currency=default_currency)
         return [offer] if offer else []
 
     if isinstance(payload, list):
         offers = []
         for item in payload:
-            offers.extend(_extract_offers(item, store))
+            offers.extend(_extract_offers(item, store, default_currency))
         return offers
 
     return []
 
 
-def _match_offers(product_name: str, offers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _extract_ebay_offers(payload: Any) -> list[dict[str, Any]]:
+    items = payload.get("itemSummaries") if isinstance(payload, dict) else []
+    offers: list[dict[str, Any]] = []
+    if not isinstance(items, list):
+        return offers
+    for item in items:
+        price_info = item.get("price") or {}
+        offer = _offer(
+            item.get("title"),
+            price_info.get("value"),
+            "eBay",
+            item.get("itemWebUrl") or "",
+            currency=price_info.get("currency") or "USD",
+            default_currency="USD",
+        )
+        if offer:
+            offers.append(offer)
+    return offers
+
+
+def _match_offers(product_name: str, offers: list[dict[str, Any]], allow_nearest_spec: bool = False) -> list[dict[str, Any]]:
     source = normalize_product_name(_clean_name(product_name))
     matched = []
     for offer in offers:
@@ -137,9 +207,17 @@ def _match_offers(product_name: str, offers: list[dict[str, Any]]) -> list[dict[
             continue
         candidate = normalize_product_name(_clean_name(offer["name"]))
         score = fuzz.token_set_ratio(source, candidate)
-        if score >= MIN_MATCH_SCORE:
-            matched.append({**offer, "score": round(score / 100, 4)})
-    return sorted(matched, key=lambda item: (-item["score"], item["price"]))
+        spec_score = _spec_match_score(product_name, offer["name"])
+        if not allow_nearest_spec and spec_score < 1:
+            continue
+        if score >= MIN_MATCH_SCORE or spec_score > 0:
+            final_score = (score / 100 * 0.7) + (spec_score * 0.3)
+            matched.append({**offer, "score": round(final_score, 4), "spec_match_score": round(spec_score, 4)})
+
+    if allow_nearest_spec and matched and _spec_tokens(product_name):
+        best_spec_score = max(item["spec_match_score"] for item in matched)
+        matched = [item for item in matched if item["spec_match_score"] == best_spec_score]
+    return sorted(matched, key=lambda item: (-item["spec_match_score"], -item["score"], item["price"]))
 
 
 def _fetch_custom_market_url(query: str) -> list[dict[str, Any]]:
@@ -169,6 +247,76 @@ def _fetch_pricesapi(query: str) -> list[dict[str, Any]]:
         return _extract_offers(response.json(), "PricesAPI")
     except (requests.RequestException, ValueError) as exc:
         logger.warning("PricesAPI fetch failed: %s", exc)
+        return []
+
+
+def _fetch_international_market_url(query: str) -> list[dict[str, Any]]:
+    market_url = os.environ.get("INTERNATIONAL_MARKET_PRODUCTS_URL", "").strip()
+    if not market_url:
+        return []
+    try:
+        response = requests.get(market_url, params={"q": query}, timeout=PROVIDER_TIMEOUT_SECONDS)
+        response.raise_for_status()
+        offers = _extract_offers(response.json(), "International Market API", default_currency="USD")
+        return [{**offer, "store": offer["store"] or "International Market API"} for offer in offers]
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("Configured international market API failed: %s", exc)
+        return []
+
+
+def _fetch_international_pricesapi(query: str) -> list[dict[str, Any]]:
+    api_key = os.environ.get("INTERNATIONAL_PRICESAPI_KEY", os.environ.get("PRICESAPI_KEY", "")).strip()
+    if not api_key:
+        return []
+    try:
+        response = requests.get(
+            "https://api.pricesapi.io/api/v1/products/search",
+            params={"q": query, "api_key": api_key, "country": "US"},
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        return _extract_offers(response.json(), "International PricesAPI", default_currency="USD")
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("International PricesAPI fetch failed: %s", exc)
+        return []
+
+
+def _fetch_ebay_browse_api(query: str) -> list[dict[str, Any]]:
+    token = os.environ.get("EBAY_BEARER_TOKEN", "").strip()
+    if not token:
+        return []
+    try:
+        response = requests.get(
+            "https://api.ebay.com/buy/browse/v1/item_summary/search",
+            params={"q": query, "limit": 10, "filter": "buyingOptions:{FIXED_PRICE}"},
+            headers={"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": "EBAY_US"},
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        return _extract_ebay_offers(response.json())
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("eBay international fetch failed: %s", exc)
+        return []
+
+
+def _fetch_amazon_apify(query: str) -> list[dict[str, Any]]:
+    token = os.environ.get("APIFY_TOKEN", "").strip()
+    actor = os.environ.get("APIFY_AMAZON_ACTOR", "junglee/amazon-crawler").strip()
+    if not token:
+        return []
+    actor_id = actor.replace("/", "~")
+    url = f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
+    payload = {
+        "categoryOrProductUrls": [{"url": f"https://www.amazon.com/s?k={requests.utils.quote(query)}"}],
+        "maxItems": 10,
+        "proxyConfiguration": {"useApifyProxy": True},
+    }
+    try:
+        response = requests.post(url, params={"token": token}, json=payload, timeout=TOTAL_TIMEOUT_SECONDS)
+        response.raise_for_status()
+        return _extract_offers(response.json(), "Amazon US", default_currency="USD")
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("Amazon Apify fetch failed: %s", exc)
         return []
 
 
@@ -239,15 +387,8 @@ def _fetch_gadgetbyte(query: str) -> list[dict[str, Any]]:
     return offers
 
 
-def get_market_price_snapshot(product) -> dict[str, Any]:
-    query = _clean_name(product.name)
-    cache_key = f"market_price_snapshot:{MATCH_VERSION}:{product.id}:{normalize_product_name(query)}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-
+def _fetch_offers(query: str, fetchers: tuple) -> list[dict[str, Any]]:
     all_offers = []
-    fetchers = (_fetch_custom_market_url, _fetch_pricesapi, _fetch_daraz_apify, _fetch_gadgetbyte)
     executor = ThreadPoolExecutor(max_workers=len(fetchers))
     try:
         future_map = {executor.submit(fetcher, query): fetcher.__name__ for fetcher in fetchers}
@@ -265,11 +406,13 @@ def get_market_price_snapshot(product) -> dict[str, Any]:
                 future.cancel()
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
+    return all_offers
 
-    matched = _match_offers(product.name, all_offers)
+
+def _build_snapshot(offers: list[dict[str, Any]], source: str) -> dict[str, Any]:
     unique = []
     seen = set()
-    for offer in matched:
+    for offer in offers:
         key = (offer["store"], offer["name"], offer["price"])
         if key in seen:
             continue
@@ -282,13 +425,41 @@ def get_market_price_snapshot(product) -> dict[str, Any]:
         average_price = mean(prices)
         if average_price:
             volatility = round(((max(prices) - min(prices)) / average_price) * 100, 1)
-    snapshot = {
+    return {
         "market_price": round(mean(prices), 2) if prices else None,
         "lowest_market_price": min(prices) if prices else None,
         "highest_market_price": max(prices) if prices else None,
         "market_volatility_percent": volatility,
         "offers": unique[:8],
-        "source": "live_market_api" if prices else "fallback",
+        "source": source if prices else "no_live_market_data",
+        "currency_note": "USD offers converted to NPR at 1 USD = NPR 140" if source == "international_market_api" else "",
     }
+
+
+def get_market_price_snapshot(product) -> dict[str, Any]:
+    query = _clean_name(product.name)
+    cache_key = f"market_price_snapshot:{MATCH_VERSION}:{product.id}:{normalize_product_name(query)}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    nepal_fetchers = (_fetch_custom_market_url, _fetch_daraz_apify, _fetch_gadgetbyte)
+    nepal_matches = _match_offers(product.name, _fetch_offers(query, nepal_fetchers), allow_nearest_spec=False)
+    snapshot = _build_snapshot(nepal_matches, "live_market_api")
+
+    if snapshot["market_price"] is None:
+        international_fetchers = (
+            _fetch_international_market_url,
+            _fetch_international_pricesapi,
+            _fetch_ebay_browse_api,
+            _fetch_amazon_apify,
+        )
+        international_matches = _match_offers(
+            product.name,
+            _fetch_offers(query, international_fetchers),
+            allow_nearest_spec=True,
+        )
+        snapshot = _build_snapshot(international_matches, "international_market_api")
+
     cache.set(cache_key, snapshot, CACHE_TTL_SECONDS)
     return snapshot
