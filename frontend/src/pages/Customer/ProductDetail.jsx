@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import { customerAPI } from '../../services/api';
+import config from '../../Config/Config';
 import { HeaderSkeleton, CardGridSkeleton, SkeletonText } from '../../components/Common/SkeletonLoader';
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
@@ -249,10 +250,15 @@ function ProductQASection({ productId, ownerName }) {
     try {
       const qRes = await customerAPI.getProductQuestions(productId);
       setItems(qRes.data?.results || qRes.data || []);
-      try {
-        const nRes = await customerAPI.getCustomerNotifications();
-        setNotifications(nRes.data?.results || nRes.data || []);
-      } catch {
+      const hasCustomerToken = Boolean(localStorage.getItem(config.AUTH_TOKEN_KEY));
+      if (hasCustomerToken) {
+        try {
+          const nRes = await customerAPI.getCustomerNotifications();
+          setNotifications(nRes.data?.results || nRes.data || []);
+        } catch {
+          setNotifications([]);
+        }
+      } else {
         setNotifications([]);
       }
     } catch {

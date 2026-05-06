@@ -9,6 +9,7 @@ import imgDrone from '../components/images/drone.png'
 import imgGaming from '../components/images/Gaming Console.png'
 
 const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
+const productNameKey = (name = '') => name.trim().replace(/\s+/g, ' ').toLowerCase()
 
 const HERO_SLIDES = [
   { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'Gaming', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: imgGaming },
@@ -241,9 +242,15 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
       })
       const out = []
       Object.values(byStore).forEach(g => {
-        const topPerStore = [...g]
-          .sort((a, b) => (b.sold - a.sold) || (b.price - a.price))
-          .slice(0, 4)
+        const seenNames = new Set()
+        const topPerStore = []
+        for (const product of [...g].sort((a, b) => (b.sold - a.sold) || (b.price - a.price))) {
+          const key = productNameKey(product.name)
+          if (!key || seenNames.has(key)) continue
+          seenNames.add(key)
+          topPerStore.push(product)
+          if (topPerStore.length === 5) break
+        }
         out.push(...topPerStore)
       })
       items = out.sort((a, b) => (b.sold - a.sold) || (b.price - a.price))
