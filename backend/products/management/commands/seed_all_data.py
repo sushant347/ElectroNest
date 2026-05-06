@@ -77,6 +77,23 @@ class Command(BaseCommand):
             # ── Step 8: PurchaseOrderDetails ────────────────────────────────────
             self._seed_purchase_order_details(cur, data.get('purchase_order_details', []), valid_po_ids, valid_product_ids)
 
+            # ── Step 9: Product questions + customer notifications ──────────────
+            valid_user_ids = _ids_in_db(cur, '"accounts_customuser"', 'id')
+            self._seed_product_questions(
+                cur,
+                data.get('product_questions', []),
+                valid_product_ids,
+                valid_customer_ids,
+                valid_user_ids,
+            )
+            valid_question_ids = _ids_in_db(cur, '"ProductQuestions"', 'id')
+            self._seed_customer_notifications(
+                cur,
+                data.get('customer_notifications', []),
+                valid_customer_ids,
+                valid_question_ids,
+            )
+
         self._reset_sequences()
         self.stdout.write(self.style.SUCCESS('All transactional data imported.'))
 
@@ -308,6 +325,74 @@ class Command(BaseCommand):
             f'  PurchaseOrderDetails: {created} created, {skipped} skipped, {orphaned} orphaned (skipped)'
         ))
 
+    # ── ProductQuestions ─────────────────────────────────────────────────────
+    def _seed_product_questions(self, cur, rows, valid_product_ids, valid_customer_ids, valid_user_ids):
+        created = skipped = orphaned = 0
+        existing = _ids_in_db(cur, '"ProductQuestions"', 'id')
+        for r in rows:
+            row_id = r['id']
+            if row_id in existing:
+                skipped += 1
+                continue
+            product_id = r.get('product_id')
+            customer_id = r.get('customer_id')
+            if product_id not in valid_product_ids or customer_id not in valid_customer_ids:
+                orphaned += 1
+                continue
+            answered_by_id = _val(r.get('answered_by_id'))
+            if answered_by_id is not None and answered_by_id not in valid_user_ids:
+                answered_by_id = None
+            cur.execute(
+                'INSERT INTO "ProductQuestions" '
+                '("id","product_id","customer_id","question","answer","status","is_public",'
+                '"answered_by_id","asked_at","answered_at","updated_at") '
+                'VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                [
+                    row_id, product_id, customer_id,
+                    r.get('question', ''), r.get('answer', ''),
+                    r.get('status', 'pending'), r.get('is_public', True),
+                    answered_by_id, _val(r.get('asked_at')),
+                    _val(r.get('answered_at')), _val(r.get('updated_at')),
+                ]
+            )
+            existing.add(row_id)
+            created += 1
+        self.stdout.write(self.style.SUCCESS(
+            f'  ProductQuestions: {created} created, {skipped} skipped, {orphaned} orphaned (skipped)'
+        ))
+
+    # ── CustomerNotifications ────────────────────────────────────────────────
+    def _seed_customer_notifications(self, cur, rows, valid_customer_ids, valid_question_ids):
+        created = skipped = orphaned = 0
+        existing = _ids_in_db(cur, '"CustomerNotifications"', 'id')
+        for r in rows:
+            row_id = r['id']
+            if row_id in existing:
+                skipped += 1
+                continue
+            customer_id = r.get('customer_id')
+            if customer_id not in valid_customer_ids:
+                orphaned += 1
+                continue
+            question_id = _val(r.get('question_id'))
+            if question_id is not None and question_id not in valid_question_ids:
+                question_id = None
+            cur.execute(
+                'INSERT INTO "CustomerNotifications" '
+                '("id","customer_id","question_id","title","message","is_read","created_at") '
+                'VALUES (%s,%s,%s,%s,%s,%s,%s)',
+                [
+                    row_id, customer_id, question_id,
+                    r.get('title', ''), r.get('message', ''),
+                    r.get('is_read', False), _val(r.get('created_at')),
+                ]
+            )
+            existing.add(row_id)
+            created += 1
+        self.stdout.write(self.style.SUCCESS(
+            f'  CustomerNotifications: {created} created, {skipped} skipped, {orphaned} orphaned (skipped)'
+        ))
+
     # ── Reset sequences ───────────────────────────────────────────────────────
     def _reset_sequences(self):
         # pg_get_serial_sequence needs the table name WITH inner double-quotes
@@ -323,6 +408,8 @@ class Command(BaseCommand):
             ('"Reviews"',              'ReviewID'),
             ('"PurchaseOrders"',       'PurchaseOrderID'),
             ('"PurchaseOrderDetails"', 'PurchaseOrderDetailID'),
+            ('"ProductQuestions"',      'id'),
+            ('"CustomerNotifications"', 'id'),
         ]
         with connection.cursor() as cur:
             for quoted_table, col in tables:

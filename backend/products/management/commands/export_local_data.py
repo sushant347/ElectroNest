@@ -102,6 +102,17 @@ class Command(BaseCommand):
                 'FROM Cart',
                 'Cart', self.stdout)
 
+            data['product_questions'] = _fetch(cur,
+                'SELECT id, product_id, customer_id, question, answer, status, '
+                'is_public, answered_by_id, asked_at, answered_at, updated_at '
+                'FROM ProductQuestions',
+                'ProductQuestions', self.stdout)
+
+            data['customer_notifications'] = _fetch(cur,
+                'SELECT id, customer_id, question_id, title, message, is_read, created_at '
+                'FROM CustomerNotifications',
+                'CustomerNotifications', self.stdout)
+
         out = os.path.join(os.path.dirname(__file__), 'transactional_data.json')
         with open(out, 'w', encoding='utf-8') as f:
             json.dump(data, f, cls=_Encoder, ensure_ascii=False, indent=2)

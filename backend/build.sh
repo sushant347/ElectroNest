@@ -7,7 +7,7 @@ pip install -r requirements.txt
 DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 
-if [ "${RUN_SEED_DATA:-false}" = "true" ]; then
+if [ "${RUN_SEED_DATA:-true}" = "true" ]; then
   # Seed core data (categories, suppliers, products, order statuses, payment methods)
   echo "=== Running seed_products ==="
   python manage.py seed_products \

@@ -13,7 +13,7 @@ services:
       - key: DEBUG
         value: "False"
       - key: RUN_SEED_DATA
-        value: "false"
+        value: "true"
       - key: ALLOWED_HOSTS
         sync: false
       - key: CORS_ORIGINS
