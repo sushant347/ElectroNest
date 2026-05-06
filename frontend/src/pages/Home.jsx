@@ -198,21 +198,19 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
         setProds(loadedProducts)
 
-        if (Object.keys(sideImgs).length === 0) {
-          const imgs = {}
-          await Promise.all(SIDE.map(async ({ cat }) => {
-            const sideCategory = catData.find(c => (c.name || '').toLowerCase() === cat.toLowerCase())
-            if (!sideCategory) return
-            try {
-              const res = await customerAPI.getProducts({ category: sideCategory.id, page_size: 1 })
-              const p = getArrayData(res.data).find(x => x.image_url || x.ProductImageURL)
-              if (p) imgs[cat] = p.image_url || p.ProductImageURL
-            } catch {
-              // Side images are decorative; product loading should not fail because of them.
-            }
-          }))
-          setSideImgs(imgs)
-        }
+        const imgs = {}
+        await Promise.all(SIDE.map(async ({ cat }) => {
+          const sideCategory = catData.find(c => (c.name || '').toLowerCase() === cat.toLowerCase())
+          if (!sideCategory) return
+          try {
+            const res = await customerAPI.getProducts({ category: sideCategory.id, page_size: 1 })
+            const p = getArrayData(res.data).find(x => x.image_url || x.ProductImageURL)
+            if (p) imgs[cat] = p.image_url || p.ProductImageURL
+          } catch {
+            // Side images are decorative; product loading should not fail because of them.
+          }
+        }))
+        setSideImgs(prev => Object.keys(prev).length > 0 ? prev : imgs)
       } catch (e) {
         console.error(e)
         if (attempt === 1) { setTimeout(() => load(2), 3000); return }
@@ -310,7 +308,6 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
       Object.values(byStore)
         .sort((a, b) => ((a[0]?.ownerName || '').localeCompare(b[0]?.ownerName || '')))
         .forEach(group => {
-          const storeName = (group[0]?.ownerName || '').trim()
           const usedCategories = new Set()
           let storeCount = 0
           const sortedGroup = [...group].sort((a, b) => (b.sold - a.sold) || (b.rating - a.rating) || (b.price - a.price))

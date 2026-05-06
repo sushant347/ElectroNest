@@ -11,22 +11,18 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             sql="""
-            IF COL_LENGTH('Cart', 'VariantID') IS NULL
-                ALTER TABLE "Cart" ADD "VariantID" BIGINT NULL;
+            ALTER TABLE "Cart" ADD COLUMN IF NOT EXISTS "VariantID" BIGINT NULL;
             """,
             reverse_sql="""
-            IF COL_LENGTH('Cart', 'VariantID') IS NOT NULL
-                ALTER TABLE "Cart" DROP COLUMN "VariantID";
+            ALTER TABLE "Cart" DROP COLUMN IF EXISTS "VariantID";
             """,
         ),
         migrations.RunSQL(
             sql="""
-            IF COL_LENGTH('OrderDetails', 'VariantID') IS NULL
-                ALTER TABLE "OrderDetails" ADD "VariantID" BIGINT NULL;
+            ALTER TABLE "OrderDetails" ADD COLUMN IF NOT EXISTS "VariantID" BIGINT NULL;
             """,
             reverse_sql="""
-            IF COL_LENGTH('OrderDetails', 'VariantID') IS NOT NULL
-                ALTER TABLE "OrderDetails" DROP COLUMN "VariantID";
+            ALTER TABLE "OrderDetails" DROP COLUMN IF EXISTS "VariantID";
             """,
         ),
     ]
