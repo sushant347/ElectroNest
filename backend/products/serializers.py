@@ -18,7 +18,7 @@ class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
     average_rating = serializers.SerializerMethodField(read_only=True)
-    review_count = serializers.IntegerField(read_only=True)
+    review_count = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model  = Product
@@ -39,6 +39,9 @@ class ProductSerializer(serializers.ModelSerializer):
         if value is None:
             return 0
         return round(float(value), 1)
+
+    def get_review_count(self, obj):
+        return int(getattr(obj, 'review_count', 0) or 0)
 
 
 class ReviewSerializer(serializers.ModelSerializer):

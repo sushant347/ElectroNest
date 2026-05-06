@@ -130,7 +130,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     const load = async (attempt = 1) => {
       setLoading(true)
       try {
-        const [catRes, allRes] = await Promise.all([customerAPI.getCategories(), customerAPI.getProducts({ page_size: 500 })])
+        const [catRes, allRes] = await Promise.all([customerAPI.getCategories(), customerAPI.getProducts({ page_size: 80 })])
         const catData = catRes.data?.results || catRes.data || []
         const allData = allRes.data?.results || allRes.data || []
         setCats(catData)

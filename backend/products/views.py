@@ -117,6 +117,41 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
             save_kwargs['owner_name'] = f"{self.request.user.first_name} {self.request.user.last_name}".strip()
         serializer.save(**save_kwargs)
 
+    def _attach_review_stats(self, products):
+        product_list = list(products)
+        product_ids = [p.id for p in product_list]
+        if not product_ids:
+            return product_list
+
+        stats = {
+            row['product_id']: row
+            for row in Review.objects
+            .filter(product_id__in=product_ids)
+            .order_by()
+            .values('product_id')
+            .annotate(
+                average_rating=Avg('rating'),
+                review_count=Count('id'),
+            )
+        }
+        for product in product_list:
+            row = stats.get(product.id)
+            product.average_rating = row['average_rating'] if row else 0
+            product.review_count = row['review_count'] if row else 0
+        return product_list
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            products = self._attach_review_stats(page)
+            serializer = self.get_serializer(products, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        products = self._attach_review_stats(queryset)
+        serializer = self.get_serializer(products, many=True)
+        return Response(serializer.data)
+
     def get_queryset(self):
         qs       = super().get_queryset()
         category = self.request.query_params.get('category')
@@ -151,13 +186,16 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
                 and self.request.user.role == 'owner'):
             store_name = f"{self.request.user.first_name} {self.request.user.last_name}"
             qs = qs.filter(owner_name__icontains=store_name.strip())
-        qs = qs.annotate(
-            average_rating=Avg('reviews__rating'),
-            review_count=Count('reviews', distinct=True)
-        )
 
         # ── Smart Sorting ──
         sort_by = self.request.query_params.get('sort_by', '')
+        action = getattr(self, 'action', None)
+        if action == 'retrieve' or sort_by == 'top_rated':
+            qs = qs.annotate(
+                average_rating=Avg('reviews__rating'),
+                review_count=Count('reviews', distinct=True)
+            )
+
         if sort_by == 'price_low':
             qs = qs.order_by('selling_price')
         elif sort_by == 'price_high':
