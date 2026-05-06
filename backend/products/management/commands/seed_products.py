@@ -13,6 +13,14 @@ from products.models import Category, Supplier, Product
 DATA_FILE = os.path.join(os.path.dirname(__file__), 'seed_data.json')
 
 
+def _text(value):
+    return value if value is not None else ''
+
+
+def _number(value, default=0):
+    return value if value is not None else default
+
+
 class Command(BaseCommand):
     help = 'Seed Categories, Suppliers, and Products from exported data'
 
@@ -64,19 +72,19 @@ class Command(BaseCommand):
 
         for p in data['products']:
             values = {
-                'name': p['name'],
+                'name': _text(p.get('name')),
                 'category': cat_map.get(p['category_id']),
-                'brand': p['brand'],
-                'owner_name': p['owner_name'],
+                'brand': _text(p.get('brand')),
+                'owner_name': _text(p.get('owner_name')),
                 'supplier': sup_map.get(p['supplier_id']),
-                'selling_price': p['selling_price'],
-                'cost_price': p['cost_price'],
-                'stock': p['stock'],
-                'reorder_level': p['reorder_level'],
-                'description': p['description'],
-                'image_url': p['image_url'],
-                'specifications': p['specifications'],
-                'units_sold': p['units_sold'],
+                'selling_price': _number(p.get('selling_price'), '0.00'),
+                'cost_price': _number(p.get('cost_price'), '0.00'),
+                'stock': _number(p.get('stock')),
+                'reorder_level': _number(p.get('reorder_level'), 10),
+                'description': _text(p.get('description')),
+                'image_url': _text(p.get('image_url')),
+                'specifications': _text(p.get('specifications')),
+                'units_sold': _number(p.get('units_sold')),
             }
             existing = existing_by_sku.get(p['sku'])
             if existing:
