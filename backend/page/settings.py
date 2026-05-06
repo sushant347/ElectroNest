@@ -4,6 +4,7 @@ Django settings for page project.
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -11,11 +12,27 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure--@0wgwe@1pykf_-92-0cwn7m^u%n#-k641j6+y0j*p952*7%=w')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
+def _split_env_list(value):
+    return [item.strip() for item in (value or '').split(',') if item.strip()]
+
+
+def _clean_host(value):
+    parsed = urlparse(value if '://' in value else f'//{value}')
+    return (parsed.netloc or parsed.path).strip().strip('/')
+
+
+def _clean_origin(value):
+    parsed = urlparse(value)
+    if not parsed.scheme or not parsed.netloc:
+        return value.strip().rstrip('/')
+    return f'{parsed.scheme}://{parsed.netloc}'
+
+
 _allowed_hosts_env = os.environ.get('ALLOWED_HOSTS')
 if _allowed_hosts_env:
-    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
+    ALLOWED_HOSTS = [_clean_host(h) for h in _split_env_list(_allowed_hosts_env)]
 else:
-    ALLOWED_HOSTS = ['*']
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'electronest-api.onrender.com']
 
 
 # Application definition
@@ -154,7 +171,7 @@ DEFAULT_CORS_ORIGINS = [
     'http://127.0.0.1:5173',
 ]
 _cors_env = os.environ.get('CORS_ORIGINS', '')
-_cors_origins = DEFAULT_CORS_ORIGINS + [o.strip() for o in _cors_env.split(',') if o.strip()]
+_cors_origins = DEFAULT_CORS_ORIGINS + [_clean_origin(o) for o in _split_env_list(_cors_env)]
 CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_cors_origins))
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
