@@ -52,25 +52,25 @@ function StarRow({ rating, size = 16, color = '#FBBF24' }) {
 
 /* ── Price Comparison Chart ── */
 function PriceComparisonChart({ productId }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [priceState, setPriceState] = useState({ productId: null, data: null, loading: false });
   const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
-    setData(null);
-    setLoading(false);
-  }, [productId]);
+  const data = priceState.productId === productId ? priceState.data : null;
+  const loading = priceState.productId === productId && priceState.loading;
 
-  useEffect(() => {
-    if (!isOpen || data || loading) return;
-    let cancelled = false;
-    setLoading(true);
+  const loadPriceHistory = () => {
+    if (loading || data) return;
+    setPriceState({ productId, data: null, loading: true });
     customerAPI.getPriceHistory(productId)
-      .then(res => { if (!cancelled) setData(res.data); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [isOpen, data, loading, productId]);
+      .then(res => setPriceState({ productId, data: res.data, loading: false }))
+      .catch(() => setPriceState({ productId, data: null, loading: false }));
+  };
+
+  const toggleOpen = () => {
+    const nextOpen = !isOpen;
+    setIsOpen(nextOpen);
+    if (nextOpen) loadPriceHistory();
+  };
 
   const priceHistory = Array.isArray(data?.price_history) ? data.price_history : [];
   const hasLiveMarketData = ['gadgetbyte_api', 'live_market_api', 'international_market_api'].includes(data?.market_source) && priceHistory.length > 0;
@@ -95,7 +95,7 @@ function PriceComparisonChart({ productId }) {
       boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     }}>
       <button
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={toggleOpen}
         style={{
           width: '100%',
           border: '1px solid #f97316',

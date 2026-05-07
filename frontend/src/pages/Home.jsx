@@ -3,16 +3,16 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FiHeart, FiBarChart2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { customerAPI } from '../services/api'
 import { HeaderSkeleton, CardGridSkeleton } from '../components/Common/SkeletonLoader'
-import imgHeadphones from '../components/images/hero-optimized/headphones.jpg'
-import imgLaptops from '../components/images/hero-optimized/laptops.jpg'
-import imgMonitors from '../components/images/hero-optimized/monitors.jpg'
-import imgSmartphones from '../components/images/hero-optimized/smartphones.jpg'
-import imgSpeakers from '../components/images/hero-optimized/speakers.jpg'
-import imgTablets from '../components/images/hero-optimized/tablets.jpg'
-import imgWatch from '../components/images/hero-optimized/smart-watches.jpg'
-import imgCamera from '../components/images/hero-optimized/camera.jpg'
-import imgDrone from '../components/images/hero-optimized/drone.jpg'
-import imgGaming from '../components/images/hero-optimized/gaming-console.jpg'
+import imgHeadphones from '../components/images/headphones.png'
+import imgLaptops from '../components/images/laptops.png'
+import imgMonitors from '../components/images/monitors.png'
+import imgSmartphones from '../components/images/smartphones.png'
+import imgSpeakers from '../components/images/speakers.png'
+import imgTablets from '../components/images/tablets.png'
+import imgWatch from '../components/images/smart watches.png'
+import imgCamera from '../components/images/camera.png'
+import imgDrone from '../components/images/drone.png'
+import imgGaming from '../components/images/Gaming Console.png'
 
 const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
 const getArrayData = (data) => data?.results || data || []
@@ -67,9 +67,9 @@ const HERO_SLIDES = [
 ]
 
 const SIDE = [
-  { eyebrow: 'Trend Devices', title: 'Latest Laptops', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', emoji: '💻', img: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=600&auto=format' },
-  { eyebrow: 'Desk Ready', title: 'Monitors', cat: 'Monitors', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', ec: '#16a34a', emoji: '🖥️' },
-  { eyebrow: 'Most Popular', title: 'Popular Watches', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', ec: '#F97316', emoji: '⌚' },
+  { eyebrow: 'Trend Devices', title: 'Latest Laptops', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', emoji: '💻', img: CAT_IMGS.Laptops },
+  { eyebrow: 'Desk Ready', title: 'Monitors', cat: 'Monitors', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', ec: '#16a34a', emoji: '🖥️', img: CAT_IMGS.Monitors },
+  { eyebrow: 'Most Popular', title: 'Popular Watches', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', ec: '#F97316', emoji: '⌚', img: CAT_IMGS.Smartwatches },
 ]
 
 function getCatEmoji(n) { return { Smartphones: '📱', Laptops: '💻', Monitors: '🖥️', Tablets: '📟', Drones: '🚁', Smartwatches: '⌚', 'PC Builds': '🧩', Speakers: '🔊', Earbuds: '🎧', Headphones: '🎧', Cameras: '📷', 'Gaming Consoles': '🎮' }[n] || '📦' }
@@ -173,16 +173,12 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         const catData = uniqueByName(getArrayData(catRes.data).filter(cat => CATALOG_CATEGORIES.includes(cat.name)))
         setCats(catData)
 
-        const activeCategory = catParam
-          ? catData.find(cat => (cat.name || '').toLowerCase() === catParam.toLowerCase())
-          : null
         let loadedProducts
-        if (activeCategory || searchQ) {
+        if (searchQ) {
           const productParams = {
             page_size: 120,
             compact: 1,
-            ...(activeCategory ? { category: activeCategory.id } : {}),
-            ...(searchQ ? { search: searchQ } : {}),
+            search: searchQ,
           }
           const allRes = await customerAPI.getProducts(productParams)
           loadedProducts = getArrayData(allRes.data)
@@ -206,7 +202,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
       } finally { setLoading(false) }
     }
     load()
-  }, [catParam, searchQ])
+  }, [searchQ])
 
   /* Per-product image variants — alternates by position: 1,3,5 → urls[0]  2,4,6 → urls[1]
      test: substring checked against product name (case-insensitive) */
@@ -410,7 +406,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
                     <span className="hm-s-ttl sm">{b.title}</span>
                     <button className="hm-s-btn sm" onClick={e => { e.stopPropagation(); nav(`/?cat=${encodeURIComponent(b.cat)}`) }}>View More</button>
                   </div>
-                  <div className="hm-s-imgbox sm">{sideImgs[b.cat] ? <img src={sideImgs[b.cat]} alt={b.title} className="hm-s-img" /> : <span className="hm-s-em sm">{b.emoji}</span>}</div>
+                  <div className="hm-s-imgbox sm">{(b.img || sideImgs[b.cat]) ? <img src={b.img || sideImgs[b.cat]} alt={b.title} className="hm-s-img" /> : <span className="hm-s-em sm">{b.emoji}</span>}</div>
                 </div>
               ))}
             </div>
@@ -652,10 +648,10 @@ const STYLES = `
 /* HERO */
 .hm-hero-sec{background:#F3F4F6;padding:1.25rem 1.5rem;}
 .hm-layout{display:grid;grid-template-columns:1fr 370px;gap:1rem;width:100%;}
-.hm-hero{border-radius:14px;position:relative;overflow:hidden;display:block;transition:background .5s;height:360px;background:#eef2ff;}
-.hm-banner-img{position:relative;width:100%;height:100%;object-fit:contain;display:block;z-index:0;background:#fff;}
+.hm-hero{border-radius:14px;position:relative;overflow:hidden;display:block;transition:background .5s;aspect-ratio:1440/610;background:#eef2ff;}
+.hm-banner-img{position:relative;width:100%;height:100%;object-fit:cover;display:block;z-index:0;}
 .hm-banner-img.is-loading{opacity:0;}
-.hm-hero:hover .hm-banner-img{transform:scale(1.03);transition:transform .5s ease;}
+.hm-hero:hover .hm-banner-img{transition:transform .5s ease;}
 .hm-emoji-fall{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12rem;opacity:.15;z-index:0;}
 .hm-banner-cta{position:absolute;bottom:2rem;left:2rem;z-index:2;}
 .hm-shopbtn{background:#F97316;color:#fff;border:none;border-radius:8px;padding:.7rem 1.75rem;font-size:.9rem;font-weight:700;font-family:inherit;cursor:pointer;transition:background .15s,transform .15s;box-shadow:0 4px 16px rgba(249,115,22,.4);}
@@ -825,5 +821,5 @@ const STYLES = `
 /* RESPONSIVE */
 @media(max-width:1024px){.hm-layout{grid-template-columns:1fr 300px;}.hm-grid{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:768px){.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:row;}.hm-side-lg{flex:2;}.hm-side-row{flex:1;flex-direction:column;gap:.85rem;}.hm-side-sm{min-height:0;flex:1;}.hm-grid{grid-template-columns:repeat(3,1fr);}.hm-prods-sec{padding:1.25rem 1.5rem;}.hm-card-img{height:185px;}}
-@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-hero{height:210px;}.hm-controls{display:none;}.hm-banner-cta{bottom:.6rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1rem .85rem;}.hm-grid{grid-template-columns:repeat(2,1fr);gap:.75rem;}.hm-card-img{height:155px;}.hm-card-img.compact{padding:10px;}.hm-on-sale{font-size:.72rem;padding:5px 10px;}.hm-pnm{font-size:.85rem;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}.hm-ticket{padding:9px 11px 10px;}.hm-ticket-price{font-size:1.25rem;}.hm-ticket-icon{font-size:1.1rem;}.hm-ticket-save{font-size:.72rem;}.hm-ticket-ltd{display:none;}.hm-icon-btn{width:32px;height:32px;}}
+@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-controls{display:none;}.hm-banner-cta{bottom:.6rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1rem .85rem;}.hm-grid{grid-template-columns:repeat(2,1fr);gap:.75rem;}.hm-card-img{height:155px;}.hm-card-img.compact{padding:10px;}.hm-on-sale{font-size:.72rem;padding:5px 10px;}.hm-pnm{font-size:.85rem;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}.hm-ticket{padding:9px 11px 10px;}.hm-ticket-price{font-size:1.25rem;}.hm-ticket-icon{font-size:1.1rem;}.hm-ticket-save{font-size:.72rem;}.hm-ticket-ltd{display:none;}.hm-icon-btn{width:32px;height:32px;}}
 `
