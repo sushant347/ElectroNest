@@ -451,6 +451,7 @@ class StockMovementsView(APIView):
                 order_status_name = ''
                 shipping_cost = 0.0
                 order_total = 0.0
+                commission_items = []
 
                 if po_product_ids:
                     # Look for the most recent order containing any of these products within ±1 day
@@ -475,8 +476,15 @@ class StockMovementsView(APIView):
                         shipping_cost = float(getattr(candidate, 'shipping_cost', 0) or 0)
                         order_total = 0.0
                         for detail in candidate.details.select_related('product__category', 'product__supplier').all():
+                            product = display_product_for_detail(detail)
                             unit_price = detail.unit_price or 0
-                            order_total += float(unit_price * detail.quantity)
+                            line_total = float(unit_price * detail.quantity)
+                            order_total += line_total
+                            commission_items.append({
+                                'product_owner': _line_item_store_name(product, detail.product_id),
+                                'quantity': detail.quantity,
+                                'line_total': line_total,
+                            })
 
                 po_status = po.order_status.name if po.order_status else 'Unknown'
                 store_names_in_po = list(dict.fromkeys(
@@ -505,7 +513,15 @@ class StockMovementsView(APIView):
                 # Commission calculation per store — only for Shipped or Delivered orders
                 if order_status_name in ('Shipped', 'Delivered'):
                     is_free_shipping = shipping_cost == 0
-                    for item in po_items:
+                    commission_source = commission_items or [
+                        {
+                            'product_owner': item['product_owner'],
+                            'quantity': item['quantity'],
+                            'line_total': item['product_price'] * item['quantity'],
+                        }
+                        for item in po_items
+                    ]
+                    for item in commission_source:
                         sname = item['product_owner'] or 'Unassigned'
                         if sname not in store_commission:
                             store_commission[sname] = {
@@ -515,7 +531,7 @@ class StockMovementsView(APIView):
                                 'free_shipping_commission': 0.0,
                                 'orders': 0,
                             }
-                        item_total = item['product_price'] * item['quantity']
+                        item_total = item['line_total']
                         store_commission[sname]['product_revenue'] += item_total
                         store_commission[sname]['orders'] += 1
 
@@ -526,7 +542,7 @@ class StockMovementsView(APIView):
                             store_commission[sname]['commission'] += comm
                         else:
                             # 10% of product price + shipping per item
-                            shipping_per_item = shipping_cost / max(len(po_items), 1)
+                            shipping_per_item = shipping_cost / max(len(commission_source), 1)
                             comm = item_total * 0.10 + shipping_per_item
                             store_commission[sname]['shipping_revenue'] += shipping_per_item
                             store_commission[sname]['commission'] += comm
