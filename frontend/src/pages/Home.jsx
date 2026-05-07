@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FiHeart, FiBarChart2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { customerAPI } from '../services/api'
@@ -139,6 +139,11 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   const suppressScrollRef = useRef(false)
   const catParam = sp.get('cat') || ''
   const searchQ = sp.get('search') || ''
+  const homeProductsParams = useMemo(() => (
+    searchQ
+      ? { page_size: 120, compact: 1, search: searchQ }
+      : { page_size: 500, compact: 1, sort_by: 'best_selling' }
+  ), [searchQ])
 
   /* ── Smart Filter state ── */
   const [minPrice, setMinPrice] = useState('')
@@ -167,7 +172,17 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
   useEffect(() => {
     const load = async (attempt = 1) => {
-      setLoading(true)
+      const cachedCats = customerAPI.peekCategories?.()
+      const cachedProducts = customerAPI.peekProducts?.(homeProductsParams)
+      if (cachedCats && cachedProducts) {
+        const catData = uniqueByName(getArrayData(cachedCats).filter(cat => CATALOG_CATEGORIES.includes(cat.name)))
+        const allowed = new Set(catData.map(cat => cat.name))
+        setCats(catData)
+        setProds(searchQ ? getArrayData(cachedProducts) : getArrayData(cachedProducts).filter(product => allowed.has(product.category_name)))
+        setLoading(false)
+      } else {
+        setLoading(true)
+      }
       try {
         const catRes = await customerAPI.getCategories()
         const catData = uniqueByName(getArrayData(catRes.data).filter(cat => CATALOG_CATEGORIES.includes(cat.name)))
@@ -175,15 +190,10 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
         let loadedProducts
         if (searchQ) {
-          const productParams = {
-            page_size: 120,
-            compact: 1,
-            search: searchQ,
-          }
-          const allRes = await customerAPI.getProducts(productParams)
+          const allRes = await customerAPI.getProducts(homeProductsParams)
           loadedProducts = getArrayData(allRes.data)
         } else {
-          const allRes = await customerAPI.getProducts({ page_size: 500, compact: 1, sort_by: 'best_selling' })
+          const allRes = await customerAPI.getProducts(homeProductsParams)
           const allowed = new Set(catData.map(cat => cat.name))
           loadedProducts = getArrayData(allRes.data).filter(product => allowed.has(product.category_name))
         }
@@ -202,7 +212,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
       } finally { setLoading(false) }
     }
     load()
-  }, [searchQ])
+  }, [homeProductsParams, searchQ])
 
   /* Per-product image variants — alternates by position: 1,3,5 → urls[0]  2,4,6 → urls[1]
      test: substring checked against product name (case-insensitive) */

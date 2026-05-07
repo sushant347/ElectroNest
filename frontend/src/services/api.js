@@ -1,6 +1,62 @@
 import axios from 'axios';
 import config from '../Config/Config';
 
+const GET_CACHE_TTL = 90_000;
+const getCache = new Map();
+const inflightGet = new Map();
+
+const stableStringify = (value) => {
+  if (!value || typeof value !== 'object') return JSON.stringify(value ?? null);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+};
+
+const getAuthCachePart = () => {
+  const token = localStorage.getItem(config.AUTH_TOKEN_KEY) || '';
+  return token ? token.slice(-16) : 'public';
+};
+
+const makeGetCacheKey = (url, params) => `${getAuthCachePart()}|${url}|${stableStringify(params || {})}`;
+
+const readStoredGet = (key) => {
+  const memory = getCache.get(key);
+  const now = Date.now();
+  if (memory && memory.expiresAt > now) return memory.data;
+  if (memory) getCache.delete(key);
+
+  try {
+    const raw = sessionStorage.getItem(`api:${key}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.expiresAt <= now) {
+      sessionStorage.removeItem(`api:${key}`);
+      return null;
+    }
+    getCache.set(key, parsed);
+    return parsed.data;
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredGet = (key, data, ttl = GET_CACHE_TTL) => {
+  const entry = { data, expiresAt: Date.now() + ttl };
+  getCache.set(key, entry);
+  try { sessionStorage.setItem(`api:${key}`, JSON.stringify(entry)); } catch { /* storage can be full/private */ }
+};
+
+export const peekCachedGet = (url, params) => readStoredGet(makeGetCacheKey(url, params));
+
+const clearGetCache = () => {
+  getCache.clear();
+  inflightGet.clear();
+  try {
+    Object.keys(sessionStorage)
+      .filter(key => key.startsWith('api:'))
+      .forEach(key => sessionStorage.removeItem(key));
+  } catch { /* ignore storage access errors */ }
+};
+
 const decodeJwtPayload = (token) => {
   if (!token) return null;
   const parts = token.split('.');
@@ -21,11 +77,29 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+const cachedGet = (url, options = {}, ttl = GET_CACHE_TTL) => {
+  const params = options.params || undefined;
+  const key = makeGetCacheKey(url, params);
+  const cached = readStoredGet(key);
+  if (cached) return Promise.resolve({ data: cached, status: 200, statusText: 'OK', headers: {}, config: options, cached: true });
+  if (inflightGet.has(key)) return inflightGet.get(key);
+
+  const request = api.get(url, options)
+    .then((response) => {
+      writeStoredGet(key, response.data, ttl);
+      return response;
+    })
+    .finally(() => inflightGet.delete(key));
+  inflightGet.set(key, request);
+  return request;
+};
+
 // ── Request Interceptor (attach JWT) ──
 api.interceptors.request.use(
   (cfg) => {
     const token = localStorage.getItem(config.AUTH_TOKEN_KEY);
     if (token) cfg.headers.Authorization = `Bearer ${token}`;
+    if (cfg.method && cfg.method.toLowerCase() !== 'get') clearGetCache();
     return cfg;
   },
   (error) => Promise.reject(error)
@@ -127,49 +201,49 @@ api.interceptors.response.use(
 // ── Owner API Endpoints ──
 export const ownerAPI = {
   // Dashboard Analytics
-  getSalesOverview: (params) => api.get('/analytics/sales-overview/', { params }),
-  getRevenueTrend: (params) => api.get('/analytics/revenue-trend/', { params }),
-  getTopProducts: (params) => api.get('/analytics/top-products/', { params }),
-  getCategoryPerformance: (params) => api.get('/analytics/category-performance/', { params }),
-  getPaymentMethodStats: (params) => api.get('/analytics/payment-methods/', { params }),
-  getOrderStatusStats: (params) => api.get('/analytics/order-status/', { params }),
-  getLowStockProducts: (params) => api.get('/analytics/low-stock/', { params }),
+  getSalesOverview: (params) => cachedGet('/analytics/sales-overview/', { params }),
+  getRevenueTrend: (params) => cachedGet('/analytics/revenue-trend/', { params }),
+  getTopProducts: (params) => cachedGet('/analytics/top-products/', { params }),
+  getCategoryPerformance: (params) => cachedGet('/analytics/category-performance/', { params }),
+  getPaymentMethodStats: (params) => cachedGet('/analytics/payment-methods/', { params }),
+  getOrderStatusStats: (params) => cachedGet('/analytics/order-status/', { params }),
+  getLowStockProducts: (params) => cachedGet('/analytics/low-stock/', { params }),
 
   // Product Management
-  getAllProducts: (params) => api.get('/products/', { params }),
-  getProduct: (id) => api.get(`/products/${id}/`),
+  getAllProducts: (params) => cachedGet('/products/', { params }),
+  getProduct: (id) => cachedGet(`/products/${id}/`),
   createProduct: (data) => api.post('/products/', data),
   updateProduct: (id, data) => api.patch(`/products/${id}/`, data),
   deleteProduct: (id) => api.delete(`/products/${id}/`),
 
   // Order Management
-  getAllOrders: (params) => api.get('/orders/', { params }),
-  getOrderDetails: (id) => api.get(`/orders/${id}/`),
+  getAllOrders: (params) => cachedGet('/orders/', { params }),
+  getOrderDetails: (id) => cachedGet(`/orders/${id}/`),
   updateOrderStatus: (id, statusData) => api.patch(`/orders/${id}/update-status/`, statusData),
-  getOrderStatuses: () => api.get('/order-statuses/'),
+  getOrderStatuses: () => cachedGet('/order-statuses/'),
 
   // Categories, Brands & Owners (for dropdowns)
-  getCategories: () => api.get('/categories/'),
-  getBrands: () => api.get('/brands/'),
-  getSuppliers: () => api.get('/suppliers/'),
-  getOwners: () => api.get('/auth/owners/'),
+  getCategories: () => cachedGet('/categories/'),
+  getBrands: () => cachedGet('/brands/'),
+  getSuppliers: () => cachedGet('/suppliers/'),
+  getOwners: () => cachedGet('/auth/owners/'),
 
   // Notifications
-  getNotifications: () => api.get('/notifications/'),
+  getNotifications: () => cachedGet('/notifications/', {}, 15_000),
   markNotificationRead: (id) => api.patch(`/notifications/${id}/read/`),
   markAllNotificationsRead: () => api.patch('/notifications/read-all/'),
   clearAllNotifications: () => api.delete('/notifications/clear-all/'),
-  getProductQuestions: (params) => api.get('/product-questions/', { params }),
+  getProductQuestions: (params) => cachedGet('/product-questions/', { params }),
   answerProductQuestion: (id, answer) => api.patch(`/product-questions/${id}/answer/`, { answer }),
 
   // Analytics — Product Growth
-  getProductGrowth: (productId, days = 90) => api.get(`/analytics/product-growth/${productId}/`, { params: { days } }),
+  getProductGrowth: (productId, days = 90) => cachedGet(`/analytics/product-growth/${productId}/`, { params: { days } }),
 
   // Analytics — Demand Forecast
-  getDemandForecast: (productId, history = 30, forecast = 7) => api.get(`/analytics/forecast/${productId}/`, { params: { history, forecast } }),
+  getDemandForecast: (productId, history = 30, forecast = 7) => cachedGet(`/analytics/forecast/${productId}/`, { params: { history, forecast } }),
 
   // Analytics — Comprehensive Forecast (multi-model)
-  getComprehensiveForecast: (productId, days = 30, forecastDays = 7) => api.get(`/analytics/comprehensive-forecast/${productId}/`, { params: { days, forecast_days: forecastDays } }),
+  getComprehensiveForecast: (productId, days = 30, forecastDays = 7) => cachedGet(`/analytics/comprehensive-forecast/${productId}/`, { params: { days, forecast_days: forecastDays } }),
 
   // Stock increase for existing product
   increaseStock: (id, stock) => api.patch(`/products/${id}/`, { stock }),
@@ -178,7 +252,7 @@ export const ownerAPI = {
   bulkImportProducts: (formData) => api.post('/products/bulk-import/', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 
   // Coupon Management (owner sees only their own coupons, backend enforced)
-  getCoupons: (params) => api.get('/coupons/', { params }),
+  getCoupons: (params) => cachedGet('/coupons/', { params }),
   createCoupon: (data) => api.post('/coupons/', data),
   updateCoupon: (id, data) => api.patch(`/coupons/${id}/`, data),
   deleteCoupon: (id) => api.delete(`/coupons/${id}/`),
@@ -187,105 +261,108 @@ export const ownerAPI = {
 // ── Warehouse API Endpoints ──
 export const warehouseAPI = {
   // Dashboard
-  getDashboard: () => api.get('/warehouse/dashboard/'),
+  getDashboard: () => cachedGet('/warehouse/dashboard/'),
 
   // Stock Movements (detailed: shipped orders, received POs, product updates)
-  getStockMovements: (params) => api.get('/warehouse/stock-movements/', { params }),
+  getStockMovements: (params) => cachedGet('/warehouse/stock-movements/', { params }),
 
   // Purchase Orders
-  getPurchaseOrders: (params) => api.get('/warehouse/purchase-orders/', { params }),
-  getPurchaseOrder: (id) => api.get(`/warehouse/purchase-orders/${id}/`),
+  getPurchaseOrders: (params) => cachedGet('/warehouse/purchase-orders/', { params }),
+  getPurchaseOrder: (id) => cachedGet(`/warehouse/purchase-orders/${id}/`),
   createPurchaseOrder: (data) => api.post('/warehouse/purchase-orders/', data),
   receivePurchaseOrder: (id) => api.patch(`/warehouse/purchase-orders/${id}/receive/`),
 
   // Low Stock (from analytics)
-  getLowStockProducts: (params) => api.get('/analytics/low-stock/', { params }),
+  getLowStockProducts: (params) => cachedGet('/analytics/low-stock/', { params }),
 
   // Suppliers & Products (for dropdowns)
-  getSuppliers: (params) => api.get('/suppliers/', { params }),
-  getProducts: (params) => api.get('/products/', { params }),
+  getSuppliers: (params) => cachedGet('/suppliers/', { params }),
+  getProducts: (params) => cachedGet('/products/', { params }),
 
   // Inventory items (alias for products with stock info)
-  getInventoryItems: (params) => api.get('/products/', { params }),
+  getInventoryItems: (params) => cachedGet('/products/', { params }),
 
   // Owners (users with owner role)
-  getOwners: () => api.get('/admin/users/', { params: { role: 'owner' } }),
+  getOwners: () => cachedGet('/admin/users/', { params: { role: 'owner' } }),
 
   // Notifications
-  getNotifications: () => api.get('/notifications/'),
+  getNotifications: () => cachedGet('/notifications/', {}, 15_000),
   markNotificationRead: (id) => api.patch(`/notifications/${id}/read/`),
   markAllNotificationsRead: () => api.patch('/notifications/read-all/'),
   clearAllNotifications: () => api.delete('/notifications/clear-all/'),
   sendLowStockAlert: (productId) => api.post('/notifications/send-low-stock/', { product_id: productId }),
 
   // Shipped orders (for warehouse delivery) — load all then filter client-side
-  getShippedOrders: () => api.get('/orders/', { params: { page_size: 500 } }),
-  getOrderDetails: (id) => api.get(`/orders/${id}/`),
+  getShippedOrders: () => cachedGet('/orders/', { params: { page_size: 500 } }),
+  getOrderDetails: (id) => cachedGet(`/orders/${id}/`),
   markOrderDelivered: (id) => api.patch(`/orders/${id}/update-status/`, { order_status: 'Delivered' }),
 };
 
 // ── Customer API Endpoints ──
 export const customerAPI = {
   // Browsing
-  getProducts: (params) => api.get('/products/', { params }),
-  getProduct: (id) => api.get(`/products/${id}/`),
-  getCategories: () => api.get('/categories/'),
-  getBrands: () => api.get('/brands/'),
-  searchProducts: (query) => api.get('/products/', { params: { search: query } }),
-  getPriceHistory: (productId) => api.get(`/products/${productId}/price-history/`),
-  getProductQuestions: (productId) => api.get('/product-questions/', { params: { product: productId } }),
+  getProducts: (params) => cachedGet('/products/', { params }),
+  peekProducts: (params) => peekCachedGet('/products/', params),
+  getProduct: (id) => cachedGet(`/products/${id}/`),
+  peekProduct: (id) => peekCachedGet(`/products/${id}/`),
+  getCategories: () => cachedGet('/categories/'),
+  peekCategories: () => peekCachedGet('/categories/'),
+  getBrands: () => cachedGet('/brands/'),
+  searchProducts: (query) => cachedGet('/products/', { params: { search: query } }),
+  getPriceHistory: (productId) => cachedGet(`/products/${productId}/price-history/`),
+  getProductQuestions: (productId) => cachedGet('/product-questions/', { params: { product: productId } }),
   askProductQuestion: (productId, question) => api.post('/product-questions/', { product: productId, question }),
-  getCustomerNotifications: () => api.get('/customer-notifications/'),
+  getCustomerNotifications: () => cachedGet('/customer-notifications/', {}, 15_000),
   markCustomerNotificationRead: (id) => api.patch(`/customer-notifications/${id}/read/`),
   markAllCustomerNotificationsRead: () => api.patch('/customer-notifications/read-all/'),
 
   // Cart
-  getCart: () => api.get('/cart/'),
+  getCart: () => cachedGet('/cart/', {}, 20_000),
   addToCart: (productId, orderCount = 1, variantId = null) => api.post('/cart/', { product: productId, variant: variantId, order_count: orderCount }),
   updateCartItem: (itemId, orderCount) => api.patch(`/cart/${itemId}/`, { order_count: orderCount }),
   removeCartItem: (itemId) => api.delete(`/cart/${itemId}/`),
   clearCart: () => api.delete('/cart/clear/'),
 
   // Wishlist
-  getWishlist: () => api.get('/wishlist/'),
+  getWishlist: () => cachedGet('/wishlist/', {}, 20_000),
   addToWishlist: (productId) => api.post('/wishlist/', { product: productId }),
   removeFromWishlist: (itemId) => api.delete(`/wishlist/${itemId}/`),
 
   // Compare List
-  getCompareList: () => api.get('/compare/'),
+  getCompareList: () => cachedGet('/compare/', {}, 20_000),
   addToCompare: (productId) => api.post('/compare/', { product: productId }),
   removeFromCompare: (itemId) => api.delete(`/compare/${itemId}/`),
   clearCompare: () => api.delete('/compare/clear/'),
 
   // Orders
   placeOrder: (data) => api.post('/orders/', data),
-  getMyOrders: (params) => api.get('/orders/', { params }),
-  getOrderDetails: (id) => api.get(`/orders/${id}/`),
+  getMyOrders: (params) => cachedGet('/orders/', { params }),
+  getOrderDetails: (id) => cachedGet(`/orders/${id}/`),
   cancelOrder: (id) => api.patch(`/orders/${id}/cancel/`),
 
   // Profile & Addresses
-  getProfile: () => api.get('/auth/profile/'),
+  getProfile: () => cachedGet('/auth/profile/'),
   updateProfile: (data) => api.patch('/auth/profile/', data),
   changePassword: (data) => api.post('/auth/change-password/', data),
-  getAddresses: () => api.get('/auth/addresses/'),
+  getAddresses: () => cachedGet('/auth/addresses/'),
   addAddress: (data) => api.post('/auth/addresses/', data),
   updateAddress: (id, data) => api.patch(`/auth/addresses/${id}/`, data),
   deleteAddress: (id) => api.delete(`/auth/addresses/${id}/`),
 
   // Reviews
   addReview: (data) => api.post('/reviews/', data),
-  getReviews: (productId) => api.get('/reviews/', { params: { product: productId } }),
-  getMyReview: (productId) => api.get('/reviews/', { params: { product: productId, mine: 'true' } }),
+  getReviews: (productId) => cachedGet('/reviews/', { params: { product: productId } }),
+  getMyReview: (productId) => cachedGet('/reviews/', { params: { product: productId, mine: 'true' } }),
 
   // Coupons — pass ownerName to scope results to a specific store
   validateCoupon: (code, ownerName) => api.post('/coupons/validate/', { code, ...(ownerName ? { owner_name: ownerName } : {}) }),
-  getCoupons: (ownerName) => api.get('/coupons/', { params: ownerName ? { owner_name: ownerName } : {} }),
+  getCoupons: (ownerName) => cachedGet('/coupons/', { params: ownerName ? { owner_name: ownerName } : {} }),
 
   // Payment Methods
-  getPaymentMethods: () => api.get('/payment-methods/'),
+  getPaymentMethods: () => cachedGet('/payment-methods/'),
 
   // Payments
-  getPayments: () => api.get('/payments/'),
+  getPayments: () => cachedGet('/payments/'),
 
   // Support / Contact
   submitContactQuery: (data) => api.post('/admin/user-queries/submit/', data),
@@ -294,54 +371,54 @@ export const customerAPI = {
 // ── Admin API Endpoints ──
 export const adminAPI = {
   // Dashboard
-  getDashboard: () => api.get('/admin/dashboard/'),
+  getDashboard: () => cachedGet('/admin/dashboard/'),
 
   // User Management
-  getUsers: (params) => api.get('/admin/users/', { params }),
-  getUser: (id) => api.get(`/admin/users/${id}/`),
+  getUsers: (params) => cachedGet('/admin/users/', { params }),
+  getUser: (id) => cachedGet(`/admin/users/${id}/`),
   createUser: (data) => api.post('/admin/users/', data),
   updateUser: (id, data) => api.patch(`/admin/users/${id}/`, data),
   deleteUser: (id) => api.delete(`/admin/users/${id}/`),
   toggleUserStatus: (id) => api.patch(`/admin/users/${id}/toggle-active/`),
 
   // Supplier Management
-  getSuppliers: (params) => api.get('/admin/suppliers/', { params }),
-  getSupplier: (id) => api.get(`/admin/suppliers/${id}/`),
+  getSuppliers: (params) => cachedGet('/admin/suppliers/', { params }),
+  getSupplier: (id) => cachedGet(`/admin/suppliers/${id}/`),
   createSupplier: (data) => api.post('/admin/suppliers/', data),
   updateSupplier: (id, data) => api.patch(`/admin/suppliers/${id}/`, data),
   deleteSupplier: (id) => api.delete(`/admin/suppliers/${id}/`),
 
   // Audit Logs
-  getLogs: (params) => api.get('/admin/logs/', { params }),
-  getAuditLog: (id) => api.get(`/admin/logs/${id}/`),
-  getAuditStatistics: () => api.get('/admin/logs/stats/'),
+  getLogs: (params) => cachedGet('/admin/logs/', { params }),
+  getAuditLog: (id) => cachedGet(`/admin/logs/${id}/`),
+  getAuditStatistics: () => cachedGet('/admin/logs/stats/'),
 
   // Customers
-  getCustomers: (params) => api.get('/admin/customers/', { params }),
-  getCustomer: (id) => api.get(`/admin/customers/${id}/`),
+  getCustomers: (params) => cachedGet('/admin/customers/', { params }),
+  getCustomer: (id) => cachedGet(`/admin/customers/${id}/`),
   deleteCustomer: (id) => api.delete(`/admin/customers/${id}/`),
   toggleCustomerStatus: (id, isActive) => api.patch(`/admin/customers/${id}/`, { is_active: isActive }),
 
   // User Queries
-  getUserQueries: (params) => api.get('/admin/user-queries/', { params }),
-  getUserQuery: (id) => api.get(`/admin/user-queries/${id}/`),
+  getUserQueries: (params) => cachedGet('/admin/user-queries/', { params }),
+  getUserQuery: (id) => cachedGet(`/admin/user-queries/${id}/`),
   updateUserQuery: (id, data) => api.patch(`/admin/user-queries/${id}/`, data),
   markUserQueryRead: (id) => api.patch(`/admin/user-queries/${id}/mark-read/`),
 
   // Analytics (reuse owner analytics endpoints)
-  getSalesOverview: (params) => api.get('/analytics/sales-overview/', { params }),
-  getRevenueTrend: (params) => api.get('/analytics/revenue-trend/', { params }),
-  getCategoryPerformance: (params) => api.get('/analytics/category-performance/', { params }),
-  getTopProducts: (params) => api.get('/analytics/top-products/', { params }),
-  getLowStockProducts: (params) => api.get('/analytics/low-stock/', { params }),
+  getSalesOverview: (params) => cachedGet('/analytics/sales-overview/', { params }),
+  getRevenueTrend: (params) => cachedGet('/analytics/revenue-trend/', { params }),
+  getCategoryPerformance: (params) => cachedGet('/analytics/category-performance/', { params }),
+  getTopProducts: (params) => cachedGet('/analytics/top-products/', { params }),
+  getLowStockProducts: (params) => cachedGet('/analytics/low-stock/', { params }),
 
   // ML / BI Features
-  getCustomerSegmentation: (params) => api.get('/analytics/segmentation/', { params }),
-  getChurnPrediction: (params) => api.get('/analytics/churn-prediction/', { params }),
-  getDemandForecast: (productId, params) => api.get(`/analytics/forecast/${productId}/`, { params }),
-  getProductRecommendations: (productId, params) => api.get(`/analytics/recommendations/${productId}/`, { params }),
-  getPaymentMethodStats: (params) => api.get('/analytics/payment-methods/', { params }),
-  getOrderStatusStats: (params) => api.get('/analytics/order-status/', { params }),
+  getCustomerSegmentation: (params) => cachedGet('/analytics/segmentation/', { params }),
+  getChurnPrediction: (params) => cachedGet('/analytics/churn-prediction/', { params }),
+  getDemandForecast: (productId, params) => cachedGet(`/analytics/forecast/${productId}/`, { params }),
+  getProductRecommendations: (productId, params) => cachedGet(`/analytics/recommendations/${productId}/`, { params }),
+  getPaymentMethodStats: (params) => cachedGet('/analytics/payment-methods/', { params }),
+  getOrderStatusStats: (params) => cachedGet('/analytics/order-status/', { params }),
 };
 
 // ── Auth API ──

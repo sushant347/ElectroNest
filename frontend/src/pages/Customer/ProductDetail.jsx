@@ -849,7 +849,15 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
+      const cached = customerAPI.peekProduct?.(id);
+      if (cached) {
+        const normalized = normalize(cached);
+        setProduct(normalized);
+        setSelectedVariantId((normalized.variants.find(v => v.isDefault) || normalized.variants[0] || null)?.id || null);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
       try {
         const productRes = await customerAPI.getProduct(id);
         const normalized = normalize(productRes.data);

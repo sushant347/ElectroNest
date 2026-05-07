@@ -3,6 +3,7 @@ import io
 import json
 import random
 import string
+import time
 from datetime import timedelta
 
 from rest_framework import viewsets, filters, status as drf_status
@@ -19,6 +20,9 @@ from .models import Category, Supplier, Product, Review, MarketPriceSnapshot
 from .serializers import CategorySerializer, SupplierSerializer, ProductSerializer, ProductCompactSerializer, ReviewSerializer
 from .price_matching import get_price_comparison
 from admin_panel.models import AuditMixin, AuditLog
+
+_REVIEW_STATS_CACHE = {'expires_at': 0, 'stats': {}}
+_REVIEW_STATS_TTL_SECONDS = 120
 
 def _get_market_anchor_price(product: Product) -> Decimal:
     """Baseline market anchor used when product is created."""
@@ -141,17 +145,21 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
         if not product_ids:
             return product_list
 
-        stats = {
-            row['product_id']: row
-            for row in Review.objects
-            .filter(product_id__in=product_ids)
-            .order_by()
-            .values('product_id')
-            .annotate(
-                average_rating=Avg('rating'),
-                review_count=Count('id'),
-            )
-        }
+        now = time.monotonic()
+        stats = _REVIEW_STATS_CACHE['stats']
+        if _REVIEW_STATS_CACHE['expires_at'] <= now:
+            stats = {
+                row['product_id']: row
+                for row in Review.objects
+                .order_by()
+                .values('product_id')
+                .annotate(
+                    average_rating=Avg('rating'),
+                    review_count=Count('id'),
+                )
+            }
+            _REVIEW_STATS_CACHE['stats'] = stats
+            _REVIEW_STATS_CACHE['expires_at'] = now + _REVIEW_STATS_TTL_SECONDS
         for product in product_list:
             row = stats.get(product.id)
             product.average_rating = row['average_rating'] if row else 0
@@ -354,6 +362,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
         if Review.objects.filter(product__id=product_id, customer=self.request.user).exists():
             raise ValidationError('You have already reviewed this product.')
         serializer.save(customer=self.request.user)
+        _REVIEW_STATS_CACHE['expires_at'] = 0
 
 
 class BrandsListView(APIView):
