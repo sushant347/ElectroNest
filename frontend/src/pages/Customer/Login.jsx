@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, MapPin, ArrowRight, Phone, Calendar, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { authAPI, warehouseAPI } from '../../services/api';
+import { adminAPI, authAPI, customerAPI, warehouseAPI } from '../../services/api';
 import config from '../../Config/Config';
 
 // Province/State data by country
@@ -24,6 +24,23 @@ const prewarmWarehouseEntry = () => {
   setTimeout(() => {
     warehouseAPI.getNotifications().catch(() => {});
   }, 1200);
+};
+
+const prewarmAdminEntry = () => {
+  Promise.allSettled([
+    adminAPI.getDashboard(),
+    adminAPI.getLogs({ page_size: 100 }).catch(() => null),
+    import('../../components/admin/AdminLayout'),
+    import('../Admin/Dashboard'),
+  ]);
+};
+
+const prewarmCustomerEntry = () => {
+  Promise.allSettled([
+    customerAPI.getCategories(),
+    customerAPI.getProducts({ page_size: 80, compact: 1 }),
+    import('../Home'),
+  ]);
 };
 
 export default function Login() {
@@ -166,6 +183,8 @@ export default function Login() {
       if (userData.last_name && !userData.lastName) userData.lastName = userData.last_name;
       login(userData);
       if (userData.role === 'warehouse') prewarmWarehouseEntry();
+      if (userData.role === 'admin') prewarmAdminEntry();
+      if (userData.role === 'customer') prewarmCustomerEntry();
 
       // ── Redirect based on role ──
       const roleHome = {

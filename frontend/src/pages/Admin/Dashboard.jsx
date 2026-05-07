@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   RefreshCw, Users, ShoppingCart, DollarSign, Package, BarChart3,
   UserCheck, Search, ChevronLeft, ChevronRight, X, TrendingUp,
@@ -177,10 +177,13 @@ function HealthDot({ title, status, details, icon: Icon }) {
    ADMIN DASHBOARD
 ═══════════════════════════════════════════════ */
 export default function Dashboard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const initialDashRef = useRef(adminAPI.peekDashboard?.() || null);
+  const initialLogsRef = useRef(adminAPI.peekLogs?.({ page_size: 100 }) || null);
+  const dataRef = useRef(initialDashRef.current ? { ...initialDashRef.current, recentLogs: initialLogsRef.current?.results || initialLogsRef.current || [] } : null);
+  const [data, setData] = useState(dataRef.current);
+  const [loading, setLoading] = useState(!dataRef.current);
   const [error, setError] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(dataRef.current ? new Date() : null);
   const [realtimeMode, setRealtimeMode] = useState(false);
   const [refreshTimer, setRefreshTimer] = useState(null);
 
@@ -193,7 +196,9 @@ export default function Dashboard() {
   });
 
   /* Customer table state */
-  const [customers, setCustomers] = useState([]);
+  const initialCustomersRef = useRef(adminAPI.peekCustomers?.({}) || null);
+  const customersRef = useRef(initialCustomersRef.current?.results || initialCustomersRef.current || []);
+  const [customers, setCustomers] = useState(customersRef.current);
   const [custLoading, setCustLoading] = useState(false);
   const [custSearch, setCustSearch] = useState('');
   const [custGender, setCustGender] = useState('');
@@ -201,9 +206,33 @@ export default function Dashboard() {
   const [custPage, setCustPage] = useState(1);
   const custPerPage = 12;
 
+  const applyDashboardData = useCallback((nextData) => {
+    dataRef.current = nextData;
+    setData(nextData);
+    setLastUpdate(new Date());
+
+    const logCount = nextData.recentLogs?.length || 0;
+    setHealth({
+      database: { status: 'healthy', details: 'All connections active' },
+      auditLogs: { status: 'healthy', details: `${logCount} recent entries` },
+      users: {
+        status: (nextData.total_users || 0) < 5 ? 'warning' : 'healthy',
+        details: `${nextData.total_users || 0} total users`,
+      },
+      orders: { status: 'healthy', details: `${nextData.total_orders || 0} total orders` },
+    });
+  }, []);
+
   /* ── Fetch dashboard data ── */
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async ({ background = false } = {}) => {
+    const cachedDash = adminAPI.peekDashboard?.();
+    const cachedLogs = adminAPI.peekLogs?.({ page_size: 100 });
+    if (cachedDash) {
+      applyDashboardData({ ...cachedDash, recentLogs: cachedLogs?.results || cachedLogs || [] });
+      setLoading(false);
+    } else if (!background && !dataRef.current) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const [dashRes, logsRes] = await Promise.all([
@@ -211,20 +240,7 @@ export default function Dashboard() {
         adminAPI.getLogs({ page_size: 100 }).catch(() => ({ data: { results: [] } })),
       ]);
       const d = { ...dashRes.data, recentLogs: logsRes.data?.results || [] };
-      setData(d);
-      setLastUpdate(new Date());
-
-      // Update health indicators
-      const logCount = d.recentLogs?.length || 0;
-      setHealth({
-        database: { status: 'healthy', details: 'All connections active' },
-        auditLogs: { status: 'healthy', details: `${logCount} recent entries` },
-        users: {
-          status: (d.total_users || 0) < 5 ? 'warning' : 'healthy',
-          details: `${d.total_users || 0} total users`,
-        },
-        orders: { status: 'healthy', details: `${d.total_orders || 0} total orders` },
-      });
+      applyDashboardData(d);
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       setError('Failed to load dashboard data.');
@@ -232,18 +248,29 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applyDashboardData]);
 
   /* ── Fetch customers ── */
   const fetchCustomers = useCallback(async () => {
-    setCustLoading(true);
+    const params = {};
+    if (custSearch.trim()) params.search = custSearch.trim();
+    if (custGender) params.gender = custGender;
+    if (custStatus) params.is_active = custStatus === 'active' ? 'true' : 'false';
+    const cached = adminAPI.peekCustomers?.(params);
+    if (cached) {
+      const rows = cached.results || cached || [];
+      customersRef.current = rows;
+      setCustomers(rows);
+      setCustPage(1);
+      setCustLoading(false);
+    } else {
+      setCustLoading(true);
+    }
     try {
-      const params = {};
-      if (custSearch.trim()) params.search = custSearch.trim();
-      if (custGender) params.gender = custGender;
-      if (custStatus) params.is_active = custStatus === 'active' ? 'true' : 'false';
       const res = await adminAPI.getCustomers(params);
-      setCustomers(res.data?.results || res.data || []);
+      const rows = res.data?.results || res.data || [];
+      customersRef.current = rows;
+      setCustomers(rows);
       setCustPage(1);
     } catch {
       setCustomers([]);
@@ -256,7 +283,7 @@ export default function Dashboard() {
   const toggleRealtime = () => {
     setRealtimeMode(prev => {
       if (!prev) {
-        const t = setInterval(fetchData, 30000);
+        const t = setInterval(() => fetchData({ background: true }), 30000);
         setRefreshTimer(t);
       } else {
         if (refreshTimer) { clearInterval(refreshTimer); setRefreshTimer(null); }
@@ -266,7 +293,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData({ background: Boolean(dataRef.current) });
     return () => { if (refreshTimer) clearInterval(refreshTimer); };
   }, [fetchData]);
 
@@ -296,13 +323,13 @@ export default function Dashboard() {
   }
 
   /* ── Error state ── */
-  if (error) {
+  if (error && !data) {
     return (
       <div className="adm-center" style={{ color: '#DC2626' }}>
         <AlertTriangle size={48} style={{ marginBottom: 16 }} />
         <h2 style={{ margin: 0 }}>Dashboard Error</h2>
         <p>{error}</p>
-        <button onClick={fetchData} style={{ padding: '12px 24px', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button onClick={() => fetchData()} style={{ padding: '12px 24px', background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
           <RefreshCw size={16} /> Retry
         </button>
         <style>{`.adm-center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:12px}`}</style>
@@ -361,7 +388,7 @@ export default function Dashboard() {
             <button className={`rt-btn ${realtimeMode ? 'active' : ''}`} onClick={toggleRealtime}>
               <Zap size={15} /> {realtimeMode ? 'Live' : 'Static'}
             </button>
-            <button className="refresh-btn" onClick={fetchData}>
+            <button className="refresh-btn" onClick={() => fetchData({ background: true })}>
               <RefreshCw size={15} className={loading ? 'spin' : ''} /> Refresh
             </button>
           </div>

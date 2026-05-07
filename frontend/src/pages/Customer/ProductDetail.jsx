@@ -10,7 +10,7 @@ import {
 import { customerAPI } from '../../services/api';
 import config from '../../Config/Config';
 import { HeaderSkeleton, CardGridSkeleton, SkeletonText } from '../../components/Common/SkeletonLoader';
-import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 
 const formatPrice = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p);
 const cleanVariantTitle = (title) => /^option\s+\d+$/i.test(String(title || '').trim())
@@ -58,12 +58,19 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
   const [priceState, setPriceState] = useState({ productId: null, data: null, loading: false });
   const [isOpen, setIsOpen] = useState(false);
   const [activeVariantKey, setActiveVariantKey] = useState('selected');
+  const chartBoxRef = useRef(null);
+  const [chartWidth, setChartWidth] = useState(0);
 
   const data = priceState.productId === productId ? priceState.data : null;
   const loading = priceState.productId === productId && priceState.loading;
 
   const loadPriceHistory = () => {
     if (loading || data) return;
+    const cached = customerAPI.peekPriceHistory?.(productId);
+    if (cached) {
+      setPriceState({ productId, data: cached, loading: false });
+      return;
+    }
     setPriceState({ productId, data: null, loading: true });
     customerAPI.getPriceHistory(productId)
       .then(res => setPriceState({ productId, data: res.data, loading: false }))
@@ -97,6 +104,24 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
   const volatility = Number(data?.market_volatility_percent || 0);
   const advantage = Number(activeSeries?.savings_percent ?? data?.price_advantage_percent ?? savings ?? 0);
   const chartColors = ['#ef4444', '#0ea5e9', '#16a34a', '#8b5cf6', '#f97316', '#0891b2', '#be123c', '#4f46e5'];
+  const chartHeight = typeof window !== 'undefined' && window.innerWidth <= 480 ? 210 : typeof window !== 'undefined' && window.innerWidth <= 768 ? 230 : 280;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const measure = () => {
+      const nodeWidth = chartBoxRef.current?.getBoundingClientRect?.().width || 0;
+      const fallback = typeof window !== 'undefined' ? Math.max(260, window.innerWidth - 48) : 320;
+      setChartWidth(Math.max(260, Math.floor(nodeWidth || fallback)));
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (observer && chartBoxRef.current) observer.observe(chartBoxRef.current);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [isOpen, priceHistory.length, isAllVariants]);
 
   return (
     <div className="price-insights-wrap" style={{
@@ -108,6 +133,7 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
       boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     }}>
       <button
+        className="price-insights-toggle"
         onClick={toggleOpen}
         style={{
           width: '100%',
@@ -118,24 +144,25 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 12,
           cursor: 'pointer',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div style={{
             width: 34, height: 34, borderRadius: 9, background: '#fff7ed',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           </div>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', textAlign: 'left' }}>Smart Price Insights</div>
-            <div style={{ fontSize: 12, color: '#ffedd5', textAlign: 'left' }}>
+            <div style={{ fontSize: 12, color: '#ffedd5', textAlign: 'left', overflowWrap: 'anywhere' }}>
               {loading ? 'Loading live market comparison...' : isOpen ? 'Hide comparison dashboard' : 'Open market trend dashboard'}
             </div>
           </div>
         </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+        <div className="price-insights-action" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           {spread > 0 && (
             <span style={{
               fontSize: 12,
@@ -145,6 +172,7 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
               border: '1px solid #86efac',
               borderRadius: 999,
               padding: '4px 10px',
+              overflowWrap: 'anywhere',
             }}>
               You save {formatPrice(spread)}
             </span>
@@ -203,7 +231,7 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: 10, marginTop: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+      <div className="price-metrics-grid" style={{ display: 'grid', gap: 10, marginTop: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         <div style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#9a3412', marginBottom: 4 }}>{isAllVariants ? 'Store Price Range' : 'Your Price'}</div>
           <div style={s.priceMetricValue}>{isAllVariants ? `${formatPrice(Math.min(...variantSeries.map(v => Number(v.store_price || 0))))} - ${formatPrice(Math.max(...variantSeries.map(v => Number(v.store_price || 0))))}` : formatPrice(yourPrice)}</div>
@@ -267,7 +295,7 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
               <span style={{ fontSize: 12, color: '#475569', fontWeight: 700, minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.35 }}>
                 {offer.store}: {offer.name}
               </span>
-              <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <span className="market-offer-price" style={{ fontSize: 12, color: '#dc2626', fontWeight: 800, textAlign: 'right', overflowWrap: 'anywhere', flexShrink: 0 }}>
                 {formatPrice(offer.price)}
                 {offer.currency === 'USD' && offer.original_price ? ` ($${Number(offer.original_price).toLocaleString()})` : ''}
               </span>
@@ -300,9 +328,9 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
         )}
       </div>
 
-      <div className="price-chart-box" style={{ width: '100%', height: 280 }}>
-        <ResponsiveContainer>
-          <ComposedChart data={priceHistory} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+      <div ref={chartBoxRef} className="price-chart-box" style={{ width: '100%', height: chartHeight, minWidth: 0 }}>
+        {chartWidth > 0 && (
+          <ComposedChart width={chartWidth} height={chartHeight} data={priceHistory} margin={{ top: 10, right: 8, left: -8, bottom: 0 }}>
             <defs>
               <linearGradient id="marketFillNew" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#f97316" stopOpacity={0.28}/>
@@ -314,7 +342,7 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
               dataKey="date" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 10, fill: '#94a3b8' }}
               tickFormatter={(val) => {
                 const d = new Date(val);
                 return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
@@ -323,7 +351,7 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
             <YAxis 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 10, fill: '#94a3b8' }}
               tickFormatter={(val) => `${Math.round(val / 1000)}k`}
               domain={['auto', 'auto']}
             />
@@ -360,7 +388,7 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
               </>
             )}
           </ComposedChart>
-        </ResponsiveContainer>
+        )}
       </div>
 
       <div style={{
@@ -1783,9 +1811,30 @@ const spinnerCSS = `
     .price-insights-wrap {
       padding: 14px !important;
       border-radius: 14px !important;
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+      box-sizing: border-box !important;
+    }
+    .price-insights-toggle {
+      flex-wrap: wrap !important;
+      align-items: flex-start !important;
+    }
+    .price-insights-action {
+      width: 100% !important;
+      justify-content: space-between !important;
+    }
+    .price-metrics-grid {
+      grid-template-columns: 1fr 1fr !important;
     }
     .price-chart-box {
       height: 220px !important;
+      min-width: 0 !important;
+      overflow: hidden !important;
+    }
+    .market-offer-price {
+      white-space: normal !important;
+      text-align: left !important;
+      flex-basis: 100% !important;
     }
   }
   @media (max-width: 480px) {
@@ -1801,8 +1850,11 @@ const spinnerCSS = `
     .price-insights-wrap {
       margin-top: 18px !important;
     }
+    .price-metrics-grid {
+      grid-template-columns: 1fr !important;
+    }
     .price-chart-box {
-      height: 200px !important;
+      height: 210px !important;
     }
   }
   @media (max-width: 640px) {

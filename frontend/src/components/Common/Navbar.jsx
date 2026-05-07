@@ -48,6 +48,13 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
   const { logout } = useAuth()
 
   useEffect(() => {
+    const cached = customerAPI.peekCategories?.()
+    if (cached) {
+      const data = cached.results || cached || []
+      const visible = uniqueByName(data.filter(cat => CATALOG_CATEGORIES.includes(cat.name)))
+      setCategories(visible)
+      if (visible.length > 0) setHovCat(visible[0])
+    }
     customerAPI.getCategories().then(res => {
       const data = res.data?.results || res.data || []
       const visible = uniqueByName(data.filter(cat => CATALOG_CATEGORIES.includes(cat.name)))
@@ -62,7 +69,13 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
     const requestId = ++catReqRef.current
     catDbRef.current = setTimeout(async () => {
       try {
-        const res = await customerAPI.getProducts({ category: hovCat.id, page_size: 6, compact: 1, skip_stats: 1 })
+        const params = { category: hovCat.id, page_size: 6, compact: 1, skip_stats: 1 }
+        const cached = customerAPI.peekProducts?.(params)
+        if (cached) {
+          setCatProds((cached.results || cached || []).slice(0, 6))
+          return
+        }
+        const res = await customerAPI.getProducts(params)
         if (requestId !== catReqRef.current) return
         setCatProds((res.data?.results || res.data || []).slice(0, 6))
       } catch { setCatProds([]) }

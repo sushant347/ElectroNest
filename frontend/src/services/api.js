@@ -346,9 +346,8 @@ export const customerAPI = {
   peekCategories: () => peekCachedGet('/categories/'),
   getBrands: () => cachedGet('/brands/'),
   searchProducts: (query) => cachedGet('/products/', { params: { search: query } }),
-  getPriceHistory: (productId) => api.get(`/products/${productId}/price-history/`, {
-    params: { _: Date.now() },
-  }),
+  getPriceHistory: (productId) => cachedGet(`/products/${productId}/price-history/`, {}, 300_000),
+  peekPriceHistory: (productId) => peekCachedGet(`/products/${productId}/price-history/`),
   getProductQuestions: (productId) => cachedGet('/product-questions/', { params: { product: productId } }),
   askProductQuestion: (productId, question) => api.post('/product-questions/', { product: productId, question }),
   getCustomerNotifications: () => cachedGet('/customer-notifications/', {}, 15_000),
@@ -411,9 +410,11 @@ export const customerAPI = {
 export const adminAPI = {
   // Dashboard
   getDashboard: () => cachedGet('/admin/dashboard/', {}, 180_000),
+  peekDashboard: () => peekCachedGet('/admin/dashboard/'),
 
   // User Management
   getUsers: (params) => cachedGet('/admin/users/', { params }),
+  peekUsers: (params) => peekCachedGet('/admin/users/', params),
   getUser: (id) => cachedGet(`/admin/users/${id}/`),
   createUser: (data) => api.post('/admin/users/', data),
   updateUser: (id, data) => api.patch(`/admin/users/${id}/`, data),
@@ -429,11 +430,13 @@ export const adminAPI = {
 
   // Audit Logs
   getLogs: (params) => cachedGet('/admin/logs/', { params }),
+  peekLogs: (params) => peekCachedGet('/admin/logs/', params),
   getAuditLog: (id) => cachedGet(`/admin/logs/${id}/`),
   getAuditStatistics: () => cachedGet('/admin/logs/stats/'),
 
   // Customers
   getCustomers: (params) => cachedGet('/admin/customers/', { params }),
+  peekCustomers: (params) => peekCachedGet('/admin/customers/', params),
   getCustomer: (id) => cachedGet(`/admin/customers/${id}/`),
   deleteCustomer: (id) => api.delete(`/admin/customers/${id}/`),
   toggleCustomerStatus: (id, isActive) => api.patch(`/admin/customers/${id}/`, { is_active: isActive }),
