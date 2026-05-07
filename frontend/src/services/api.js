@@ -2,7 +2,7 @@ import axios from 'axios';
 import config from '../Config/Config';
 
 const GET_CACHE_TTL = 90_000;
-const GET_CACHE_VERSION = 'sqlserver-local-v4';
+const GET_CACHE_VERSION = 'sqlserver-local-v5';
 const GET_CACHE_PREFIX = `api:${GET_CACHE_VERSION}:`;
 const LEGACY_GET_CACHE_PREFIX = 'api:';
 const getCache = new Map();
@@ -317,7 +317,7 @@ export const ownerAPI = {
   deleteCoupon: (id) => api.delete(`/coupons/${id}/`),
 };
 
-const warehouseMovementParams = (params) => ({ limit: 120, ...(params || {}) });
+const warehouseMovementParams = (params) => ({ limit: 30000, ...(params || {}) });
 
 // ── Warehouse API Endpoints ──
 export const warehouseAPI = {

@@ -33,6 +33,8 @@ const EMPTY_MOVEMENTS = {
   product_updates: [],
   store_shipping_summary: {},
   store_commission: {},
+  total_counts: {},
+  limits: {},
 };
 const buildStockMovementParams = (section, days = 90) => ({ section, days });
 const MOVEMENT_TAB_KEYS = TABS.map(t => t.key);
@@ -593,7 +595,7 @@ export default function StockMovements() {
             {t.label}
             <span className="sm-tab-count">
               {t.key === 'purchase_orders' ? enrichedPOs.length
-                : t.key === 'shipped_orders' ? (movements.shipped_orders || []).length
+                : t.key === 'shipped_orders' ? (movements.total_counts?.shipped_orders ?? (movements.shipped_orders || []).length)
                 : (movements.product_updates || []).length}
             </span>
           </button>
@@ -899,7 +901,10 @@ export default function StockMovements() {
                   </tbody>
                 </table>
                 <div className="sm-table-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <span>Showing {(coPage - 1) * CO_PER_PAGE + 1}–{Math.min(coPage * CO_PER_PAGE, filteredShipped.length)} of {filteredShipped.length} orders</span>
+                  <span>
+                    Showing {(coPage - 1) * CO_PER_PAGE + 1}–{Math.min(coPage * CO_PER_PAGE, filteredShipped.length)} of {filteredShipped.length} loaded orders
+                    {(movements.total_counts?.shipped_orders || 0) > filteredShipped.length ? ` (${movements.total_counts.shipped_orders} total in selected period)` : ''}
+                  </span>
                   {coTotalPages > 1 && (
                     <div className="sm-co-pag">
                       <button className="sm-pag-btn" disabled={coPage === 1} onClick={() => setCoPage(p => p - 1)}>‹</button>

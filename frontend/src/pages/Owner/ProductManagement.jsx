@@ -670,20 +670,28 @@ export default function ProductManagement() {
         .owner-pm-reset-btn:hover { background: #f3f4f6; color: #374151; }
 
         /* Table */
-        .owner-pm-table-wrap { max-width: 1280px; margin: 0 auto; background: #fff; border-radius: 14px; border: 1px solid #e5e7eb; overflow-x: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-        .owner-pm-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .owner-pm-table-wrap { max-width: 1280px; margin: 0 auto; background: #fff; border-radius: 14px; border: 1px solid #e5e7eb; overflow-x: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .owner-pm-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.85rem; }
         .owner-pm-table th { text-align: left; padding: 0.75rem 1rem; color: #6b7280; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; background: #f9fafb; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
         .owner-pm-table td { padding: 0.7rem 1rem; border-bottom: 1px solid #f3f4f6; color: #374151; }
         .owner-pm-table tbody tr:hover { background: #FFF7ED; }
         .owner-pm-empty { text-align: center; padding: 2.5rem 1rem !important; color: #9ca3af; }
         .owner-pm-empty span { display: block; margin-top: 0.5rem; font-weight: 500; }
 
-        .pm-product-cell { display: flex; align-items: center; gap: 0.6rem; }
+        .owner-pm-table th:nth-child(1), .owner-pm-table td:nth-child(1) { width: 34%; }
+        .owner-pm-table th:nth-child(2), .owner-pm-table td:nth-child(2) { width: 13%; }
+        .owner-pm-table th:nth-child(3), .owner-pm-table td:nth-child(3) { width: 11%; }
+        .owner-pm-table th:nth-child(4), .owner-pm-table td:nth-child(4),
+        .owner-pm-table th:nth-child(5), .owner-pm-table td:nth-child(5) { width: 11%; }
+        .owner-pm-table th:nth-child(6), .owner-pm-table td:nth-child(6) { width: 7%; }
+        .owner-pm-table th:nth-child(7), .owner-pm-table td:nth-child(7) { width: 8%; }
+        .owner-pm-table th:nth-child(8), .owner-pm-table td:nth-child(8) { width: 5%; }
+        .pm-product-cell { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
         .pm-product-img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 1px solid #e5e7eb; flex-shrink: 0; }
         .pm-product-img-placeholder { width: 40px; height: 40px; border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #d1d5db; flex-shrink: 0; }
-        .pm-product-name { font-weight: 600; color: #1e293b; white-space: nowrap; }
-        .pm-cat-badge { font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 5px; background: #EFF6FF; color: #3B82F6; white-space: nowrap; }
-        .pm-brand { color: #6b7280; font-weight: 500; white-space: nowrap; }
+        .pm-product-name { font-weight: 600; color: #1e293b; white-space: normal; word-break: normal; overflow-wrap: normal; line-height: 1.32; }
+        .pm-cat-badge { display: inline-block; max-width: 100%; font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 5px; background: #EFF6FF; color: #3B82F6; white-space: normal; word-break: normal; overflow-wrap: normal; line-height: 1.25; }
+        .pm-brand { color: #6b7280; font-weight: 500; white-space: normal; word-break: normal; overflow-wrap: normal; line-height: 1.25; }
         .pm-num { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .pm-price { color: #16a34a; }
         .pm-stock { font-weight: 700; }
@@ -717,7 +725,13 @@ export default function ProductManagement() {
         .pm-del-confirm { padding: 0.5rem 1.25rem; border-radius: 8px; background: #ef4444; color: #fff; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; font-family: inherit; }
         .pm-del-confirm:hover { background: #dc2626; }
 
-        @media (max-width: 900px) { .owner-pm { padding: 1.25rem; } }
+        @media (max-width: 900px) {
+          .owner-pm { padding: 1.25rem; }
+          .owner-pm-table th, .owner-pm-table td { padding: 0.65rem 0.55rem; }
+          .owner-pm-table { font-size: 0.78rem; }
+          .pm-product-img, .pm-product-img-placeholder { width: 34px; height: 34px; }
+          .pm-status-badge { min-width: 0; padding: 0.24rem 0.45rem; white-space: normal; }
+        }
       `}</style>
     </div>
   );

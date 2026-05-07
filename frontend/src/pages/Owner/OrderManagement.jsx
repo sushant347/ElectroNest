@@ -38,7 +38,7 @@ export default function OrderManagement() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   /** 30 / 90 / 0 (lifetime). Sent as API `days` so filtering happens in the database. */
-  const [orderDays, setOrderDays] = useState(90);
+  const [orderDays, setOrderDays] = useState(0);
 
   const orderPeriodSubtitle = useMemo(() => {
     if (orderDays === 0) return 'all time';
@@ -50,7 +50,7 @@ export default function OrderManagement() {
       setPageLoading(true);
       setPageError(null);
       const res = await ownerAPI.getAllOrders({
-        page_size: 1000,
+        page_size: 30000,
         ordering: '-order_date',
         days: orderDays,
       });

@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Avg, Count, Prefetch, Q, Value
 from django.db.models.functions import Concat
@@ -650,6 +651,7 @@ class OrderViewSet(AuditMixin, viewsets.ModelViewSet):
                 return Response({'detail': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
             order.order_status = new_status
             order.save()
+            cache.clear()
 
             # When an order is marked Shipped, notify all warehouse staff
             if new_status.name == 'Shipped':

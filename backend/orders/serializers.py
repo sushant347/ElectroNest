@@ -129,7 +129,15 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_payment_status(self, obj):
         # Use prefetched payments (no extra query)
         payments = obj.payments.all()
-        return 'Completed' if payments else 'Pending'
+        payment = payments[0] if payments else None
+        if not payment:
+            return 'Pending'
+        method_name = payment.method.name if payment.method else ''
+        is_cash = method_name in ('Cash', 'Cash on Delivery', 'COD')
+        order_status = obj.order_status.name if obj.order_status else ''
+        if is_cash and order_status != 'Delivered':
+            return 'Pending'
+        return 'Completed'
 
 
 class CartSerializer(serializers.ModelSerializer):

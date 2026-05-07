@@ -325,12 +325,13 @@ class StockMovementsView(APIView):
         enriched_pos = []
         store_commission = {}
         product_updates = []
+        shipped_total_count = 0
         try:
-            row_limit = int(request.query_params.get('limit') or 120)
+            row_limit = int(request.query_params.get('limit') or 5000)
         except (TypeError, ValueError):
-            row_limit = 120
-        row_limit = max(20, min(row_limit, 300))
-        cache_key = f'warehouse:stock_movements:v4:{section}:{days_raw}:{row_limit}'
+            row_limit = 5000
+        row_limit = max(20, min(row_limit, 30000))
+        cache_key = f'warehouse:stock_movements:v6:{section}:{days_raw}:{row_limit}'
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -343,9 +344,10 @@ class StockMovementsView(APIView):
             order_q = Q(order_status_id__in=status_ids)
             if order_since is not None:
                 order_q &= Q(order_date__gte=order_since)
+            orders_qs = Order.objects.filter(order_q)
+            shipped_total_count = orders_qs.count()
             orders = (
-                Order.objects
-                .filter(order_q)
+                orders_qs
                 .select_related('customer', 'order_status', 'address')
                 .prefetch_related(
                     'details__product__supplier',
@@ -406,7 +408,13 @@ class StockMovementsView(APIView):
                     'items': items,
                     'items_count': len(items),
                     'payment_method': payment.method.name if payment and payment.method else 'N/A',
-                    'payment_status': 'Completed' if payment else 'Pending',
+                    'payment_status': (
+                        'Completed'
+                        if payment and payment.method and payment.method.name not in ('Cash', 'Cash on Delivery', 'COD')
+                        else 'Completed'
+                        if payment and payment.method and payment.method.name in ('Cash', 'Cash on Delivery', 'COD') and (o.order_status and o.order_status.name == 'Delivered')
+                        else 'Pending'
+                    ),
                 })
 
         if section in ('all', 'purchase_orders'):
@@ -588,6 +596,14 @@ class StockMovementsView(APIView):
             'product_updates': product_updates,
             'store_shipping_summary': store_shipping_summary,
             'store_commission': store_commission,
+            'total_counts': {
+                'shipped_orders': shipped_total_count if section in ('all', 'shipped_orders') else len(customer_orders),
+                'enriched_purchase_orders': len(enriched_pos),
+                'product_updates': len(product_updates),
+            },
+            'limits': {
+                'row_limit': row_limit,
+            },
         }
         cache.set(cache_key, data, 90)
         return Response(data)
