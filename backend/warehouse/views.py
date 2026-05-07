@@ -331,7 +331,12 @@ class StockMovementsView(APIView):
         except (TypeError, ValueError):
             row_limit = 5000
         row_limit = max(20, min(row_limit, 30000))
-        cache_key = f'warehouse:stock_movements:v6:{section}:{days_raw}:{row_limit}'
+        try:
+            row_offset = int(request.query_params.get('offset') or 0)
+        except (TypeError, ValueError):
+            row_offset = 0
+        row_offset = max(0, row_offset)
+        cache_key = f'warehouse:stock_movements:v7:{section}:{days_raw}:{row_limit}:{row_offset}'
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -353,7 +358,7 @@ class StockMovementsView(APIView):
                     'details__product__supplier',
                     'payments__method',
                 )
-                .order_by('-order_date', '-id')[:row_limit]
+                .order_by('-order_date', '-id')[row_offset:row_offset + row_limit]
             )
             for o in orders:
                 items = []
@@ -603,6 +608,7 @@ class StockMovementsView(APIView):
             },
             'limits': {
                 'row_limit': row_limit,
+                'row_offset': row_offset,
             },
         }
         cache.set(cache_key, data, 90)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Search, Download, ChevronLeft, ChevronRight, Eye, ShoppingBag, RefreshCw, AlertCircle, CalendarDays } from 'lucide-react';
 import { ownerAPI } from '../../services/api';
 import OrderDetailsModal from '../../components/Owner/OrderDetailsModal';
@@ -12,6 +12,7 @@ const statusColors = {
   Delivered: { bg: '#DCFCE7', color: '#16A34A' },
   Cancelled: { bg: '#FEE2E2', color: '#DC2626' },
 };
+const ORDER_CHUNK_SIZE = 50;
 
 const paymentMethodLabel = (order) => {
   const method = (order.payment_method || '').trim();
@@ -30,7 +31,9 @@ const paymentStatusLabel = (order) => {
 
 export default function OrderManagement() {
   const [orders, setOrders] = useState([]);
+  const [ordersTotal, setOrdersTotal] = useState(0);
   const [pageLoading, setPageLoading] = useState(true);
+  const [backgroundLoading, setBackgroundLoading] = useState(false);
   const [pageError, setPageError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,6 +42,7 @@ export default function OrderManagement() {
   const [updatingStatus, setUpdatingStatus] = useState(null);
   /** 30 / 90 / 0 (lifetime). Sent as API `days` so filtering happens in the database. */
   const [orderDays, setOrderDays] = useState(0);
+  const fetchSeqRef = useRef(0);
 
   const orderPeriodSubtitle = useMemo(() => {
     if (orderDays === 0) return 'all time';
@@ -46,21 +50,72 @@ export default function OrderManagement() {
   }, [orderDays]);
 
   const fetchOrders = useCallback(async () => {
+    const fetchSeq = fetchSeqRef.current + 1;
+    fetchSeqRef.current = fetchSeq;
     try {
       setPageLoading(true);
+      setBackgroundLoading(false);
       setPageError(null);
-      const res = await ownerAPI.getAllOrders({
-        page_size: 30000,
+
+      const baseParams = {
         ordering: '-order_date',
         days: orderDays,
+      };
+
+      if (orderDays !== 0) {
+        const res = await ownerAPI.getAllOrders({
+          ...baseParams,
+          page_size: 30000,
+        });
+        if (fetchSeqRef.current !== fetchSeq) return;
+        const list = res.data.results || res.data;
+        list.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+        setOrders(list);
+        setOrdersTotal(res.data.count || list.length);
+        return;
+      }
+
+      const firstRes = await ownerAPI.getAllOrders({
+        ...baseParams,
+        page_size: ORDER_CHUNK_SIZE,
+        page: 1,
       });
-      const list = res.data.results || res.data;
-      list.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
-      setOrders(list);
-    } catch (err) {
-      setPageError(err.response?.data?.message || 'Failed to load orders. Please try again.');
-    } finally {
+      if (fetchSeqRef.current !== fetchSeq) return;
+      const firstList = firstRes.data.results || firstRes.data;
+      const total = firstRes.data.count || firstList.length;
+      firstList.sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+      setOrders(firstList);
+      setOrdersTotal(total);
       setPageLoading(false);
+
+      const totalPagesToLoad = Math.ceil(total / ORDER_CHUNK_SIZE);
+      if (totalPagesToLoad <= 1) return;
+      setBackgroundLoading(true);
+      for (let page = 2; page <= totalPagesToLoad; page += 1) {
+        const res = await ownerAPI.getAllOrders({
+          ...baseParams,
+          page_size: ORDER_CHUNK_SIZE,
+          page,
+        });
+        if (fetchSeqRef.current !== fetchSeq) return;
+        const list = res.data.results || res.data;
+        setOrders(prev => {
+          const merged = new Map(prev.map(order => [order.id, order]));
+          list.forEach(order => merged.set(order.id, order));
+          return Array.from(merged.values()).sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+        });
+      }
+    } catch (err) {
+      if (fetchSeqRef.current !== fetchSeq) return;
+      setPageError(err.response?.data?.message || 'Failed to load orders. Please try again.');
+      setBackgroundLoading(false);
+      setPageLoading(false);
+      return;
+    } finally {
+      if (fetchSeqRef.current === fetchSeq) {
+        setPageLoading(false);
+        setBackgroundLoading(false);
+      }
     }
   }, [orderDays]);
 
@@ -118,7 +173,9 @@ export default function OrderManagement() {
         <div>
           <h1 className="owner-om-title">Order Management</h1>
           <p className="owner-om-sub">
-            {pageLoading ? 'Loading orders…' : `${orders.length} orders (${orderPeriodSubtitle})`}
+            {pageLoading
+              ? 'Loading orders…'
+              : `${orders.length}${ordersTotal > orders.length ? ` of ${ordersTotal}` : ''} orders (${orderPeriodSubtitle})${backgroundLoading ? ' · loading more…' : ''}`}
           </p>
         </div>
         <button className="owner-om-export-btn" onClick={exportCSV}><Download size={16} /> Export CSV</button>
@@ -169,7 +226,7 @@ export default function OrderManagement() {
             <option value={90}>Last 90 days</option>
             <option value={0}>Lifetime (all orders)</option>
           </select>
-          {pageLoading && <RefreshCw size={14} className="om-period-spin spin" aria-hidden />}
+          {(pageLoading || backgroundLoading) && <RefreshCw size={14} className="om-period-spin spin" aria-hidden />}
         </div>
         <div className="owner-om-search">
           <Search size={16} className="om-search-icon" />

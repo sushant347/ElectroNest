@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Package, ChevronDown, ChevronUp, XCircle, MapPin, Phone, Mail, CreditCard, Truck, ShoppingBag, Printer, Star, X, Clock, CheckCircle, Box, Home } from 'lucide-react';
 import { customerAPI } from '../../services/api';
@@ -156,18 +156,22 @@ const STATUS_COLORS = {
 };
 
 const STATUS_STEPS = ['Pending', 'Processing', 'Shipped', 'Delivered'];
+const ORDER_CHUNK_SIZE = 50;
 
 export default function MyOrders() {
   const [orders, setOrders] = useState([]);
+  const [ordersTotal, setOrdersTotal] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [backgroundLoading, setBackgroundLoading] = useState(false);
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('All');
   const [printOrder, setPrintOrder] = useState(null);
   const [hideDelivered, setHideDelivered] = useState(false);
+  const fetchSeqRef = useRef(0);
 
   useEffect(() => {
     loadOrders();
@@ -180,15 +184,41 @@ export default function MyOrders() {
   }, [location.state, orders]);
 
   const loadOrders = async () => {
+    const fetchSeq = fetchSeqRef.current + 1;
+    fetchSeqRef.current = fetchSeq;
     setLoading(true);
+    setBackgroundLoading(false);
+    setError('');
     try {
-      const res = await customerAPI.getMyOrders();
-      const data = res.data?.results || res.data || [];
-      setOrders(data);
+      const firstRes = await customerAPI.getMyOrders({ page_size: ORDER_CHUNK_SIZE, page: 1 });
+      if (fetchSeqRef.current !== fetchSeq) return;
+      const firstPage = firstRes.data?.results || firstRes.data || [];
+      const total = firstRes.data?.count || firstPage.length;
+      setOrders(firstPage);
+      setOrdersTotal(total);
+      setLoading(false);
+
+      const totalPages = Math.ceil(total / ORDER_CHUNK_SIZE);
+      if (totalPages <= 1) return;
+      setBackgroundLoading(true);
+      for (let page = 2; page <= totalPages; page += 1) {
+        const res = await customerAPI.getMyOrders({ page_size: ORDER_CHUNK_SIZE, page });
+        if (fetchSeqRef.current !== fetchSeq) return;
+        const data = res.data?.results || res.data || [];
+        setOrders(prev => {
+          const merged = new Map(prev.map(order => [order.id, order]));
+          data.forEach(order => merged.set(order.id, order));
+          return Array.from(merged.values()).sort((a, b) => new Date(b.order_date || b.created_at || 0) - new Date(a.order_date || a.created_at || 0));
+        });
+      }
     } catch {
+      if (fetchSeqRef.current !== fetchSeq) return;
       setError('Failed to load orders.');
     } finally {
-      setLoading(false);
+      if (fetchSeqRef.current === fetchSeq) {
+        setLoading(false);
+        setBackgroundLoading(false);
+      }
     }
   };
 
@@ -256,6 +286,11 @@ export default function MyOrders() {
     <section style={s.page}>
       <div style={s.container}>
         <h1 style={s.title}><Package size={24} style={{ color: '#F97316' }} /> My Orders</h1>
+        {orders.length > 0 && (
+          <p style={s.loadNote}>
+            Showing {orders.length}{ordersTotal > orders.length ? ` of ${ordersTotal}` : ''} orders{backgroundLoading ? ' · loading more...' : ''}
+          </p>
+        )}
 
         {/* Filter Tabs */}
         <div style={s.filterBar}>
@@ -552,6 +587,7 @@ const s = {
   page:      { minHeight: '100vh', background: 'linear-gradient(180deg,#fff7ed 0%,#fff 35%)', padding: '40px 24px 64px', overflowX: 'hidden' },
   container: { maxWidth: 900, margin: '0 auto', width: '100%' },
   title:     { fontSize: '2rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 },
+  loadNote:  { margin: '-8px 0 18px', color: '#64748b', fontSize: 13, fontWeight: 600 },
   filterBar: { display: 'flex', gap: 6, marginBottom: 24, flexWrap: 'wrap' },
   filterBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', fontSize: 13, fontWeight: 600, color: '#64748b', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' },
   filterBtnActive: { background: '#FFF7ED', borderColor: '#F97316', color: '#F97316' },

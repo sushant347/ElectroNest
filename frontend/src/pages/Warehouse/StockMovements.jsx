@@ -36,7 +36,8 @@ const EMPTY_MOVEMENTS = {
   total_counts: {},
   limits: {},
 };
-const buildStockMovementParams = (section, days = 90) => ({ section, days });
+const STOCK_MOVEMENT_CHUNK_SIZE = 50;
+const buildStockMovementParams = (section, days = 90, extra = {}) => ({ section, days, ...extra });
 const MOVEMENT_TAB_KEYS = TABS.map(t => t.key);
 const hasMovementRows = (movements, section) => {
   if (section === 'purchase_orders') return (movements.enriched_purchase_orders || []).length > 0;
@@ -52,6 +53,23 @@ const markMovementSectionLoaded = (loadedTabsRef, section) => {
   loadedTabsRef.current.add(section);
 };
 const purchaseOrderDisplayStatus = (po) => po.customer_order_status || po.status_name || 'Pending';
+const mergeShippedMovementPayload = (prev, payload, replace = false) => {
+  const incoming = payload?.shipped_orders || [];
+  const base = replace ? [] : (prev.shipped_orders || []);
+  const merged = new Map(base.map(order => [order.id, order]));
+  incoming.forEach(order => merged.set(order.id, order));
+  return {
+    ...prev,
+    ...(payload || {}),
+    shipped_orders: Array.from(merged.values()).sort((a, b) => {
+      const tA = new Date(a.order_date || a.date || 0).getTime();
+      const tB = new Date(b.order_date || b.date || 0).getTime();
+      return tB - tA;
+    }),
+    total_counts: { ...(prev.total_counts || {}), ...(payload?.total_counts || {}) },
+    limits: { ...(prev.limits || {}), ...(payload?.limits || {}) },
+  };
+};
 
 /* ── SVG Donut Chart for Warehouse Commission (with hover tooltip) ── */
 function polarToCartesian(cx, cy, r, angleDeg) {
@@ -315,7 +333,9 @@ export default function StockMovements() {
   /** Customer orders only: passed to API as `days` (30 / 90 / 0 = lifetime). Changing this refetches movements from the DB. */
   const [coOrderDays, setCoOrderDays] = useState(90);
   const [coMovementsLoading, setCoMovementsLoading] = useState(false);
+  const [coBackgroundLoading, setCoBackgroundLoading] = useState(false);
   const coOrderDaysRef = useRef(90);
+  const coFetchSeqRef = useRef(0);
   const coPeriodFilterBoot = useRef(false);
   const loadedTabs = useRef(new Set(initialMovementsRef.current ? MOVEMENT_TAB_KEYS : []));
 
@@ -332,7 +352,50 @@ export default function StockMovements() {
   }, [coOrderDays]);
 
   const fetchMovementsOnly = useCallback(async () => {
+    const fetchSeq = coFetchSeqRef.current + 1;
+    coFetchSeqRef.current = fetchSeq;
     const days = coOrderDaysRef.current;
+    if (days === 0) {
+      const firstParams = buildStockMovementParams('shipped_orders', days, { limit: STOCK_MOVEMENT_CHUNK_SIZE, offset: 0 });
+      const cached = warehouseAPI.peekStockMovements?.(firstParams);
+      if (cached) {
+        setMovements(prev => mergeShippedMovementPayload(prev, cached, true));
+        loadedTabs.current.add('shipped_orders');
+      }
+      setCoMovementsLoading(!cached);
+      setCoBackgroundLoading(false);
+      setError('');
+      try {
+        const firstRes = await warehouseAPI.getStockMovements(firstParams);
+        if (coFetchSeqRef.current !== fetchSeq) return;
+        const firstData = firstRes.data || {};
+        setMovements(prev => mergeShippedMovementPayload(prev, firstData, true));
+        loadedTabs.current.add('shipped_orders');
+        setCoMovementsLoading(false);
+
+        const total = firstData.total_counts?.shipped_orders || firstData.shipped_orders?.length || 0;
+        const loaded = firstData.shipped_orders?.length || 0;
+        if (total <= loaded) return;
+        setCoBackgroundLoading(true);
+        for (let offset = loaded; offset < total; offset += STOCK_MOVEMENT_CHUNK_SIZE) {
+          const chunkRes = await warehouseAPI.getStockMovements(
+            buildStockMovementParams('shipped_orders', days, { limit: STOCK_MOVEMENT_CHUNK_SIZE, offset })
+          );
+          if (coFetchSeqRef.current !== fetchSeq) return;
+          setMovements(prev => mergeShippedMovementPayload(prev, chunkRes.data || false));
+        }
+      } catch (err) {
+        if (coFetchSeqRef.current !== fetchSeq) return;
+        console.error('getStockMovements failed:', err?.response?.data || err?.message);
+        setError('Failed to load customer orders for the selected period.');
+      } finally {
+        if (coFetchSeqRef.current === fetchSeq) {
+          setCoMovementsLoading(false);
+          setCoBackgroundLoading(false);
+        }
+      }
+      return;
+    }
     const params = buildStockMovementParams('shipped_orders', days);
     const cached = warehouseAPI.peekStockMovements?.(params);
     if (cached) {
@@ -340,6 +403,7 @@ export default function StockMovements() {
       loadedTabs.current.add('shipped_orders');
     }
     setCoMovementsLoading(!cached);
+    setCoBackgroundLoading(false);
     setError('');
     try {
       const movRes = await warehouseAPI.getStockMovements(params);
@@ -649,7 +713,7 @@ export default function StockMovements() {
                 <option value={90}>Last 90 days</option>
                 <option value={0}>Lifetime (all orders)</option>
               </select>
-              {coMovementsLoading && <RefreshCw size={14} className="sm-period-loading spin" aria-hidden />}
+              {(coMovementsLoading || coBackgroundLoading) && <RefreshCw size={14} className="sm-period-loading spin" aria-hidden />}
             </div>
             <div className="sm-filter-tabs">
               {[
@@ -904,6 +968,7 @@ export default function StockMovements() {
                   <span>
                     Showing {(coPage - 1) * CO_PER_PAGE + 1}–{Math.min(coPage * CO_PER_PAGE, filteredShipped.length)} of {filteredShipped.length} loaded orders
                     {(movements.total_counts?.shipped_orders || 0) > filteredShipped.length ? ` (${movements.total_counts.shipped_orders} total in selected period)` : ''}
+                    {coBackgroundLoading ? ' · loading more…' : ''}
                   </span>
                   {coTotalPages > 1 && (
                     <div className="sm-co-pag">
