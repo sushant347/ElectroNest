@@ -2,8 +2,25 @@ import axios from 'axios';
 import config from '../Config/Config';
 
 const GET_CACHE_TTL = 90_000;
+const GET_CACHE_VERSION = 'sqlserver-local-v1';
+const GET_CACHE_PREFIX = `api:${GET_CACHE_VERSION}:`;
+const LEGACY_GET_CACHE_PREFIX = 'api:';
 const getCache = new Map();
 const inflightGet = new Map();
+
+const pruneLegacyGetCache = () => {
+  const prune = (storage) => {
+    try {
+      Object.keys(storage)
+        .filter(key => key.startsWith(LEGACY_GET_CACHE_PREFIX) && !key.startsWith(GET_CACHE_PREFIX))
+        .forEach(key => storage.removeItem(key));
+    } catch { /* ignore storage access errors */ }
+  };
+  if (typeof sessionStorage !== 'undefined') prune(sessionStorage);
+  if (typeof localStorage !== 'undefined') prune(localStorage);
+};
+
+pruneLegacyGetCache();
 
 const stableStringify = (value) => {
   if (!value || typeof value !== 'object') return JSON.stringify(value ?? null);
@@ -25,12 +42,13 @@ const readStoredGet = (key) => {
   if (memory) getCache.delete(key);
 
   try {
-    const raw = sessionStorage.getItem(`api:${key}`) || localStorage.getItem(`api:${key}`);
+    const storageKey = `${GET_CACHE_PREFIX}${key}`;
+    const raw = sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed.expiresAt <= now) {
-      sessionStorage.removeItem(`api:${key}`);
-      localStorage.removeItem(`api:${key}`);
+      sessionStorage.removeItem(storageKey);
+      localStorage.removeItem(storageKey);
       return null;
     }
     getCache.set(key, parsed);
@@ -43,8 +61,8 @@ const readStoredGet = (key) => {
 const writeStoredGet = (key, data, ttl = GET_CACHE_TTL) => {
   const entry = { data, expiresAt: Date.now() + ttl };
   getCache.set(key, entry);
-  try { sessionStorage.setItem(`api:${key}`, JSON.stringify(entry)); } catch { /* storage can be full/private */ }
-  try { localStorage.setItem(`api:${key}`, JSON.stringify(entry)); } catch { /* storage can be full/private */ }
+  try { sessionStorage.setItem(`${GET_CACHE_PREFIX}${key}`, JSON.stringify(entry)); } catch { /* storage can be full/private */ }
+  try { localStorage.setItem(`${GET_CACHE_PREFIX}${key}`, JSON.stringify(entry)); } catch { /* storage can be full/private */ }
 };
 
 export const peekCachedGet = (url, params) => readStoredGet(makeGetCacheKey(url, params));
@@ -61,7 +79,7 @@ export const findCachedProduct = (id) => {
   }
   try {
     for (const key of Object.keys(sessionStorage)) {
-      if (!key.startsWith('api:') || !key.includes('/products/')) continue;
+      if (!key.startsWith(GET_CACHE_PREFIX) || !key.includes('/products/')) continue;
       const parsed = JSON.parse(sessionStorage.getItem(key) || '{}');
       if (parsed.expiresAt <= Date.now()) continue;
       const found = findInPayload(parsed.data);
@@ -77,12 +95,12 @@ const clearGetCache = () => {
   inflightGet.clear();
   try {
     Object.keys(sessionStorage)
-      .filter(key => key.startsWith('api:'))
+      .filter(key => key.startsWith(LEGACY_GET_CACHE_PREFIX))
       .forEach(key => sessionStorage.removeItem(key));
   } catch { /* ignore storage access errors */ }
   try {
     Object.keys(localStorage)
-      .filter(key => key.startsWith('api:'))
+      .filter(key => key.startsWith(LEGACY_GET_CACHE_PREFIX))
       .forEach(key => localStorage.removeItem(key));
   } catch { /* ignore storage access errors */ }
 };
