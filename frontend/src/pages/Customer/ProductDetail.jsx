@@ -16,6 +16,14 @@ const formatPrice = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', c
 const cleanVariantTitle = (title) => /^option\s+\d+$/i.test(String(title || '').trim())
   ? 'Product Details'
   : (title || 'Product Details');
+const toPrice = (value) => Number.parseFloat(value || 0) || 0;
+const getDiscountedPrice = (price, discountPrice) => {
+  const base = toPrice(price);
+  const discount = discountPrice != null && discountPrice !== '' ? toPrice(discountPrice) : null;
+  return discount !== null && discount > 0 && discount < base
+    ? { price: discount, origPrice: base, onSale: true }
+    : { price: base, origPrice: null, onSale: false };
+};
 
 const STAR_PTS = "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2";
 
@@ -551,9 +559,7 @@ function ProductQASection({ productId, ownerName }) {
 }
 
 const normalize = (p) => {
-  const selling = parseFloat(p.selling_price || 0);
-  const disc = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null;
-  const onSale = disc !== null && disc > 0 && disc < selling;
+  const basePrice = getDiscountedPrice(p.selling_price, p.discount_price);
   let fullDescription = '';
   try {
     const parsedSpecs = typeof p.specifications === 'string' ? JSON.parse(p.specifications) : p.specifications;
@@ -566,9 +572,9 @@ const normalize = (p) => {
     name: p.name || p.ProductName || '',
     category: p.category_name || '',
     categoryId: p.category || p.CategoryID || null,
-    price: onSale ? disc : selling,
-    origPrice: onSale ? selling : null,
-    onSale,
+    price: basePrice.price,
+    origPrice: basePrice.origPrice,
+    onSale: basePrice.onSale,
     image: p.image_url || '',
     rating: Number(p.average_rating ?? p.rating ?? 0),
     reviewCount: Number(p.review_count ?? 0),
@@ -583,18 +589,16 @@ const normalize = (p) => {
     reorderLevel: p.reorder_level || 10,
     unitsSold: p.units_sold || 0,
     variants: Array.isArray(p.variants) ? p.variants.filter(v => v.is_active !== false).map(v => {
-      const vPrice = parseFloat(v.price || 0);
-      const vDisc = v.discount_price != null && v.discount_price !== '' ? parseFloat(v.discount_price) : null;
-      const vOnSale = vDisc !== null && vDisc > 0 && vDisc < vPrice;
+      const variantPrice = getDiscountedPrice(v.price, v.discount_price);
       return {
         id: v.id,
         title: cleanVariantTitle(v.title),
         sku: v.sku || '',
         color: v.color || '',
         specs: v.specs || '',
-        price: vOnSale ? vDisc : vPrice,
-        origPrice: vOnSale ? vPrice : null,
-        onSale: vOnSale,
+        price: v.effective_price != null ? toPrice(v.effective_price) : variantPrice.price,
+        origPrice: variantPrice.origPrice,
+        onSale: variantPrice.onSale,
         stock: Number(v.stock || 0),
         isDefault: Boolean(v.is_default),
       };
@@ -952,7 +956,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
       if (cachedListProduct) {
         const normalized = normalize(cachedListProduct);
         setProduct(normalized);
-        setSelectedVariantId((normalized.variants.find(v => v.isDefault) || normalized.variants[0] || null)?.id || null);
+        setSelectedVariantId(null);
         setLoading(false);
       } else {
         setLoading(true);
@@ -961,7 +965,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
         const productRes = await customerAPI.getProduct(id);
         const normalized = normalize(productRes.data);
         setProduct(normalized);
-        setSelectedVariantId((normalized.variants.find(v => v.isDefault) || normalized.variants[0] || null)?.id || null);
+        setSelectedVariantId(null);
       } catch (err) {
         console.error('Failed to load product:', err);
         setProduct(null);
@@ -1042,7 +1046,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
 
   const isInWishlist = wishlistItems.some(i => i.id === product.id);
   const fillMainImage = shouldFillContainerImage(product.category, product.name);
-  const selectedVariant = product.variants.find(v => v.id === selectedVariantId) || product.variants[0] || null;
+  const selectedVariant = selectedVariantId ? product.variants.find(v => v.id === selectedVariantId) || null : null;
   const activePrice = selectedVariant ? selectedVariant.price : product.price;
   const activeOrigPrice = selectedVariant ? selectedVariant.origPrice : product.origPrice;
   const activeOnSale = selectedVariant ? selectedVariant.onSale : product.onSale;
@@ -1412,10 +1416,24 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
             <div style={s.cartModalConfig}>
               <div style={s.variantHead}>
                 <span>Choose configuration</span>
-                {selectedVariant && <strong>{formatPrice(activePrice)}</strong>}
+                <strong>{formatPrice(activePrice)}</strong>
               </div>
               {product.variants.length > 0 ? (
                 <div style={s.variantGrid}>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedVariantId(null); setQty(1); }}
+                    style={{
+                      ...s.variantBtn,
+                      ...(!selectedVariant ? s.variantBtnActive : {}),
+                      ...(product.stock <= 0 ? s.variantBtnDisabled : {}),
+                    }}
+                    disabled={product.stock <= 0}
+                  >
+                    <span style={s.variantTitle}>Standard product</span>
+                    <span style={s.variantSpecs}>Same price shown on home page</span>
+                    <span style={s.variantMeta}>{product.stock > 0 ? 'Available' : 'Out of stock'} · {formatPrice(product.price)}</span>
+                  </button>
                   {product.variants.map((variant) => {
                     const active = variant.id === selectedVariant?.id;
                     return (

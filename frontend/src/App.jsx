@@ -13,6 +13,14 @@ import { customerAPI } from './services/api'
 const cleanVariantTitle = (title) => /^option\s+\d+$/i.test(String(title || '').trim())
   ? 'Product Details'
   : (title || '')
+const toPrice = (value) => Number.parseFloat(value || 0) || 0
+const getDiscountedPrice = (price, discountPrice) => {
+  const base = toPrice(price)
+  const discount = discountPrice != null && discountPrice !== '' ? toPrice(discountPrice) : null
+  return discount !== null && discount > 0 && discount < base
+    ? { price: discount, origPrice: base, onSale: true }
+    : { price: base, origPrice: null, onSale: false }
+}
 
 const Home = lazy(() => import('./pages/Home'))
 const AboutUs = lazy(() => import('./pages/AboutUs'))
@@ -118,11 +126,10 @@ export default function App() {
   const normalizeCartItem = (item) => {
     const p = item.product_detail || item.product || {}
     const v = item.variant_detail || null
-    const selling = parseFloat(p.selling_price || 0)
-    const disc = p.discount_price != null && p.discount_price !== '' ? parseFloat(p.discount_price) : null
-    const variantPrice = v ? parseFloat(v.price || 0) : selling
-    const variantDisc = v && v.discount_price != null && v.discount_price !== '' ? parseFloat(v.discount_price) : null
-    const onSale = v ? (variantDisc !== null && variantDisc > 0 && variantDisc < variantPrice) : (disc !== null && disc > 0 && disc < selling)
+    const productPrice = getDiscountedPrice(p.selling_price, p.discount_price)
+    const variantRawPrice = v ? getDiscountedPrice(v.price, v.discount_price) : null
+    const variantEffectivePrice = v?.effective_price != null ? toPrice(v.effective_price) : variantRawPrice?.price
+    const onSale = v ? Boolean(variantRawPrice?.onSale) : productPrice.onSale
     const variantId = v?.id || item.variant || null
     return {
       id: p.id || item.product,
@@ -132,8 +139,8 @@ export default function App() {
       variantId,
       variantLabel: cleanVariantTitle(v?.title),
       category: p.category_name || '',
-      price: v ? (onSale ? variantDisc : variantPrice) : (onSale ? disc : selling),
-      origPrice: onSale ? (v ? variantPrice : selling) : null,
+      price: v ? variantEffectivePrice : productPrice.price,
+      origPrice: v ? variantRawPrice?.origPrice : productPrice.origPrice,
       onSale,
       image: p.image_url || '',
       brand: p.brand || '',
