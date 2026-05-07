@@ -245,11 +245,18 @@ class PriceHistoryView(APIView):
     """Return price history for the price comparison graph on the product detail page."""
     permission_classes = [AllowAny]
 
+    def _fresh_response(self, data, status=None):
+        response = Response(data, status=status)
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
+
     def get(self, request, product_id):
         try:
             product = Product.objects.get(id=product_id)
         except Product.DoesNotExist:
-            return Response({'detail': 'Product not found.'}, status=drf_status.HTTP_404_NOT_FOUND)
+            return self._fresh_response({'detail': 'Product not found.'}, status=drf_status.HTTP_404_NOT_FOUND)
 
         actual_selling_price = float(product.selling_price or 0)
         cost_price = float(product.cost_price)
@@ -261,7 +268,7 @@ class PriceHistoryView(APIView):
             .order_by('month')
         )
         if not snapshots:
-            return Response({
+            return self._fresh_response({
                 'product_id': product_id,
                 'product_name': product.name,
                 'current_selling_price': actual_selling_price,
@@ -317,7 +324,7 @@ class PriceHistoryView(APIView):
         except (json.JSONDecodeError, TypeError):
             market_offers = []
 
-        return Response({
+        return self._fresh_response({
             'product_id': product_id,
             'product_name': product.name,
             'current_selling_price': selling_price,

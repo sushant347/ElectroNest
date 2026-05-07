@@ -333,7 +333,9 @@ export const customerAPI = {
   peekCategories: () => peekCachedGet('/categories/'),
   getBrands: () => cachedGet('/brands/'),
   searchProducts: (query) => cachedGet('/products/', { params: { search: query } }),
-  getPriceHistory: (productId) => cachedGet(`/products/${productId}/price-history/`),
+  getPriceHistory: (productId) => api.get(`/products/${productId}/price-history/`, {
+    params: { _: Date.now() },
+  }),
   getProductQuestions: (productId) => cachedGet('/product-questions/', { params: { product: productId } }),
   askProductQuestion: (productId, question) => api.post('/product-questions/', { product: productId, question }),
   getCustomerNotifications: () => cachedGet('/customer-notifications/', {}, 15_000),
