@@ -3,6 +3,16 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FiHeart, FiBarChart2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { customerAPI } from '../services/api'
 import { HeaderSkeleton, CardGridSkeleton } from '../components/Common/SkeletonLoader'
+import imgHeadphones from '../components/images/headphones.png'
+import imgLaptops from '../components/images/laptops.png'
+import imgMonitors from '../components/images/monitors.png'
+import imgSmartphones from '../components/images/smartphones.png'
+import imgSpeakers from '../components/images/speakers.png'
+import imgTablets from '../components/images/tablets.png'
+import imgWatch from '../components/images/smart watches.png'
+import imgCamera from '../components/images/camera.png'
+import imgDrone from '../components/images/drone.png'
+import imgGaming from '../components/images/Gaming Console.png'
 
 const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
 const getArrayData = (data) => data?.results || data || []
@@ -39,21 +49,21 @@ const CAT_IMGS = {
   Speakers:       'https://media.gadgetbytenepal.com/2024/12/HiFuture-Musicbox-100-.jpg',
   Earbuds:         'https://media.gadgetbytenepal.com/2024/01/HiFuture-Fusion-Jet-Black.jpg',
   Headphones:      'https://media.gadgetbytenepal.com/2026/04/Logitech-H151-Variant-Black-Front.png',
-  Cameras:         'https://media.gadgetbytenepal.com/2025/04/CANON-EOS-R50-PRICE-IN-nepal.jpg',
+  Cameras:         'https://media.gadgetbytenepal.com/2025/04/Canon-EOS-R100-Price-in-Nepal.jpg',
   'Gaming Consoles': 'https://media.gadgetbytenepal.com/2022/08/Logitech-G-CLOUD-Price-in-Nepal.jpg',
 }
 
 const HERO_SLIDES = [
-  { badge: '💻 Work Ready', title: 'Power Through With Laptops', sub: 'Portable performance for study, creative work and business', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', img: CAT_IMGS.Laptops },
-  { badge: '📱 Fresh Picks', title: 'Find Your Next Smartphone', sub: 'Flagship cameras, smooth displays and all-day batteries', cat: 'Smartphones', bg: 'linear-gradient(135deg,#f0f9ff,#e0f2fe)', img: CAT_IMGS.Smartphones },
-  { badge: '🖥️ Desk Upgrade', title: 'Sharper Monitors For Every Setup', sub: 'Gaming, creator and office displays with crisp detail', cat: 'Monitors', bg: 'linear-gradient(135deg,#f8fafc,#e2e8f0)', img: CAT_IMGS.Monitors },
-  { badge: '📟 Portable Screens', title: 'Tablets For Work And Play', sub: 'Lightweight tablets for notes, streaming and multitasking', cat: 'Tablets', bg: 'linear-gradient(135deg,#ecfeff,#cffafe)', img: CAT_IMGS.Tablets },
-  { badge: '🔊 Room-Filling Sound', title: 'Speakers That Bring The Bass', sub: 'Compact, wireless and smart speakers for every room', cat: 'Speakers', bg: 'linear-gradient(135deg,#fff7ed,#fed7aa)', img: CAT_IMGS.Speakers },
-  { badge: '🎧 Audio Essentials', title: 'Headphones Built For Focus', sub: 'Comfortable sound for music, calls and long sessions', cat: 'Headphones', bg: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', img: CAT_IMGS.Headphones },
-  { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'PC Builds', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: CAT_IMGS['PC Builds'] },
-  { badge: '⌚ Most Popular', title: 'Wear the Future on Your Wrist', sub: 'Smart watches for fitness, work and everyday style', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', img: CAT_IMGS.Smartwatches },
-  { badge: '📷 New Arrival', title: 'Capture Every Moment', sub: 'Professional cameras & lenses for every photographer', cat: 'Cameras', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', img: CAT_IMGS.Cameras },
-  { badge: '🚁 Trending Now', title: 'Take Flight With Drones', sub: 'Aerial cameras and compact drones', cat: 'Drones', bg: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', img: CAT_IMGS.Drones },
+  { badge: '💻 Work Ready', title: 'Power Through With Laptops', sub: 'Portable performance for study, creative work and business', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', img: imgLaptops },
+  { badge: '📱 Fresh Picks', title: 'Find Your Next Smartphone', sub: 'Flagship cameras, smooth displays and all-day batteries', cat: 'Smartphones', bg: 'linear-gradient(135deg,#f0f9ff,#e0f2fe)', img: imgSmartphones },
+  { badge: '🖥️ Desk Upgrade', title: 'Sharper Monitors For Every Setup', sub: 'Gaming, creator and office displays with crisp detail', cat: 'Monitors', bg: 'linear-gradient(135deg,#f8fafc,#e2e8f0)', img: imgMonitors },
+  { badge: '📟 Portable Screens', title: 'Tablets For Work And Play', sub: 'Lightweight tablets for notes, streaming and multitasking', cat: 'Tablets', bg: 'linear-gradient(135deg,#ecfeff,#cffafe)', img: imgTablets },
+  { badge: '🔊 Room-Filling Sound', title: 'Speakers That Bring The Bass', sub: 'Compact, wireless and smart speakers for every room', cat: 'Speakers', bg: 'linear-gradient(135deg,#fff7ed,#fed7aa)', img: imgSpeakers },
+  { badge: '🎧 Audio Essentials', title: 'Headphones Built For Focus', sub: 'Comfortable sound for music, calls and long sessions', cat: 'Headphones', bg: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', img: imgHeadphones },
+  { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'PC Builds', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: imgGaming },
+  { badge: '⌚ Most Popular', title: 'Wear the Future on Your Wrist', sub: 'Smart watches for fitness, work and everyday style', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', img: imgWatch },
+  { badge: '📷 New Arrival', title: 'Capture Every Moment', sub: 'Professional cameras & lenses for every photographer', cat: 'Cameras', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', img: imgCamera },
+  { badge: '🚁 Trending Now', title: 'Take Flight With Drones', sub: 'Aerial cameras and compact drones', cat: 'Drones', bg: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', img: imgDrone },
 ]
 
 const SIDE = [
@@ -117,7 +127,6 @@ function Stars({ rating, count, sold }) {
 export default function Home({ addToCart, toggleWishlist, wishlistItems = [], toggleCompare, compareItems = [] }) {
   const [cats, setCats] = useState([])
   const [prods, setProds] = useState([])
-  const [heroImgs, setHeroImgs] = useState({})
   const [sideImgs, setSideImgs] = useState({})
   const [compactImages, setCompactImages] = useState({})
   const [loading, setLoading] = useState(true)
@@ -184,13 +193,6 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         }
 
         setProds(loadedProducts)
-
-        const hero = {}
-        CATALOG_CATEGORIES.forEach(cat => {
-          const p = loadedProducts.find(x => (x.category_name || '').toLowerCase() === cat.toLowerCase() && (x.image_url || x.ProductImageURL))
-          if (p) hero[cat] = p.image_url || p.ProductImageURL
-        })
-        setHeroImgs(prev => Object.keys(prev).length > 0 ? { ...hero, ...prev } : hero)
 
         const imgs = {}
         SIDE.forEach(({ cat }) => {
@@ -353,7 +355,6 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
   const handleCat = (name) => { suppressScrollRef.current = true; if (selCat === name) { setSelCat(null); nav('/') } else { setSelCat(name); nav(`/?cat=${encodeURIComponent(name)}`) } }
   const s = HERO_SLIDES[slide]
-  const heroImg = heroImgs[s.cat] || s.img
 
   return (
     <div className="hm">
@@ -364,10 +365,10 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
           {/* Hero Slider */}
           <div className="hm-hero" style={{ background: s.bg }}>
-            {heroImg ? (
+            {s.img ? (
               <>
                 <img
-                  src={heroImg}
+                  src={s.img}
                   alt={s.cat}
                   className="hm-banner-img"
                   loading="eager"
