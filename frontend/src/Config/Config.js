@@ -12,7 +12,10 @@
 
 const rawApiUrl = import.meta.env.VITE_API_BASE_URL;
 const productionApiUrl = 'https://electronest-api.onrender.com/api';
-const localApiUrl = 'http://127.0.0.1:8000/api';
+const localApiHost = typeof window !== 'undefined' && window.location.hostname
+  ? window.location.hostname
+  : '127.0.0.1';
+const localApiUrl = `http://${localApiHost}:8000/api`;
 
 if (!rawApiUrl && import.meta.env.PROD) {
   console.error(
