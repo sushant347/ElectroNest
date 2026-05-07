@@ -53,21 +53,24 @@ function StarRow({ rating, size = 16, color = '#FBBF24' }) {
 /* ── Price Comparison Chart ── */
 function PriceComparisonChart({ productId }) {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
+    setData(null);
+    setLoading(false);
+  }, [productId]);
+
+  useEffect(() => {
+    if (!isOpen || data || loading) return;
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     customerAPI.getPriceHistory(productId)
       .then(res => { if (!cancelled) setData(res.data); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [productId]);
-
-  if (!loading && !data) return null;
+  }, [isOpen, data, loading, productId]);
 
   const priceHistory = Array.isArray(data?.price_history) ? data.price_history : [];
   const hasLiveMarketData = ['gadgetbyte_api', 'live_market_api', 'international_market_api'].includes(data?.market_source) && priceHistory.length > 0;
@@ -144,7 +147,7 @@ function PriceComparisonChart({ productId }) {
           <SkeletonText lines={3} />
           <div style={{ height: 220, borderRadius: 14, background: 'linear-gradient(90deg,#fff7ed 25%,#ffedd5 37%,#fff7ed 63%)', backgroundSize: '400% 100%', animation: 'pd-shimmer 1.4s ease infinite' }} />
         </div>
-      ) : !hasLiveMarketData ? (
+      ) : !data ? null : !hasLiveMarketData ? (
         <div style={{
           marginTop: 14,
           padding: '14px 16px',
@@ -847,26 +850,36 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      setReviewsLoading(true);
       try {
-        const [productRes, reviewsRes] = await Promise.all([
-          customerAPI.getProduct(id),
-          customerAPI.getReviews(id),
-        ]);
+        const productRes = await customerAPI.getProduct(id);
         const normalized = normalize(productRes.data);
         setProduct(normalized);
         setSelectedVariantId((normalized.variants.find(v => v.isDefault) || normalized.variants[0] || null)?.id || null);
-        setReviews(reviewsRes.data?.results || reviewsRes.data || []);
       } catch (err) {
         console.error('Failed to load product:', err);
         setProduct(null);
-        setReviews([]);
       } finally {
         setLoading(false);
-        setReviewsLoading(false);
       }
     };
     load();
+  }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReviews([]);
+    setReviewsLoading(true);
+    customerAPI.getReviews(id)
+      .then((res) => {
+        if (!cancelled) setReviews(res.data?.results || res.data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setReviews([]);
+      })
+      .finally(() => {
+        if (!cancelled) setReviewsLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [id]);
 
   useEffect(() => {

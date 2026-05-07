@@ -3,16 +3,16 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FiHeart, FiBarChart2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { customerAPI } from '../services/api'
 import { HeaderSkeleton, CardGridSkeleton } from '../components/Common/SkeletonLoader'
-import imgHeadphones from '../components/images/headphones.png'
-import imgLaptops from '../components/images/laptops.png'
-import imgMonitors from '../components/images/monitors.png'
-import imgSmartphones from '../components/images/smartphones.png'
-import imgSpeakers from '../components/images/speakers.png'
-import imgTablets from '../components/images/tablets.png'
-import imgWatch from '../components/images/smart watches.png'
-import imgCamera from '../components/images/camera.png'
-import imgDrone from '../components/images/drone.png'
-import imgGaming from '../components/images/Gaming Console.png'
+import imgHeadphones from '../components/images/hero-optimized/headphones.jpg'
+import imgLaptops from '../components/images/hero-optimized/laptops.jpg'
+import imgMonitors from '../components/images/hero-optimized/monitors.jpg'
+import imgSmartphones from '../components/images/hero-optimized/smartphones.jpg'
+import imgSpeakers from '../components/images/hero-optimized/speakers.jpg'
+import imgTablets from '../components/images/hero-optimized/tablets.jpg'
+import imgWatch from '../components/images/hero-optimized/smart-watches.jpg'
+import imgCamera from '../components/images/hero-optimized/camera.jpg'
+import imgDrone from '../components/images/hero-optimized/drone.jpg'
+import imgGaming from '../components/images/hero-optimized/gaming-console.jpg'
 
 const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
 const getArrayData = (data) => data?.results || data || []
@@ -653,7 +653,7 @@ const STYLES = `
 .hm-hero-sec{background:#F3F4F6;padding:1.25rem 1.5rem;}
 .hm-layout{display:grid;grid-template-columns:1fr 370px;gap:1rem;width:100%;}
 .hm-hero{border-radius:14px;position:relative;overflow:hidden;display:block;transition:background .5s;height:360px;background:#eef2ff;}
-.hm-banner-img{position:relative;width:100%;height:100%;object-fit:cover;display:block;z-index:0;}
+.hm-banner-img{position:relative;width:100%;height:100%;object-fit:contain;display:block;z-index:0;background:#fff;}
 .hm-banner-img.is-loading{opacity:0;}
 .hm-hero:hover .hm-banner-img{transform:scale(1.03);transition:transform .5s ease;}
 .hm-emoji-fall{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12rem;opacity:.15;z-index:0;}
