@@ -8,7 +8,7 @@ def main():
     """Run administrative tasks."""
     try:
         from dotenv import load_dotenv
-        load_dotenv()
+        load_dotenv(override=True)
     except Exception:
         pass
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'page.settings')
