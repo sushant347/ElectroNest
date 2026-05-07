@@ -177,7 +177,7 @@ export default function Login() {
       }
 
       const userData = data.user || data;
-      if (!userData.role) userData.role = 'customer';
+      userData.role = String(userData.role || 'customer').trim().toLowerCase();
       // Normalize field names (backend uses snake_case, frontend uses camelCase)
       if (userData.first_name && !userData.firstName) userData.firstName = userData.first_name;
       if (userData.last_name && !userData.lastName) userData.lastName = userData.last_name;

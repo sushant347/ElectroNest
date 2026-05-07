@@ -53,13 +53,16 @@ def _dashboard_order_payload(order, date_field='order_date'):
 
     for detail in details:
         product = _dashboard_product_for_detail(detail)
-        unit_price = getattr(product, 'selling_price', detail.unit_price) if product else detail.unit_price
+        unit_price = detail.unit_price or 0
         display_total += float(unit_price * detail.quantity)
         if len(items) < 5:
             items.append({
                 'product_name': product.name if product else f'Product #{detail.product_id}',
                 'quantity': detail.quantity,
                 'product_id': product.id if product else detail.product_id,
+                'variant_id': detail.variant_id,
+                'unit_price': float(unit_price),
+                'total_price': float(unit_price * detail.quantity),
             })
 
     customer = getattr(order, 'customer', None)
@@ -361,13 +364,14 @@ class StockMovementsView(APIView):
                     product_id = product.id if product else d.product_id
                     product_name = product.name if product else f'Product #{d.product_id}'
                     store_name = _line_item_store_name(product, d.product_id)
-                    unit_price = getattr(product, 'selling_price', d.unit_price) if product else d.unit_price
+                    unit_price = d.unit_price or 0
                     items.append({
                         'product_name': product_name,
                         'quantity': d.quantity,
                         'unit_price': float(unit_price),
                         'total_price': float(d.quantity * unit_price),
                         'product_id': product_id,
+                        'variant_id': d.variant_id,
                         'store_name': store_name,
                     })
                 pay_list = list(o.payments.all())
@@ -471,8 +475,7 @@ class StockMovementsView(APIView):
                         shipping_cost = float(getattr(candidate, 'shipping_cost', 0) or 0)
                         order_total = 0.0
                         for detail in candidate.details.select_related('product__category', 'product__supplier').all():
-                            product = display_product_for_detail(detail)
-                            unit_price = product.selling_price if product else detail.unit_price
+                            unit_price = detail.unit_price or 0
                             order_total += float(unit_price * detail.quantity)
 
                 po_status = po.order_status.name if po.order_status else 'Unknown'

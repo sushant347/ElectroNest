@@ -26,13 +26,10 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'order', 'product', 'variant', 'variant_detail', 'product_name', 'product_image', 'product_detail', 'quantity', 'unit_price', 'total_price']
 
     def get_total_price(self, obj):
-        product = display_product_for_detail(obj)
-        unit_price = getattr(product, 'selling_price', obj.unit_price) if product else obj.unit_price
-        return float((obj.quantity or 0) * unit_price)
+        return float((obj.quantity or 0) * (obj.unit_price or 0))
 
     def get_unit_price(self, obj):
-        product = display_product_for_detail(obj)
-        return float(getattr(product, 'selling_price', obj.unit_price) if product else obj.unit_price)
+        return float(obj.unit_price or 0)
 
     def get_product(self, obj):
         product = display_product_for_detail(obj)
@@ -82,21 +79,20 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_total_amount(self, obj):
         total = 0
         for detail in obj.details.all():
-            product = display_product_for_detail(detail)
-            unit_price = getattr(product, 'selling_price', detail.unit_price) if product else detail.unit_price
-            total += (detail.quantity or 0) * unit_price
+            total += (detail.quantity or 0) * (detail.unit_price or 0)
         return float(total)
 
     def get_details(self, obj):
-        """Deduplicate order details — keep first row per product_id (handles legacy DB duplicates)."""
+        """Keep separate variants as separate order lines while hiding exact legacy duplicates."""
         details = obj.details.all()
         seen = set()
         unique = []
         for d in details:
             display_product = display_product_for_detail(d)
             pid = display_product.id if display_product else d.product_id
-            if pid not in seen:
-                seen.add(pid)
+            key = (pid, d.variant_id, str(d.unit_price or ''), d.quantity)
+            if key not in seen:
+                seen.add(key)
                 unique.append(d)
         return OrderDetailSerializer(unique, many=True).data
 
@@ -119,7 +115,7 @@ class OrderSerializer(serializers.ModelSerializer):
         ids = set()
         for detail in obj.details.all():
             product = display_product_for_detail(detail)
-            ids.add(product.id if product else detail.product_id)
+            ids.add((product.id if product else detail.product_id, detail.variant_id, str(detail.unit_price or ''), detail.quantity))
         return len(ids)
 
     def get_payment_method(self, obj):

@@ -5,6 +5,12 @@ import config from '../Config/Config';
 
 const AuthContext = createContext(null);
 
+const normalizeUser = (userData) => {
+  if (!userData) return userData;
+  const role = String(userData.role || 'customer').trim().toLowerCase();
+  return { ...userData, role };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [initialized, setInitialized] = useState(false);
@@ -58,9 +64,15 @@ export const AuthProvider = ({ children }) => {
               return res.json();
             })
             .then((data) => {
+              const currentUser = localStorage.getItem('customer_user');
+              const currentToken = localStorage.getItem(config.AUTH_TOKEN_KEY);
+              const currentRefresh = localStorage.getItem(config.REFRESH_TOKEN_KEY);
+              if (currentUser !== storedUser || currentToken !== token || currentRefresh !== refreshToken) {
+                return;
+              }
               localStorage.setItem(config.AUTH_TOKEN_KEY, data.access);
               if (data.refresh) localStorage.setItem(config.REFRESH_TOKEN_KEY, data.refresh);
-              setUser(JSON.parse(storedUser));
+              setUser(normalizeUser(JSON.parse(storedUser)));
             })
             .catch(() => {
               // Refresh failed — clear everything
@@ -77,7 +89,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem(config.AUTH_TOKEN_KEY);
           localStorage.removeItem(config.REFRESH_TOKEN_KEY);
         } else {
-          const u = JSON.parse(storedUser);
+          const u = normalizeUser(JSON.parse(storedUser));
           setUser(u);
         }
       } catch (e) {
@@ -97,8 +109,9 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (userData) => {
-    setUser(userData);
-    localStorage.setItem('customer_user', JSON.stringify(userData));
+    const normalized = normalizeUser(userData);
+    setUser(normalized);
+    localStorage.setItem('customer_user', JSON.stringify(normalized));
   };
 
   const logout = () => {
