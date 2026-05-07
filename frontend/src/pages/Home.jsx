@@ -3,16 +3,16 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FiHeart, FiBarChart2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { customerAPI } from '../services/api'
 import { HeaderSkeleton, CardGridSkeleton } from '../components/Common/SkeletonLoader'
-import imgHeadphones from '../components/images/headphones.png'
-import imgLaptops from '../components/images/laptops.png'
-import imgMonitors from '../components/images/monitors.png'
-import imgSmartphones from '../components/images/smartphones.png'
-import imgSpeakers from '../components/images/speakers.png'
-import imgTablets from '../components/images/tablets.png'
-import imgWatch from '../components/images/smart watches.png'
-import imgCamera from '../components/images/camera.png'
-import imgDrone from '../components/images/drone.png'
-import imgGaming from '../components/images/Gaming Console.png'
+import imgHeadphones from '../components/images/hero-compressed/headphones.jpg'
+import imgLaptops from '../components/images/hero-compressed/laptops.jpg'
+import imgMonitors from '../components/images/hero-compressed/monitors.jpg'
+import imgSmartphones from '../components/images/hero-compressed/smartphones.jpg'
+import imgSpeakers from '../components/images/hero-compressed/speakers.jpg'
+import imgTablets from '../components/images/hero-compressed/tablets.jpg'
+import imgWatch from '../components/images/hero-compressed/smart-watches.jpg'
+import imgCamera from '../components/images/hero-compressed/camera.jpg'
+import imgDrone from '../components/images/hero-compressed/drone.jpg'
+import imgGaming from '../components/images/hero-compressed/gaming-console.jpg'
 
 const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
 const getArrayData = (data) => data?.results || data || []
@@ -136,7 +136,6 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   const nav = useNavigate()
   const prodRef = useRef(null)
   const timerRef = useRef(null)
-  const suppressScrollRef = useRef(false)
   const catParam = sp.get('cat') || ''
   const searchQ = sp.get('search') || ''
   const homeProductsParams = useMemo(() => (
@@ -164,7 +163,6 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   useEffect(() => { if (searchQ && prodRef.current) prodRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, [searchQ])
   useEffect(() => {
     if (catParam && prodRef.current) {
-      if (suppressScrollRef.current) { suppressScrollRef.current = false; return }
       prodRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [catParam])
@@ -359,7 +357,16 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     }
   }
 
-  const handleCat = (name) => { suppressScrollRef.current = true; if (selCat === name) { setSelCat(null); nav('/') } else { setSelCat(name); nav(`/?cat=${encodeURIComponent(name)}`) } }
+  const goCategory = (name) => {
+    if (selCat === name) {
+      setSelCat(null)
+      nav('/')
+    } else {
+      setSelCat(name)
+      nav(`/?cat=${encodeURIComponent(name)}`)
+    }
+    setTimeout(() => prodRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40)
+  }
   const s = HERO_SLIDES[slide]
 
   return (
@@ -389,7 +396,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
               </>
             ) : <span className="hm-emoji-fall">{getCatEmoji(s.cat)}</span>}
             <div className="hm-banner-cta">
-              <button className="hm-shopbtn" onClick={() => nav(`/?cat=${encodeURIComponent(s.cat)}`)}>Shop Now!</button>
+              <button className="hm-shopbtn" onClick={() => goCategory(s.cat)}>Shop Now!</button>
             </div>
             <div className="hm-controls">
               <button className="hm-arr" onClick={() => { setSlide(x => (x - 1 + HERO_SLIDES.length) % HERO_SLIDES.length); resetTimer() }}><FiChevronLeft size={15} /></button>
@@ -400,21 +407,21 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
           {/* Side Banners */}
           <div className="hm-side-col">
-            <div className="hm-side hm-side-lg" style={{ background: SIDE[0].bg }} onClick={() => nav(`/?cat=${encodeURIComponent(SIDE[0].cat)}`)}>
+            <div className="hm-side hm-side-lg" style={{ background: SIDE[0].bg }} onClick={() => goCategory(SIDE[0].cat)}>
               <div className="hm-side-txt">
                 <span className="hm-s-eye">{SIDE[0].eyebrow}</span>
                 <span className="hm-s-ttl">{SIDE[0].title}</span>
-                <button className="hm-s-btn" onClick={e => { e.stopPropagation(); nav(`/?cat=${encodeURIComponent(SIDE[0].cat)}`) }}>View More</button>
+                <button className="hm-s-btn" onClick={e => { e.stopPropagation(); goCategory(SIDE[0].cat) }}>View More</button>
               </div>
               <div className="hm-s-imgbox lg">{(SIDE[0].img || sideImgs[SIDE[0].cat]) ? <img src={SIDE[0].img || sideImgs[SIDE[0].cat]} alt={SIDE[0].title} className="hm-s-img" /> : <span className="hm-s-em">{SIDE[0].emoji}</span>}</div>
             </div>
             <div className="hm-side-row">
               {SIDE.slice(1).map((b, i) => (
-                <div key={i} className="hm-side hm-side-sm" style={{ background: b.bg }} onClick={() => nav(`/?cat=${encodeURIComponent(b.cat)}`)}>
+                <div key={i} className="hm-side hm-side-sm" style={{ background: b.bg }} onClick={() => goCategory(b.cat)}>
                   <div className="hm-side-txt">
                     <span className="hm-s-eye" style={b.ec ? { color: b.ec } : {}}>{b.eyebrow}</span>
                     <span className="hm-s-ttl sm">{b.title}</span>
-                    <button className="hm-s-btn sm" onClick={e => { e.stopPropagation(); nav(`/?cat=${encodeURIComponent(b.cat)}`) }}>View More</button>
+                    <button className="hm-s-btn sm" onClick={e => { e.stopPropagation(); goCategory(b.cat) }}>View More</button>
                   </div>
                   <div className="hm-s-imgbox sm">{(b.img || sideImgs[b.cat]) ? <img src={b.img || sideImgs[b.cat]} alt={b.title} className="hm-s-img" /> : <span className="hm-s-em sm">{b.emoji}</span>}</div>
                 </div>
@@ -434,7 +441,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
           {cats.map(cat => {
             const active = selCat === cat.name
             return (
-              <div key={cat.id || cat.name} className={`hm-cat${active ? ' act' : ''}`} onClick={() => handleCat(cat.name)}>
+              <div key={cat.id || cat.name} className={`hm-cat${active ? ' act' : ''}`} onClick={() => goCategory(cat.name)}>
                 <div className="hm-cat-circle">
                   {CAT_IMGS[cat.name]
                     ? <img src={CAT_IMGS[cat.name]} alt={cat.name} className="hm-cat-img" onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
