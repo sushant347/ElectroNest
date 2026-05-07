@@ -13,6 +13,19 @@ const statusColors = {
   Cancelled: { bg: '#FEE2E2', color: '#DC2626' },
 };
 
+const paymentMethodLabel = (order) => {
+  const method = (order.payment_method || '').trim();
+  if (method && method !== 'N/A' && method.toLowerCase() !== 'pending') return method;
+  return 'Payment not recorded';
+};
+
+const paymentStatusLabel = (order) => {
+  const method = (order.payment_method || '').trim();
+  if ((!method || method === 'N/A') && order.payment_status === 'Pending') return 'Awaiting payment';
+  if (order.payment_status === 'Completed') return 'Paid';
+  return order.payment_status || 'Awaiting payment';
+};
+
 export default function OrderManagement() {
   const [orders, setOrders] = useState([]);
   const [pageLoading, setPageLoading] = useState(true);
@@ -86,7 +99,7 @@ export default function OrderManagement() {
 
   const exportCSV = () => {
     const header = 'Order ID,Customer,Date,Items,Total,Status,Payment\n';
-    const rows = filtered.map((o) => `${o.id},${o.user_name},${o.order_date},${o.items_count},${o.grand_total},${o.status},${o.payment_method}`).join('\n');
+    const rows = filtered.map((o) => `${o.id},${o.user_name},${o.order_date},${o.items_count},${o.grand_total},${o.status},${paymentMethodLabel(o)}`).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -221,8 +234,8 @@ export default function OrderManagement() {
                     <td><span className="om-status-badge" style={{ background: sc.bg, color: sc.color }}>{o.status}</span></td>
                     <td>
                       <div className="om-payment">
-                        <span>{o.payment_method}</span>
-                        <span className={`om-pay-status ${o.payment_status === 'Completed' ? 'completed' : o.payment_status === 'Refunded' ? 'refunded' : 'pending'}`}>{o.payment_status}</span>
+                        <span className="om-pay-method">{paymentMethodLabel(o)}</span>
+                        <span className={`om-pay-status ${o.payment_status === 'Completed' ? 'completed' : o.payment_status === 'Refunded' ? 'refunded' : 'pending'}`}>{paymentStatusLabel(o)}</span>
                       </div>
                     </td>
                     <td>
@@ -344,6 +357,7 @@ export default function OrderManagement() {
         .om-total { font-weight: 700; color: #1e293b; white-space: nowrap; }
         .om-status-badge { font-size: 0.72rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 20px; white-space: nowrap; }
         .om-payment { display: flex; flex-direction: column; font-size: 0.82rem; }
+        .om-pay-method { font-weight: 700; color: #1e293b; }
         .om-pay-status { font-size: 0.7rem; font-weight: 600; }
         .om-pay-status.completed { color: #16a34a; }
         .om-pay-status.refunded { color: #dc2626; }

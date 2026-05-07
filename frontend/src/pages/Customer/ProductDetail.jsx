@@ -259,10 +259,10 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 14, flexWrap: 'wrap', gap: 8 }}>
-        <div>
+      <div className="price-trend-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div className="price-trend-copy">
           <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>Market vs Platform Trend</div>
-          <div style={{ fontSize: 12, color: '#64748b' }}>
+          <div className="price-trend-subcopy" style={{ fontSize: 12, color: '#64748b' }}>
             {isAllVariants
               ? 'Showing every configuration separately so higher-spec prices are not averaged into lower-spec models.'
               : activeSeries?.title
@@ -284,6 +284,7 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
           {marketOffers.slice(0, 4).map((offer, idx) => (
             <a
               key={`${offer.store}-${offer.name}-${idx}`}
+              className="market-offer-row"
               href={offer.url || undefined}
               target={offer.url ? '_blank' : undefined}
               rel={offer.url ? 'noreferrer' : undefined}
@@ -300,7 +301,7 @@ function PriceComparisonChart({ productId, selectedVariantId }) {
                 background: '#fff',
               }}
             >
-              <span style={{ fontSize: 12, color: '#475569', fontWeight: 700, minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.35 }}>
+              <span className="market-offer-title" style={{ fontSize: 12, color: '#475569', fontWeight: 700, minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.35 }}>
                 {offer.store}: {offer.name}
               </span>
               <span className="market-offer-price" style={{ fontSize: 12, color: '#dc2626', fontWeight: 800, textAlign: 'right', overflowWrap: 'anywhere', flexShrink: 0 }}>
@@ -1844,6 +1845,20 @@ const spinnerCSS = `
     .price-metrics-grid {
       grid-template-columns: 1fr 1fr !important;
     }
+    .price-trend-head {
+      display: block !important;
+      width: 100% !important;
+    }
+    .price-trend-copy,
+    .price-trend-subcopy {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      line-height: 1.45 !important;
+      white-space: normal !important;
+      word-break: normal !important;
+      overflow-wrap: normal !important;
+    }
     .price-chart-box {
       height: 220px !important;
       min-width: 0 !important;
@@ -1853,6 +1868,16 @@ const spinnerCSS = `
       white-space: normal !important;
       text-align: left !important;
       flex-basis: 100% !important;
+    }
+    .market-offer-row {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 4px !important;
+    }
+    .market-offer-title {
+      width: 100% !important;
+      word-break: normal !important;
+      overflow-wrap: normal !important;
     }
   }
   @media (max-width: 480px) {

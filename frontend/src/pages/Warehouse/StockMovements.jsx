@@ -35,12 +35,21 @@ const EMPTY_MOVEMENTS = {
   store_commission: {},
 };
 const buildStockMovementParams = (section, days = 90) => ({ section, days });
+const MOVEMENT_TAB_KEYS = TABS.map(t => t.key);
 const hasMovementRows = (movements, section) => {
   if (section === 'purchase_orders') return (movements.enriched_purchase_orders || []).length > 0;
   if (section === 'shipped_orders') return (movements.shipped_orders || []).length > 0;
   if (section === 'product_updates') return (movements.product_updates || []).length > 0;
   return false;
 };
+const markMovementSectionLoaded = (loadedTabsRef, section) => {
+  if (section === 'all') {
+    MOVEMENT_TAB_KEYS.forEach(key => loadedTabsRef.current.add(key));
+    return;
+  }
+  loadedTabsRef.current.add(section);
+};
+const purchaseOrderDisplayStatus = (po) => po.customer_order_status || po.status_name || 'Pending';
 
 /* ── SVG Donut Chart for Warehouse Commission (with hover tooltip) ── */
 function polarToCartesian(cx, cy, r, angleDeg) {
@@ -286,7 +295,7 @@ function StoreShippingChart({ summary }) {
 }
 
 export default function StockMovements() {
-  const initialMovementsRef = useRef(warehouseAPI.peekStockMovements?.(buildStockMovementParams('purchase_orders', 90)) || null);
+  const initialMovementsRef = useRef(warehouseAPI.peekStockMovements?.(buildStockMovementParams('all', 90)) || null);
   const [movements, setMovements] = useState(() => ({ ...EMPTY_MOVEMENTS, ...(initialMovementsRef.current || {}) }));
   const movementsRef = useRef({ ...EMPTY_MOVEMENTS, ...(initialMovementsRef.current || {}) });
   const [loading, setLoading] = useState(!initialMovementsRef.current);
@@ -306,7 +315,7 @@ export default function StockMovements() {
   const [coMovementsLoading, setCoMovementsLoading] = useState(false);
   const coOrderDaysRef = useRef(90);
   const coPeriodFilterBoot = useRef(false);
-  const loadedTabs = useRef(new Set(initialMovementsRef.current ? ['purchase_orders'] : []));
+  const loadedTabs = useRef(new Set(initialMovementsRef.current ? MOVEMENT_TAB_KEYS : []));
 
   const CO_PER_PAGE = 20;
   /** Store dropdown shows at most this many names (top by activity); "All Stores" still lists every store in the table. */
@@ -348,7 +357,7 @@ export default function StockMovements() {
     const cached = warehouseAPI.peekStockMovements?.(params);
     if (cached) {
       setMovements(prev => ({ ...prev, ...(cached || {}) }));
-      loadedTabs.current.add(section);
+      markMovementSectionLoaded(loadedTabs, section);
       setLoading(false);
     }
     if (!force && loadedTabs.current.has(section)) return;
@@ -361,7 +370,7 @@ export default function StockMovements() {
         return { data: {} };
       });
       setMovements(prev => ({ ...prev, ...(movRes.data || {}) }));
-      loadedTabs.current.add(section);
+      markMovementSectionLoaded(loadedTabs, section);
     } catch (err) {
       console.error('Failed to fetch stock movements:', err);
       setError('Failed to load stock movements.');
@@ -371,7 +380,7 @@ export default function StockMovements() {
     }
   }, []);
 
-  useEffect(() => { fetchData('purchase_orders', !initialMovementsRef.current); }, [fetchData]);
+  useEffect(() => { fetchData('all', !initialMovementsRef.current); }, [fetchData]);
 
   const openTab = (key) => {
     setActiveTab(key);
@@ -472,7 +481,7 @@ export default function StockMovements() {
 
   const filteredEnrichedPOs = useMemo(() => {
     let list = enrichedPOs;
-    if (poStatusFilter !== 'all') list = list.filter(po => po.status_name === poStatusFilter);
+    if (poStatusFilter !== 'all') list = list.filter(po => purchaseOrderDisplayStatus(po) === poStatusFilter);
     if (poStoreFilter !== 'all') {
       list = list.filter(po => (po.items || []).some(i => i.product_owner === poStoreFilter));
     }
@@ -553,8 +562,8 @@ export default function StockMovements() {
 
   const poStatusCounts = useMemo(() => ({
     all: enrichedPOs.length,
-    Pending: enrichedPOs.filter(p => p.status_name === 'Pending').length,
-    Delivered: enrichedPOs.filter(p => p.status_name === 'Delivered').length,
+    Pending: enrichedPOs.filter(p => purchaseOrderDisplayStatus(p) === 'Pending').length,
+    Delivered: enrichedPOs.filter(p => purchaseOrderDisplayStatus(p) === 'Delivered').length,
   }), [enrichedPOs]);
 
   return (
@@ -762,7 +771,7 @@ export default function StockMovements() {
             ) : (
               <div className="po-cards-grid">
                 {filteredEnrichedPOs.map(po => {
-                  const displayStatus = po.customer_order_status || po.status_name || 'Pending';
+                  const displayStatus = purchaseOrderDisplayStatus(po);
                   const sc = ORDER_STATUS_COLORS[displayStatus] || { color: '#6B7280', bg: '#F3F4F6' };
                   return (
                     <div key={po.id} className="po-card">

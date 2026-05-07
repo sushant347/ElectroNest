@@ -713,7 +713,7 @@ const STYLES = `
 .hm-banner-img.is-loading{opacity:0;}
 .hm-hero:hover .hm-banner-img{transition:transform .5s ease;}
 .hm-emoji-fall{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12rem;opacity:.15;z-index:0;}
-.hm-banner-cta{position:absolute;bottom:1rem;left:2rem;z-index:2;}
+.hm-banner-cta{position:absolute;bottom:.55rem;left:2rem;z-index:2;}
 .hm-shopbtn{background:#F97316;color:#fff;border:none;border-radius:8px;padding:.7rem 1.75rem;font-size:.9rem;font-weight:700;font-family:inherit;cursor:pointer;transition:background .15s,transform .15s;box-shadow:0 4px 16px rgba(249,115,22,.4);}
 .hm-shopbtn:hover{background:#ea580c;transform:translateY(-1px);}
 .hm-controls{position:absolute;bottom:1.2rem;right:2rem;display:flex;align-items:center;gap:7px;z-index:3;}
