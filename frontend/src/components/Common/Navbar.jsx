@@ -62,7 +62,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
     const requestId = ++catReqRef.current
     catDbRef.current = setTimeout(async () => {
       try {
-        const res = await customerAPI.getProducts({ category: hovCat.id, page_size: 6, compact: 1 })
+        const res = await customerAPI.getProducts({ category: hovCat.id, page_size: 6, compact: 1, skip_stats: 1 })
         if (requestId !== catReqRef.current) return
         setCatProds((res.data?.results || res.data || []).slice(0, 6))
       } catch { setCatProds([]) }
@@ -91,7 +91,7 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
     const requestId = ++suggReqRef.current
     debouncRef.current = setTimeout(async () => {
       try {
-        const res = await customerAPI.getProducts({ search: trimmed, page_size: 10, compact: 1 })
+        const res = await customerAPI.getProducts({ search: trimmed, page_size: 10, compact: 1, skip_stats: 1 })
         if (requestId !== suggReqRef.current) return
         const all = res.data?.results || res.data || []
         // sort: exact name starts-with first, then contains, then rest

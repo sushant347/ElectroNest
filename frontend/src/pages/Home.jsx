@@ -38,6 +38,9 @@ const CATALOG_CATEGORIES = [
   'PC Builds', 'Speakers', 'Earbuds', 'Headphones', 'Cameras', 'Gaming Consoles',
 ]
 
+const DEFAULT_HOME_PARAMS = { page_size: 144, compact: 1, skip_stats: 1, sort_by: 'best_selling' }
+const FULL_HOME_PARAMS = { page_size: 500, compact: 1, sort_by: 'best_selling' }
+
 const CAT_IMGS = {
   Smartphones:    'https://media.gadgetbytenepal.com/2026/02/OPPO-Reno-15-.png',
   Laptops:        'https://media.gadgetbytenepal.com/2023/03/MSI-Raider-GE68-HX-13V-2023-i7-13th-gen-front.jpg',
@@ -141,7 +144,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   const homeProductsParams = useMemo(() => (
     searchQ
       ? { page_size: 120, compact: 1, search: searchQ }
-      : { page_size: 500, compact: 1, sort_by: 'best_selling' }
+      : DEFAULT_HOME_PARAMS
   ), [searchQ])
 
   /* ── Smart Filter state ── */
@@ -211,6 +214,32 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     }
     load()
   }, [homeProductsParams, searchQ])
+
+  useEffect(() => {
+    if (searchQ || cats.length === 0) return
+    let cancelled = false
+    const cachedFull = customerAPI.peekProducts?.(FULL_HOME_PARAMS)
+    const applyFull = (data) => {
+      if (cancelled) return
+      const allowed = new Set(cats.map(cat => cat.name))
+      const fullProducts = getArrayData(data).filter(product => allowed.has(product.category_name))
+      setProds(prev => {
+        const merged = new Map(prev.map(product => [product.id, product]))
+        fullProducts.forEach(product => merged.set(product.id, product))
+        return [...merged.values()]
+      })
+    }
+    if (cachedFull) {
+      applyFull(cachedFull)
+      return () => { cancelled = true }
+    }
+    const timer = setTimeout(() => {
+      customerAPI.getProducts(FULL_HOME_PARAMS)
+        .then(res => applyFull(res.data))
+        .catch(() => {})
+    }, 250)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [cats, searchQ])
 
   /* Per-product image variants — alternates by position: 1,3,5 → urls[0]  2,4,6 → urls[1]
      test: substring checked against product name (case-insensitive) */
@@ -364,6 +393,20 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     } else {
       setSelCat(name)
       nav(`/?cat=${encodeURIComponent(name)}`)
+      const hasCategoryProducts = prods.some(product => product.category === name || product.category_name === name)
+      const category = cats.find(cat => cat.name === name)
+      if (!hasCategoryProducts && category?.id) {
+        customerAPI.getProducts({ category: category.id, page_size: 80, compact: 1 })
+          .then(res => {
+            const incoming = getArrayData(res.data)
+            setProds(prev => {
+              const merged = new Map(prev.map(product => [product.id, product]))
+              incoming.forEach(product => merged.set(product.id, product))
+              return [...merged.values()]
+            })
+          })
+          .catch(() => {})
+      }
     }
     setTimeout(() => prodRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40)
   }

@@ -170,11 +170,11 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
-            products = self._attach_review_stats(page)
+            products = list(page) if request.query_params.get('skip_stats') in ('1', 'true', 'yes') else self._attach_review_stats(page)
             serializer = self.get_serializer(products, many=True)
             return self.get_paginated_response(serializer.data)
 
-        products = self._attach_review_stats(queryset)
+        products = list(queryset) if request.query_params.get('skip_stats') in ('1', 'true', 'yes') else self._attach_review_stats(queryset)
         serializer = self.get_serializer(products, many=True)
         return Response(serializer.data)
 

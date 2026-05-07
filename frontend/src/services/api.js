@@ -47,6 +47,29 @@ const writeStoredGet = (key, data, ttl = GET_CACHE_TTL) => {
 
 export const peekCachedGet = (url, params) => readStoredGet(makeGetCacheKey(url, params));
 
+export const findCachedProduct = (id) => {
+  const targetId = Number(id);
+  const findInPayload = (payload) => {
+    const rows = Array.isArray(payload?.results) ? payload.results : Array.isArray(payload) ? payload : [];
+    return rows.find(product => Number(product?.id) === targetId) || null;
+  };
+  for (const entry of getCache.values()) {
+    const found = findInPayload(entry.data);
+    if (found) return found;
+  }
+  try {
+    for (const key of Object.keys(sessionStorage)) {
+      if (!key.startsWith('api:') || !key.includes('/products/')) continue;
+      const parsed = JSON.parse(sessionStorage.getItem(key) || '{}');
+      if (parsed.expiresAt <= Date.now()) continue;
+      const found = findInPayload(parsed.data);
+      if (found) return found;
+    }
+  } catch { /* ignore storage access errors */ }
+  return null;
+};
+
+
 const clearGetCache = () => {
   getCache.clear();
   inflightGet.clear();
@@ -305,6 +328,7 @@ export const customerAPI = {
   peekProducts: (params) => peekCachedGet('/products/', params),
   getProduct: (id) => cachedGet(`/products/${id}/`),
   peekProduct: (id) => peekCachedGet(`/products/${id}/`),
+  peekProductFromLists: (id) => findCachedProduct(id),
   getCategories: () => cachedGet('/categories/'),
   peekCategories: () => peekCachedGet('/categories/'),
   getBrands: () => cachedGet('/brands/'),
