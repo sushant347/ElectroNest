@@ -3,16 +3,6 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { FiHeart, FiBarChart2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { customerAPI } from '../services/api'
 import { HeaderSkeleton, CardGridSkeleton } from '../components/Common/SkeletonLoader'
-import imgHeadphones from '../components/images/headphones.png'
-import imgLaptops from '../components/images/laptops.png'
-import imgMonitors from '../components/images/monitors.png'
-import imgSmartphones from '../components/images/smartphones.png'
-import imgSpeakers from '../components/images/speakers.png'
-import imgTablets from '../components/images/tablets.png'
-import imgWatch from '../components/images/smart watches.png'
-import imgCamera from '../components/images/camera.png'
-import imgDrone from '../components/images/drone.png'
-import imgGaming from '../components/images/Gaming Console.png'
 
 const fmt = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p)
 const getArrayData = (data) => data?.results || data || []
@@ -38,17 +28,32 @@ const CATALOG_CATEGORIES = [
   'PC Builds', 'Speakers', 'Earbuds', 'Headphones', 'Cameras', 'Gaming Consoles',
 ]
 
+const CAT_IMGS = {
+  Smartphones:    'https://media.gadgetbytenepal.com/2026/02/OPPO-Reno-15-.png',
+  Laptops:        'https://media.gadgetbytenepal.com/2023/03/MSI-Raider-GE68-HX-13V-2023-i7-13th-gen-front.jpg',
+  Monitors:       'https://media.gadgetbytenepal.com/2026/02/ASUS-TUF-VG289Q1A-Front.png',
+  Tablets:        'https://media.gadgetbytenepal.com/2025/06/redmi-pad-2-.jpg',
+  Drones:         'https://media.gadgetbytenepal.com/2025/11/DJI-Tello-Boost.jpg',
+  Smartwatches:   'https://media.gadgetbytenepal.com/2024/09/Huawei-Watch-Fit-3-Grey.jpg',
+  'PC Builds':    'https://media.gadgetbytenepal.com/2024/09/Budget-Gaming-PC-50k.jpg',
+  Speakers:       'https://media.gadgetbytenepal.com/2024/12/HiFuture-Musicbox-100-.jpg',
+  Earbuds:         'https://media.gadgetbytenepal.com/2024/01/HiFuture-Fusion-Jet-Black.jpg',
+  Headphones:      'https://media.gadgetbytenepal.com/2026/04/Logitech-H151-Variant-Black-Front.png',
+  Cameras:         'https://media.gadgetbytenepal.com/2025/04/CANON-EOS-R50-PRICE-IN-nepal.jpg',
+  'Gaming Consoles': 'https://media.gadgetbytenepal.com/2022/08/Logitech-G-CLOUD-Price-in-Nepal.jpg',
+}
+
 const HERO_SLIDES = [
-  { badge: '💻 Work Ready', title: 'Power Through With Laptops', sub: 'Portable performance for study, creative work and business', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', img: imgLaptops },
-  { badge: '📱 Fresh Picks', title: 'Find Your Next Smartphone', sub: 'Flagship cameras, smooth displays and all-day batteries', cat: 'Smartphones', bg: 'linear-gradient(135deg,#f0f9ff,#e0f2fe)', img: imgSmartphones },
-  { badge: '🖥️ Desk Upgrade', title: 'Sharper Monitors For Every Setup', sub: 'Gaming, creator and office displays with crisp detail', cat: 'Monitors', bg: 'linear-gradient(135deg,#f8fafc,#e2e8f0)', img: imgMonitors },
-  { badge: '📟 Portable Screens', title: 'Tablets For Work And Play', sub: 'Lightweight tablets for notes, streaming and multitasking', cat: 'Tablets', bg: 'linear-gradient(135deg,#ecfeff,#cffafe)', img: imgTablets },
-  { badge: '🔊 Room-Filling Sound', title: 'Speakers That Bring The Bass', sub: 'Compact, wireless and smart speakers for every room', cat: 'Speakers', bg: 'linear-gradient(135deg,#fff7ed,#fed7aa)', img: imgSpeakers },
-  { badge: '🎧 Audio Essentials', title: 'Headphones Built For Focus', sub: 'Comfortable sound for music, calls and long sessions', cat: 'Headphones', bg: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', img: imgHeadphones },
-  { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'PC Builds', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: imgGaming },
-  { badge: '⌚ Most Popular', title: 'Wear the Future on Your Wrist', sub: 'Smart watches for fitness, work and everyday style', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', img: imgWatch },
-  { badge: '📷 New Arrival', title: 'Capture Every Moment', sub: 'Professional cameras & lenses for every photographer', cat: 'Cameras', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', img: imgCamera },
-  { badge: '🚁 Trending Now', title: 'Take Flight With Drones', sub: 'Aerial cameras and compact drones', cat: 'Drones', bg: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', img: imgDrone },
+  { badge: '💻 Work Ready', title: 'Power Through With Laptops', sub: 'Portable performance for study, creative work and business', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', img: CAT_IMGS.Laptops },
+  { badge: '📱 Fresh Picks', title: 'Find Your Next Smartphone', sub: 'Flagship cameras, smooth displays and all-day batteries', cat: 'Smartphones', bg: 'linear-gradient(135deg,#f0f9ff,#e0f2fe)', img: CAT_IMGS.Smartphones },
+  { badge: '🖥️ Desk Upgrade', title: 'Sharper Monitors For Every Setup', sub: 'Gaming, creator and office displays with crisp detail', cat: 'Monitors', bg: 'linear-gradient(135deg,#f8fafc,#e2e8f0)', img: CAT_IMGS.Monitors },
+  { badge: '📟 Portable Screens', title: 'Tablets For Work And Play', sub: 'Lightweight tablets for notes, streaming and multitasking', cat: 'Tablets', bg: 'linear-gradient(135deg,#ecfeff,#cffafe)', img: CAT_IMGS.Tablets },
+  { badge: '🔊 Room-Filling Sound', title: 'Speakers That Bring The Bass', sub: 'Compact, wireless and smart speakers for every room', cat: 'Speakers', bg: 'linear-gradient(135deg,#fff7ed,#fed7aa)', img: CAT_IMGS.Speakers },
+  { badge: '🎧 Audio Essentials', title: 'Headphones Built For Focus', sub: 'Comfortable sound for music, calls and long sessions', cat: 'Headphones', bg: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', img: CAT_IMGS.Headphones },
+  { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'PC Builds', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: CAT_IMGS['PC Builds'] },
+  { badge: '⌚ Most Popular', title: 'Wear the Future on Your Wrist', sub: 'Smart watches for fitness, work and everyday style', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', img: CAT_IMGS.Smartwatches },
+  { badge: '📷 New Arrival', title: 'Capture Every Moment', sub: 'Professional cameras & lenses for every photographer', cat: 'Cameras', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', img: CAT_IMGS.Cameras },
+  { badge: '🚁 Trending Now', title: 'Take Flight With Drones', sub: 'Aerial cameras and compact drones', cat: 'Drones', bg: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', img: CAT_IMGS.Drones },
 ]
 
 const SIDE = [
@@ -67,21 +72,6 @@ function shouldUseContainInCard(categoryName = '', productName = '') {
 function cardObjectPosition(categoryName = '', productName = '') {
   const hay = `${categoryName} ${productName}`.toLowerCase()
   return /benq/.test(hay) ? 'center top' : 'center'
-}
-
-const CAT_IMGS = {
-  Smartphones:    'https://applefun.com.ua/upload/2025-09/0-apple-iphone-17-pro-max-256gb-cosmic-orange-11757497912.webp',
-  Laptops:        'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=600&auto=format',
-  Monitors:       'https://media.us.lg.com/transform/ecomm-PDPGallery-1100x730/e64bb88d-49a1-4f54-a9dc-de6dd1b33714/md08003935-DZ-07-jpg',
-  Tablets:        'https://static1.anpoimages.com/wordpress/wp-content/uploads/2023/08/samsung-galaxy-tab-s9-ultra-plants.jpg',
-  Drones:         'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTuLYKV8ecGw76FaI258F0yz1VSIe2e4b_H2w&s',
-  Smartwatches:   'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQmhDiLgjN7ncyoUlQlnhYuS2BLjDl72u_xVQ&s',
-  'PC Builds':    'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=600&auto=format',
-  Speakers:       'https://www.apple.com/newsroom/images/2024/07/apple-introduces-homepod-mini-in-midnight/article/Apple-HomePod-mini-midnight_inline.jpg.large_2x.jpg',
-  Earbuds:         'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=600&auto=format',
-  Headphones:      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format',
-  Cameras:         'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format',
-  'Gaming Consoles': 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=600&auto=format',
 }
 
 /* Star rating — SVG-based filled / half / empty stars */
@@ -127,6 +117,7 @@ function Stars({ rating, count, sold }) {
 export default function Home({ addToCart, toggleWishlist, wishlistItems = [], toggleCompare, compareItems = [] }) {
   const [cats, setCats] = useState([])
   const [prods, setProds] = useState([])
+  const [heroImgs, setHeroImgs] = useState({})
   const [sideImgs, setSideImgs] = useState({})
   const [compactImages, setCompactImages] = useState({})
   const [loading, setLoading] = useState(true)
@@ -180,36 +171,32 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
         if (activeCategory || searchQ) {
           const productParams = {
             page_size: 120,
+            compact: 1,
             ...(activeCategory ? { category: activeCategory.id } : {}),
             ...(searchQ ? { search: searchQ } : {}),
           }
           const allRes = await customerAPI.getProducts(productParams)
           loadedProducts = getArrayData(allRes.data)
         } else {
-          const categoryResults = await Promise.all(catData.map(cat =>
-            customerAPI.getProducts({ category: cat.id, page_size: 40 }).then(res => getArrayData(res.data)).catch(() => [])
-          ))
-          const byId = new Map()
-          categoryResults.flat().forEach(product => {
-            if (product?.id != null) byId.set(product.id, product)
-          })
-          loadedProducts = [...byId.values()]
+          const allRes = await customerAPI.getProducts({ page_size: 500, compact: 1, sort_by: 'best_selling' })
+          const allowed = new Set(catData.map(cat => cat.name))
+          loadedProducts = getArrayData(allRes.data).filter(product => allowed.has(product.category_name))
         }
 
         setProds(loadedProducts)
 
+        const hero = {}
+        CATALOG_CATEGORIES.forEach(cat => {
+          const p = loadedProducts.find(x => (x.category_name || '').toLowerCase() === cat.toLowerCase() && (x.image_url || x.ProductImageURL))
+          if (p) hero[cat] = p.image_url || p.ProductImageURL
+        })
+        setHeroImgs(prev => Object.keys(prev).length > 0 ? { ...hero, ...prev } : hero)
+
         const imgs = {}
-        await Promise.all(SIDE.map(async ({ cat }) => {
-          const sideCategory = catData.find(c => (c.name || '').toLowerCase() === cat.toLowerCase())
-          if (!sideCategory) return
-          try {
-            const res = await customerAPI.getProducts({ category: sideCategory.id, page_size: 1 })
-            const p = getArrayData(res.data).find(x => x.image_url || x.ProductImageURL)
-            if (p) imgs[cat] = p.image_url || p.ProductImageURL
-          } catch {
-            // Side images are decorative; product loading should not fail because of them.
-          }
-        }))
+        SIDE.forEach(({ cat }) => {
+          const p = loadedProducts.find(x => (x.category_name || '').toLowerCase() === cat.toLowerCase() && (x.image_url || x.ProductImageURL))
+          if (p) imgs[cat] = p.image_url || p.ProductImageURL
+        })
         setSideImgs(prev => Object.keys(prev).length > 0 ? prev : imgs)
       } catch (e) {
         console.error(e)
@@ -366,6 +353,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
   const handleCat = (name) => { suppressScrollRef.current = true; if (selCat === name) { setSelCat(null); nav('/') } else { setSelCat(name); nav(`/?cat=${encodeURIComponent(name)}`) } }
   const s = HERO_SLIDES[slide]
+  const heroImg = heroImgs[s.cat] || s.img
 
   return (
     <div className="hm">
@@ -376,10 +364,23 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
           {/* Hero Slider */}
           <div className="hm-hero" style={{ background: s.bg }}>
-            {s.img
-              ? <img src={s.img} alt={s.cat} className="hm-banner-img" />
-              : <span className="hm-emoji-fall">{s.emoji}</span>
-            }
+            {heroImg ? (
+              <>
+                <img
+                  src={heroImg}
+                  alt={s.cat}
+                  className="hm-banner-img"
+                  loading="eager"
+                  decoding="async"
+                  onError={e => {
+                    e.currentTarget.style.display = 'none'
+                    const fallback = e.currentTarget.nextElementSibling
+                    if (fallback) fallback.style.display = 'flex'
+                  }}
+                />
+                <span className="hm-emoji-fall" style={{ display: 'none' }}>{getCatEmoji(s.cat)}</span>
+              </>
+            ) : <span className="hm-emoji-fall">{getCatEmoji(s.cat)}</span>}
             <div className="hm-banner-cta">
               <button className="hm-shopbtn" onClick={() => nav(`/?cat=${encodeURIComponent(s.cat)}`)}>Shop Now!</button>
             </div>
@@ -650,8 +651,9 @@ const STYLES = `
 /* HERO */
 .hm-hero-sec{background:#F3F4F6;padding:1.25rem 1.5rem;}
 .hm-layout{display:grid;grid-template-columns:1fr 370px;gap:1rem;width:100%;}
-.hm-hero{border-radius:14px;position:relative;overflow:hidden;display:block;transition:background .5s;}
-.hm-banner-img{position:relative;width:100%;height:auto;display:block;z-index:0;}
+.hm-hero{border-radius:14px;position:relative;overflow:hidden;display:block;transition:background .5s;height:360px;background:#eef2ff;}
+.hm-banner-img{position:relative;width:100%;height:100%;object-fit:cover;display:block;z-index:0;}
+.hm-banner-img.is-loading{opacity:0;}
 .hm-hero:hover .hm-banner-img{transform:scale(1.03);transition:transform .5s ease;}
 .hm-emoji-fall{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12rem;opacity:.15;z-index:0;}
 .hm-banner-cta{position:absolute;bottom:2rem;left:2rem;z-index:2;}
@@ -822,5 +824,5 @@ const STYLES = `
 /* RESPONSIVE */
 @media(max-width:1024px){.hm-layout{grid-template-columns:1fr 300px;}.hm-grid{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:768px){.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:row;}.hm-side-lg{flex:2;}.hm-side-row{flex:1;flex-direction:column;gap:.85rem;}.hm-side-sm{min-height:0;flex:1;}.hm-grid{grid-template-columns:repeat(3,1fr);}.hm-prods-sec{padding:1.25rem 1.5rem;}.hm-card-img{height:185px;}}
-@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-controls{display:none;}.hm-banner-cta{bottom:.6rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1rem .85rem;}.hm-grid{grid-template-columns:repeat(2,1fr);gap:.75rem;}.hm-card-img{height:155px;}.hm-card-img.compact{padding:10px;}.hm-on-sale{font-size:.72rem;padding:5px 10px;}.hm-pnm{font-size:.85rem;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}.hm-ticket{padding:9px 11px 10px;}.hm-ticket-price{font-size:1.25rem;}.hm-ticket-icon{font-size:1.1rem;}.hm-ticket-save{font-size:.72rem;}.hm-ticket-ltd{display:none;}.hm-icon-btn{width:32px;height:32px;}}
+@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-hero{height:210px;}.hm-controls{display:none;}.hm-banner-cta{bottom:.6rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1rem .85rem;}.hm-grid{grid-template-columns:repeat(2,1fr);gap:.75rem;}.hm-card-img{height:155px;}.hm-card-img.compact{padding:10px;}.hm-on-sale{font-size:.72rem;padding:5px 10px;}.hm-pnm{font-size:.85rem;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}.hm-ticket{padding:9px 11px 10px;}.hm-ticket-price{font-size:1.25rem;}.hm-ticket-icon{font-size:1.1rem;}.hm-ticket-save{font-size:.72rem;}.hm-ticket-ltd{display:none;}.hm-icon-btn{width:32px;height:32px;}}
 `

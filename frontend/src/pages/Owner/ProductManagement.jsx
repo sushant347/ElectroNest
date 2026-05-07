@@ -337,7 +337,7 @@ export default function ProductManagement() {
       setPageLoading(true);
       setPageError(null);
       const [prodRes, catRes, ownersRes] = await Promise.all([
-        ownerAPI.getAllProducts({ page_size: 1000, my_products: true }),
+        ownerAPI.getAllProducts({ page_size: 1000, my_products: true, compact: 1 }),
         ownerAPI.getCategories(),
         ownerAPI.getOwners(),
       ]);
@@ -372,7 +372,16 @@ export default function ProductManagement() {
   const openNewProduct = () => { setShowAddChoice(false); setEditingProduct(null); setShowModal(true); };
   const openExistingProduct = () => { setShowAddChoice(false); setShowStockModal(true); };
   const openCsvImport = () => { setShowAddChoice(false); setShowCsvModal(true); };
-  const openEdit = (p) => { setEditingProduct(p); setShowModal(true); };
+  const openEdit = async (p) => {
+    setEditingProduct(p);
+    setShowModal(true);
+    try {
+      const res = await ownerAPI.getProduct(p.id);
+      setEditingProduct(res.data);
+    } catch {
+      // The compact row has enough data to keep the modal usable if detail fetch fails.
+    }
+  };
 
   const handleStockUpdate = (productId, newStock) => {
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: newStock } : p));

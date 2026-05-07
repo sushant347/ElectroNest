@@ -16,7 +16,7 @@ from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
 from .models import Category, Supplier, Product, Review, MarketPriceSnapshot
-from .serializers import CategorySerializer, SupplierSerializer, ProductSerializer, ReviewSerializer
+from .serializers import CategorySerializer, SupplierSerializer, ProductSerializer, ProductCompactSerializer, ReviewSerializer
 from .price_matching import get_price_comparison
 from admin_panel.models import AuditMixin, AuditLog
 
@@ -94,7 +94,7 @@ class SupplierViewSet(AuditMixin, viewsets.ModelViewSet):
 
 
 class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
-    queryset         = Product.objects.select_related('category', 'supplier').prefetch_related('variants')
+    queryset         = Product.objects.select_related('category', 'supplier')
     serializer_class = ProductSerializer
     filter_backends  = [filters.SearchFilter, filters.OrderingFilter]
     search_fields    = ['name', 'sku', 'brand']
@@ -107,6 +107,11 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
 
     def get_audit_table_name(self):
         return 'Products'
+
+    def get_serializer_class(self):
+        if self.action == 'list' and self.request.query_params.get('compact') in ('1', 'true', 'yes'):
+            return ProductCompactSerializer
+        return super().get_serializer_class()
 
     def _generate_sku(self):
         """Generate a unique SKU like PRD-AB3X9K2M."""
@@ -167,6 +172,9 @@ class ProductViewSet(AuditMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs       = super().get_queryset()
+        compact = self.request.query_params.get('compact') in ('1', 'true', 'yes')
+        if getattr(self, 'action', None) != 'list' or not compact:
+            qs = qs.prefetch_related('variants')
         if getattr(self, 'action', None) == 'list':
             qs = qs.exclude(category__name='Legacy Catalog')
         category = self.request.query_params.get('category')

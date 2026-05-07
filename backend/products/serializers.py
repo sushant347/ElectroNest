@@ -84,6 +84,34 @@ class ProductSerializer(serializers.ModelSerializer):
         )
 
 
+class ProductCompactSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    average_rating = serializers.SerializerMethodField(read_only=True)
+    review_count = serializers.SerializerMethodField(read_only=True)
+    rating_count = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'sku', 'name', 'category', 'category_name', 'supplier', 'supplier_name',
+            'brand', 'owner_name', 'selling_price', 'cost_price', 'discount_price',
+            'stock', 'reorder_level', 'units_sold', 'image_url',
+            'average_rating', 'review_count', 'rating_count', 'created_at', 'updated_at',
+        ]
+
+    def get_average_rating(self, obj):
+        value = getattr(obj, 'average_rating', None)
+        return round(float(value), 1) if value is not None else 0
+
+    def get_review_count(self, obj):
+        return int(getattr(obj, 'review_count', 0) or 0)
+
+    def get_rating_count(self, obj):
+        sold = int(getattr(obj, 'units_sold', 0) or 0)
+        return int(sold * 0.8) if sold > 0 else self.get_review_count(obj)
+
+
 class ReviewSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField(read_only=True)
     product_name  = serializers.CharField(source='product.name', read_only=True)

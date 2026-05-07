@@ -882,7 +882,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   // Fetch same-category products for "You May Also Like" (least sold first)
   useEffect(() => {
     if (!product?.categoryId) return;
-    customerAPI.getProducts({ category: product.categoryId, page_size: 20 })
+    customerAPI.getProducts({ category: product.categoryId, page_size: 20, compact: 1 })
       .then((res) => {
         const all = (res.data?.results || res.data || []).map(normalize);
         // Exclude the current product, sort by unitsSold ascending (least sold first)

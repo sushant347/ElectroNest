@@ -17,7 +17,7 @@ export default function InventoryManagement() {
     setLoading(true);
     setError('');
     try {
-      const params = { page, page_size: 20 };
+      const params = { page, page_size: 20, compact: 1 };
       if (search) params.search = search;
       const res = await warehouseAPI.getProducts(params);
       const data = res.data;
