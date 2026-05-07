@@ -11,8 +11,8 @@ const NAV_LINKS = [
   { label: 'Contact Us', path: '/support/contact' },
 ]
 const CATALOG_CATEGORIES = [
-  'Smartphones', 'Laptops', 'Gaming', 'Tablets', 'Smart Home', 'Headphones',
-  'Display', 'Cameras', 'Drones', 'Smart Watches', 'Speakers', 'Accessories',
+  'Smartphones', 'Laptops', 'Monitors', 'Tablets', 'Drones', 'Smartwatches',
+  'PC Builds', 'Speakers', 'Earbuds', 'Headphones', 'Cameras', 'Gaming Consoles',
 ]
 const uniqueByName = (items) => {
   const seen = new Set()

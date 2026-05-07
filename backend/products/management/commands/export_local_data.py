@@ -72,6 +72,24 @@ class Command(BaseCommand):
                 'FROM Products',
                 'Products', self.stdout)
 
+            core_data['product_variants'] = _fetch(cur,
+                'SELECT VariantID AS id, ProductID AS product_id, VariantTitle AS title, '
+                'VariantSKU AS sku, VariantColor AS color, VariantSpecs AS specs, '
+                'VariantPrice AS price, VariantDiscountPrice AS discount_price, '
+                'VariantStock AS stock, SourceVariantID AS source_id, IsDefault AS is_default, '
+                'IsActive AS is_active, CreatedAt AS created_at, UpdatedAt AS updated_at '
+                'FROM ProductVariants',
+                'ProductVariants', self.stdout)
+
+            core_data['market_price_snapshots'] = _fetch(cur,
+                'SELECT SnapshotID AS id, ProductID AS product_id, SnapshotMonth AS month, '
+                'MarketPrice AS market_price, LowestMarketPrice AS lowest_market_price, '
+                'HighestMarketPrice AS highest_market_price, VolatilityPercent AS volatility_percent, '
+                'Source AS source, CurrencyNote AS currency_note, OffersJSON AS offers_json, '
+                'FetchedAt AS fetched_at '
+                'FROM MarketPriceSnapshots',
+                'MarketPriceSnapshots', self.stdout)
+
             transactional_data['customers'] = _fetch(cur,
                 'SELECT CustomerID, FirstName, LastName, Email, Phone, Gender, '
                 'DateOfBirth, RegistrationDate, isActive, Password '

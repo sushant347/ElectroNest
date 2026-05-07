@@ -34,30 +34,30 @@ const productNameKey = (name = '') => name
   .toLowerCase()
 
 const CATALOG_CATEGORIES = [
-  'Smartphones', 'Laptops', 'Gaming', 'Tablets', 'Smart Home', 'Headphones',
-  'Display', 'Cameras', 'Drones', 'Smart Watches', 'Speakers', 'Accessories',
+  'Smartphones', 'Laptops', 'Monitors', 'Tablets', 'Drones', 'Smartwatches',
+  'PC Builds', 'Speakers', 'Earbuds', 'Headphones', 'Cameras', 'Gaming Consoles',
 ]
 
 const HERO_SLIDES = [
   { badge: '💻 Work Ready', title: 'Power Through With Laptops', sub: 'Portable performance for study, creative work and business', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', img: imgLaptops },
   { badge: '📱 Fresh Picks', title: 'Find Your Next Smartphone', sub: 'Flagship cameras, smooth displays and all-day batteries', cat: 'Smartphones', bg: 'linear-gradient(135deg,#f0f9ff,#e0f2fe)', img: imgSmartphones },
-  { badge: '🖥️ Desk Upgrade', title: 'Sharper Displays For Every Setup', sub: 'Gaming, creator and office displays with crisp detail', cat: 'Display', bg: 'linear-gradient(135deg,#f8fafc,#e2e8f0)', img: imgMonitors },
+  { badge: '🖥️ Desk Upgrade', title: 'Sharper Monitors For Every Setup', sub: 'Gaming, creator and office displays with crisp detail', cat: 'Monitors', bg: 'linear-gradient(135deg,#f8fafc,#e2e8f0)', img: imgMonitors },
   { badge: '📟 Portable Screens', title: 'Tablets For Work And Play', sub: 'Lightweight tablets for notes, streaming and multitasking', cat: 'Tablets', bg: 'linear-gradient(135deg,#ecfeff,#cffafe)', img: imgTablets },
   { badge: '🔊 Room-Filling Sound', title: 'Speakers That Bring The Bass', sub: 'Compact, wireless and smart speakers for every room', cat: 'Speakers', bg: 'linear-gradient(135deg,#fff7ed,#fed7aa)', img: imgSpeakers },
   { badge: '🎧 Audio Essentials', title: 'Headphones Built For Focus', sub: 'Comfortable sound for music, calls and long sessions', cat: 'Headphones', bg: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', img: imgHeadphones },
-  { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'Gaming', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: imgGaming },
-  { badge: '⌚ Most Popular', title: 'Wear the Future on Your Wrist', sub: 'Smart watches for fitness, work and everyday style', cat: 'Smart Watches', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', img: imgWatch },
+  { badge: '🎮 Trending', title: 'Level Up Your Gaming Setup', sub: 'Consoles, accessories and gaming peripherals', cat: 'PC Builds', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', img: imgGaming },
+  { badge: '⌚ Most Popular', title: 'Wear the Future on Your Wrist', sub: 'Smart watches for fitness, work and everyday style', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', img: imgWatch },
   { badge: '📷 New Arrival', title: 'Capture Every Moment', sub: 'Professional cameras & lenses for every photographer', cat: 'Cameras', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', img: imgCamera },
   { badge: '🚁 Trending Now', title: 'Take Flight With Drones', sub: 'Aerial cameras and compact drones', cat: 'Drones', bg: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', img: imgDrone },
 ]
 
 const SIDE = [
   { eyebrow: 'Trend Devices', title: 'Latest Laptops', cat: 'Laptops', bg: 'linear-gradient(135deg,#eef2ff,#dbeafe)', emoji: '💻', img: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=600&auto=format' },
-  { eyebrow: 'Desk Ready', title: 'Displays', cat: 'Display', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', ec: '#16a34a', emoji: '🖥️' },
-  { eyebrow: 'Most Popular', title: 'Popular Watches', cat: 'Smart Watches', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', ec: '#F97316', emoji: '⌚' },
+  { eyebrow: 'Desk Ready', title: 'Monitors', cat: 'Monitors', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', ec: '#16a34a', emoji: '🖥️' },
+  { eyebrow: 'Most Popular', title: 'Popular Watches', cat: 'Smartwatches', bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)', ec: '#F97316', emoji: '⌚' },
 ]
 
-function getCatEmoji(n) { return { Smartphones: '📱', Laptops: '💻', Display: '🖥️', Tablets: '📟', Drones: '🚁', 'Smart Watches': '⌚', Gaming: '🎮', Speakers: '🔊', Accessories: '🔌', Headphones: '🎧', Cameras: '📷', 'Smart Home': '🏠' }[n] || '📦' }
+function getCatEmoji(n) { return { Smartphones: '📱', Laptops: '💻', Monitors: '🖥️', Tablets: '📟', Drones: '🚁', Smartwatches: '⌚', 'PC Builds': '🧩', Speakers: '🔊', Earbuds: '🎧', Headphones: '🎧', Cameras: '📷', 'Gaming Consoles': '🎮' }[n] || '📦' }
 
 function shouldUseContainInCard(categoryName = '', productName = '') {
   return /smartphones|headphones|earbuds|smartwatches|tablets|pc builds|speakers/i.test(categoryName)
@@ -72,16 +72,16 @@ function cardObjectPosition(categoryName = '', productName = '') {
 const CAT_IMGS = {
   Smartphones:    'https://applefun.com.ua/upload/2025-09/0-apple-iphone-17-pro-max-256gb-cosmic-orange-11757497912.webp',
   Laptops:        'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=600&auto=format',
-  Display:        'https://media.us.lg.com/transform/ecomm-PDPGallery-1100x730/e64bb88d-49a1-4f54-a9dc-de6dd1b33714/md08003935-DZ-07-jpg',
+  Monitors:       'https://media.us.lg.com/transform/ecomm-PDPGallery-1100x730/e64bb88d-49a1-4f54-a9dc-de6dd1b33714/md08003935-DZ-07-jpg',
   Tablets:        'https://static1.anpoimages.com/wordpress/wp-content/uploads/2023/08/samsung-galaxy-tab-s9-ultra-plants.jpg',
   Drones:         'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTuLYKV8ecGw76FaI258F0yz1VSIe2e4b_H2w&s',
-  'Smart Watches': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQmhDiLgjN7ncyoUlQlnhYuS2BLjDl72u_xVQ&s',
-  Gaming:         'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=600&auto=format',
-  'Smart Home':   'https://images.unsplash.com/photo-1558002038-1055907df827?w=600&auto=format',
+  Smartwatches:   'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQmhDiLgjN7ncyoUlQlnhYuS2BLjDl72u_xVQ&s',
+  'PC Builds':    'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=600&auto=format',
   Speakers:       'https://www.apple.com/newsroom/images/2024/07/apple-introduces-homepod-mini-in-midnight/article/Apple-HomePod-mini-midnight_inline.jpg.large_2x.jpg',
+  Earbuds:         'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=600&auto=format',
   Headphones:      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format',
   Cameras:         'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format',
-  Accessories:    'https://images.unsplash.com/photo-1625842268584-8f3296236761?w=600&auto=format',
+  'Gaming Consoles': 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=600&auto=format',
 }
 
 /* Star rating — SVG-based filled / half / empty stars */

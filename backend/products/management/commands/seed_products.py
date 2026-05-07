@@ -7,7 +7,7 @@ import json
 import os
 from django.core.management.base import BaseCommand
 from django.db import connection
-from products.models import Category, Supplier, Product
+from products.models import Category, Supplier, Product, ProductVariant, MarketPriceSnapshot
 
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), 'seed_data.json')
@@ -101,6 +101,52 @@ class Command(BaseCommand):
             f'Products: {len(new_products)} created, {len(products_to_update)} updated'
         ))
 
+        product_ids = set(Product.objects.values_list('id', flat=True))
+
+        # ── Product variants ──
+        ProductVariant.objects.all().delete()
+        variants = []
+        for v in data.get('product_variants', []):
+            if v['product_id'] not in product_ids:
+                continue
+            variants.append(ProductVariant(
+                id=v['id'],
+                product_id=v['product_id'],
+                title=_text(v.get('title')),
+                sku=_text(v.get('sku')),
+                color=_text(v.get('color')),
+                specs=_text(v.get('specs')),
+                price=_number(v.get('price'), '0.00'),
+                discount_price=v.get('discount_price'),
+                stock=_number(v.get('stock')),
+                source_id=_text(v.get('source_id')),
+                is_default=bool(v.get('is_default')),
+                is_active=bool(v.get('is_active', True)),
+            ))
+        ProductVariant.objects.bulk_create(variants, ignore_conflicts=True, batch_size=500)
+        self.stdout.write(self.style.SUCCESS(f'ProductVariants: {len(variants)} imported'))
+
+        # ── Market price snapshots for price history/comparison ──
+        MarketPriceSnapshot.objects.all().delete()
+        snapshots = []
+        for s in data.get('market_price_snapshots', []):
+            if s['product_id'] not in product_ids:
+                continue
+            snapshots.append(MarketPriceSnapshot(
+                id=s['id'],
+                product_id=s['product_id'],
+                month=s.get('month'),
+                market_price=s.get('market_price'),
+                lowest_market_price=s.get('lowest_market_price'),
+                highest_market_price=s.get('highest_market_price'),
+                volatility_percent=_number(s.get('volatility_percent'), '0.00'),
+                source=_text(s.get('source')),
+                currency_note=_text(s.get('currency_note')),
+                offers_json=_text(s.get('offers_json') or '[]'),
+            ))
+        MarketPriceSnapshot.objects.bulk_create(snapshots, ignore_conflicts=True, batch_size=500)
+        self.stdout.write(self.style.SUCCESS(f'MarketPriceSnapshots: {len(snapshots)} imported'))
+
         # ── OrderStatus ──
         from orders.models import OrderStatus
         for name in ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned', 'Refunded']:
@@ -123,6 +169,8 @@ class Command(BaseCommand):
                 ('"Categories"', 'CategoryID'),
                 ('"Suppliers"',  'SupplierID'),
                 ('"Products"',   'ProductID'),
+                ('"ProductVariants"', 'VariantID'),
+                ('"MarketPriceSnapshots"', 'SnapshotID'),
                 ('"OrderStatus"', 'OrderStatusID'),
                 ('"PaymentMethods"', 'MethodID'),
             ]:
