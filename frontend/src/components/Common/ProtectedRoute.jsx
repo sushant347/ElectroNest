@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { CenteredSkeleton } from './SkeletonLoader';
+import config from '../../Config/Config';
 
 /**
  * ProtectedRoute — wraps routes that require a specific role.
@@ -22,7 +23,7 @@ export default function ProtectedRoute({ allowedRoles, children }) {
   }
 
   // Not logged in → go to login
-  if (!user) {
+  if (!user || !localStorage.getItem(config.AUTH_TOKEN_KEY)) {
     return <Navigate to="/login" replace />;
   }
 

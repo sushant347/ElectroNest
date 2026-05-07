@@ -2,6 +2,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import config from '../Config/Config';
+import { clearApiCache } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -109,12 +110,14 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (userData) => {
+    clearApiCache();
     const normalized = normalizeUser(userData);
     setUser(normalized);
     localStorage.setItem('customer_user', JSON.stringify(normalized));
   };
 
   const logout = () => {
+    clearApiCache();
     setUser(null);
     localStorage.removeItem('customer_user');
     localStorage.removeItem(config.AUTH_TOKEN_KEY);

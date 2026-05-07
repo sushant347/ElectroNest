@@ -9,6 +9,7 @@ import { CenteredSkeleton } from './components/Common/SkeletonLoader'
 import ErrorBoundary from './components/Common/ErrorBoundary'
 import { useAuth } from './context/AuthContext'
 import { customerAPI } from './services/api'
+import config from './Config/Config'
 
 const cleanVariantTitle = (title) => /^option\s+\d+$/i.test(String(title || '').trim())
   ? 'Product Details'
@@ -73,7 +74,8 @@ const TermsOfService = lazy(() => import('./pages/Support/TermsOfService'))
 function LoginRoute() {
   const { user, initialized } = useAuth()
   if (!initialized) return null
-  if (user) {
+  const hasToken = Boolean(localStorage.getItem(config.AUTH_TOKEN_KEY))
+  if (user && hasToken) {
     const roleHome = {
       customer: '/',
       owner: '/owner/dashboard',
@@ -89,7 +91,8 @@ function LoginRoute() {
 function HomeRoute(props) {
   const { user, initialized } = useAuth()
   if (!initialized) return null
-  if (user && user.role !== 'customer') {
+  const hasToken = Boolean(localStorage.getItem(config.AUTH_TOKEN_KEY))
+  if (user && hasToken && user.role !== 'customer') {
     const roleHome = {
       owner: '/owner/dashboard',
       warehouse: '/warehouse/dashboard',

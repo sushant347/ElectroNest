@@ -105,6 +105,8 @@ const clearGetCache = () => {
   } catch { /* ignore storage access errors */ }
 };
 
+export const clearApiCache = clearGetCache;
+
 const decodeJwtPayload = (token) => {
   if (!token) return null;
   const parts = token.split('.');
@@ -166,6 +168,7 @@ const processQueue = (error, token = null) => {
 };
 
 function clearAuthAndRedirect() {
+  clearGetCache();
   localStorage.removeItem(config.AUTH_TOKEN_KEY);
   localStorage.removeItem(config.REFRESH_TOKEN_KEY);
   localStorage.removeItem('customer_user');
@@ -209,12 +212,20 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
+        const userBeforeRefresh = localStorage.getItem('customer_user');
         const refreshPayload = decodeJwtPayload(refreshToken);
         const isCustomer = refreshPayload?.user_type === 'customer';
         const refreshUrl = isCustomer
           ? `${config.API_BASE_URL}/auth/refresh-customer/`
           : `${config.API_BASE_URL}/auth/refresh/`;
         const { data } = await axios.post(refreshUrl, { refresh: refreshToken });
+        const currentRefresh = localStorage.getItem(config.REFRESH_TOKEN_KEY);
+        const currentUser = localStorage.getItem('customer_user');
+        if (currentRefresh !== refreshToken || currentUser !== userBeforeRefresh) {
+          const staleError = new Error('Stale auth refresh ignored');
+          processQueue(staleError, null);
+          return Promise.reject(staleError);
+        }
         const newAccessToken = data.access;
         localStorage.setItem(config.AUTH_TOKEN_KEY, newAccessToken);
         if (data.refresh) {
