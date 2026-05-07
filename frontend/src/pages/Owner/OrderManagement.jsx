@@ -15,6 +15,8 @@ const statusColors = {
 
 const paymentMethodLabel = (order) => {
   const method = (order.payment_method || '').trim();
+  if (method === 'BankTransfer' || method === 'Bank Transfer') return 'Bank';
+  if (method === 'Cash on Delivery') return 'Cash';
   if (method && method !== 'N/A' && method.toLowerCase() !== 'pending') return method;
   return 'Payment not recorded';
 };

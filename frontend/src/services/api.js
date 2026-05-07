@@ -2,7 +2,7 @@ import axios from 'axios';
 import config from '../Config/Config';
 
 const GET_CACHE_TTL = 90_000;
-const GET_CACHE_VERSION = 'sqlserver-local-v2';
+const GET_CACHE_VERSION = 'sqlserver-local-v4';
 const GET_CACHE_PREFIX = `api:${GET_CACHE_VERSION}:`;
 const LEGACY_GET_CACHE_PREFIX = 'api:';
 const getCache = new Map();

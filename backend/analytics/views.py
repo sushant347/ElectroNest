@@ -75,6 +75,16 @@ def revenue_expr():
     return ExpressionWrapper(F('quantity') * F('unit_price'), output_field=DecimalField(max_digits=14, decimal_places=2))
 
 
+def _payment_method_label(name):
+    if name in ('BankTransfer', 'Bank Transfer'):
+        return 'Bank'
+    if name in ('eSewa', 'ESewa'):
+        return 'Esewa'
+    if name == 'Cash on Delivery':
+        return 'Cash'
+    return name or 'Unknown'
+
+
 def _owner_filtered_details(request, qs):
     store = get_owner_store_name(request.user)
     if not store:
@@ -245,19 +255,30 @@ class PaymentMethodsView(APIView):
         days      = int(request.query_params.get('days', 3650))
         from_date = timezone.now() - timedelta(days=days)
 
-        from orders.models import Payment
-        data = (
-            Payment.objects
-            .filter(paid_at__gte=from_date)
-            .values('method__name')
-            .annotate(value=Sum('payable_amount'))
+        detail_qs = (
+            OrderDetail.objects
+            .filter(order__order_date__gte=from_date, order__payments__isnull=False)
+            .exclude(order__order_status__name='Cancelled')
+        )
+        detail_qs = _owner_filtered_details(request, detail_qs)
+        rows = (
+            detail_qs
+            .values('order__payments__method__name')
+            .annotate(value=Sum(revenue_expr()))
             .order_by('-value')
         )
 
-        return Response([{
-            'name':  item['method__name'],
-            'value': float(item['value'] or 0),
-        } for item in data])
+        totals = {}
+        for item in rows:
+            label = _payment_method_label(item['order__payments__method__name'])
+            totals[label] = totals.get(label, 0.0) + float(item['value'] or 0)
+
+        preferred_order = {'Cash': 0, 'Esewa': 1, 'Khalti': 2, 'Bank': 3}
+        return Response([
+            {'name': name, 'value': round(value, 2)}
+            for name, value in sorted(totals.items(), key=lambda kv: (preferred_order.get(kv[0], 99), kv[0]))
+            if value > 0
+        ])
 
 
 class OrderStatusView(APIView):

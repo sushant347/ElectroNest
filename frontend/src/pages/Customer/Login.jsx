@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, MapPin, ArrowRight, Phone, Calendar, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -51,7 +52,7 @@ export default function Login() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -155,6 +156,7 @@ export default function Login() {
       }
     }
 
+    logout();
     setIsLoading(true);
 
     try {
@@ -181,7 +183,9 @@ export default function Login() {
       // Normalize field names (backend uses snake_case, frontend uses camelCase)
       if (userData.first_name && !userData.firstName) userData.firstName = userData.first_name;
       if (userData.last_name && !userData.lastName) userData.lastName = userData.last_name;
-      login(userData);
+      flushSync(() => {
+        login(userData);
+      });
       if (userData.role === 'warehouse') prewarmWarehouseEntry();
       if (userData.role === 'admin') prewarmAdminEntry();
       if (userData.role === 'customer') prewarmCustomerEntry();

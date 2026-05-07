@@ -114,6 +114,16 @@ const paymentMethods = [
   },
 ];
 
+const DEFAULT_PAYMENT_METHOD_IDS = { esewa: 4, khalti: 5, bank: 6, cod: 1 };
+const paymentMethodKeyFromName = (name = '') => {
+  const normalized = String(name).trim().toLowerCase().replace(/\s+/g, '');
+  if (normalized.includes('esewa')) return 'esewa';
+  if (normalized.includes('khalti')) return 'khalti';
+  if (normalized.includes('bank')) return 'bank';
+  if (normalized.includes('cash') || normalized === 'cod') return 'cod';
+  return null;
+};
+
 /* ── Styles ──────────────────────────────────────────────── */
 const s = {
   page: {
@@ -556,6 +566,7 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
 
   const [form, setForm] = useState(emptyForm);
   const [paymentMethod, setPaymentMethod] = useState(null);
+  const [paymentMethodIds, setPaymentMethodIds] = useState(DEFAULT_PAYMENT_METHOD_IDS);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedSavedId, setSelectedSavedId] = useState(null);
@@ -617,6 +628,20 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
         }));
       }
     }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    customerAPI.getPaymentMethods()
+      .then((res) => {
+        const rows = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+        const next = { ...DEFAULT_PAYMENT_METHOD_IDS };
+        rows.forEach((method) => {
+          const key = paymentMethodKeyFromName(method.name);
+          if (key && method.id) next[key] = method.id;
+        });
+        setPaymentMethodIds(next);
+      })
+      .catch(() => {});
   }, []);
 
   /* -- pre-fill contact info from stored customer session -- */
@@ -900,11 +925,9 @@ const Checkout = ({ cartItems = [], selectedIds = [], onPaymentSuccess }) => {
         orderData.coupon_code = appliedCoupon.code;
       }
 
-      // Map frontend payment method to backend payment method ID
-      // DB: Cash=1, CreditCard=2, DebitCard=3, Esewa=4, Khalti=5, BankTransfer=6
-      const methodMap = { esewa: 4, khalti: 5, bank: 6, cod: 1 };
-      if (paymentMethod && methodMap[paymentMethod]) {
-        orderData.method_id = methodMap[paymentMethod];
+      // Map frontend payment choice to the real backend PaymentMethod ID for the active database.
+      if (paymentMethod && paymentMethodIds[paymentMethod]) {
+        orderData.method_id = paymentMethodIds[paymentMethod];
       }
       
       const response = await customerAPI.placeOrder(orderData);
