@@ -24,6 +24,12 @@ const uniqueByName = (items) => {
   })
 }
 
+const getCachedVisibleCategories = () => {
+  const cached = customerAPI.peekCategories?.()
+  const data = cached?.results || cached || []
+  return uniqueByName(data.filter(cat => CATALOG_CATEGORIES.includes(cat.name)))
+}
+
 export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount = 0, user = null }) {
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchVal, setSearchVal] = useState('')
@@ -48,13 +54,12 @@ export default function Navbar({ cartCount = 0, wishlistCount = 0, compareCount 
   const { logout } = useAuth()
 
   useEffect(() => {
-    const cached = customerAPI.peekCategories?.()
-    if (cached) {
-      const data = cached.results || cached || []
-      const visible = uniqueByName(data.filter(cat => CATALOG_CATEGORIES.includes(cat.name)))
+    queueMicrotask(() => {
+      const visible = getCachedVisibleCategories()
+      if (!visible.length) return
       setCategories(visible)
-      if (visible.length > 0) setHovCat(visible[0])
-    }
+      setHovCat(prev => prev || visible[0])
+    })
     customerAPI.getCategories().then(res => {
       const data = res.data?.results || res.data || []
       const visible = uniqueByName(data.filter(cat => CATALOG_CATEGORIES.includes(cat.name)))

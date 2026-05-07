@@ -96,28 +96,39 @@ WSGI_APPLICATION = 'page.wsgi.application'
 import dj_database_url
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
+USE_LOCAL_SQLSERVER = os.environ.get('USE_LOCAL_SQLSERVER', '').lower() in ('1', 'true', 'yes', 'on')
 
-if DATABASE_URL:
-    # Cloud: Neon PostgreSQL — conn_max_age=0 required for Neon's pgBouncer pooling
+
+def sqlserver_database_config():
+    return {
+        'ENGINE': 'mssql',
+        'NAME': os.environ.get('SQLSERVER_NAME', 'ElectroNestDB'),
+        'HOST': os.environ.get('SQLSERVER_HOST', r'localhost\SQLEXPRESS'),
+        'PORT': os.environ.get('SQLSERVER_PORT', ''),
+        'CONN_MAX_AGE': int(os.environ.get('SQLSERVER_CONN_MAX_AGE', '60')),
+        'OPTIONS': {
+            'driver': os.environ.get('SQLSERVER_DRIVER', 'ODBC Driver 17 for SQL Server'),
+            'trusted_connection': os.environ.get('SQLSERVER_TRUSTED_CONNECTION', 'yes'),
+            'extra_params': os.environ.get(
+                'SQLSERVER_EXTRA_PARAMS',
+                'Encrypt=no;TrustServerCertificate=yes',
+            ),
+        },
+    }
+
+
+if DATABASE_URL and not USE_LOCAL_SQLSERVER:
+    # Cloud/hosted default: Neon PostgreSQL. conn_max_age=0 is required for Neon's pgBouncer pooling.
     DATABASES = {
         'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=0, ssl_require=True)
     }
 else:
-    # Local: SQL Server Express (unchanged)
     DATABASES = {
-        'default': {
-            'ENGINE': 'mssql',
-            'NAME': 'ElectroNestDB',
-            'HOST': '.\\SQLEXPRESS',
-            'PORT': '',
-            'CONN_MAX_AGE': 60,
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'trusted_connection': 'yes',
-                'extra_params': 'TrustServerCertificate=yes;Encrypt=no',
-            },
-        }
+        'default': sqlserver_database_config()
     }
+
+    if DATABASE_URL:
+        DATABASES['neon'] = dj_database_url.config(default=DATABASE_URL, conn_max_age=0, ssl_require=True)
 
 
 # Password validation
