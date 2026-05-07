@@ -3,7 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from django.db.models import Sum, Count, F, Q
+from django.core.cache import cache
+from django.db.models import Sum, Count, F, Q, Prefetch
 from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
@@ -36,6 +37,46 @@ def _line_item_store_name(product, product_id_fallback=None):
     if sku:
         return f'Store · SKU {sku}'
     return f'Store · product #{product.id}'
+
+
+def _dashboard_product_for_detail(detail):
+    product = getattr(detail, 'product', None)
+    if getattr(getattr(product, 'category', None), 'name', '') == 'Legacy Catalog':
+        return display_product_for_detail(detail)
+    return product
+
+
+def _dashboard_order_payload(order, date_field='order_date'):
+    details = list(order.details.all())
+    items = []
+    display_total = 0.0
+
+    for detail in details:
+        product = _dashboard_product_for_detail(detail)
+        unit_price = getattr(product, 'selling_price', detail.unit_price) if product else detail.unit_price
+        display_total += float(unit_price * detail.quantity)
+        if len(items) < 5:
+            items.append({
+                'product_name': product.name if product else f'Product #{detail.product_id}',
+                'quantity': detail.quantity,
+                'product_id': product.id if product else detail.product_id,
+            })
+
+    customer = getattr(order, 'customer', None)
+    first_name = getattr(customer, 'first_name', '') or ''
+    last_name = getattr(customer, 'last_name', '') or ''
+    order_date = getattr(order, date_field, None)
+
+    return {
+        'id': order.id,
+        'order_number': order.order_number,
+        'status': order.order_status.name if order.order_status else '',
+        'customer_name': f"{first_name} {last_name}".strip() or 'Customer',
+        'total_amount': display_total,
+        'date': order_date.isoformat() if order_date else '',
+        'items': items,
+        'items_count': getattr(order, 'detail_count', len(details)),
+    }
 
 
 class IsWarehouseOrOwner(IsAuthenticated):
@@ -169,128 +210,89 @@ class WarehouseDashboardView(APIView):
     permission_classes = [IsWarehouseOrOwner]
 
     def get(self, request):
+        cached = cache.get('warehouse:dashboard:v4')
+        if cached is not None:
+            return Response(cached)
+
         visible_products  = Product.objects.exclude(category__name='Legacy Catalog')
-        total_products    = visible_products.count()
-        total_stock       = visible_products.aggregate(t=Sum('stock'))['t'] or 0
-        low_stock_count   = visible_products.filter(stock__lte=F('reorder_level')).count()
+        product_totals = visible_products.aggregate(
+            total_products=Count('id'),
+            total_stock=Sum('stock'),
+            low_stock_count=Count('id', filter=Q(stock__lte=F('reorder_level'))),
+        )
+        total_products    = product_totals['total_products'] or 0
+        total_stock       = product_totals['total_stock'] or 0
+        low_stock_count   = product_totals['low_stock_count'] or 0
         pending_pos       = PurchaseOrder.objects.filter(order_status__name='Pending').count()
 
-        low_stock_items = list(visible_products.filter(
-            stock__lte=F('reorder_level')
-        ).select_related('category')[:10])
+        low_stock_data = list(
+            visible_products
+            .filter(stock__lte=F('reorder_level'))
+            .select_related('category')
+            .values('id', 'name', 'sku', 'stock', 'reorder_level', 'brand', category_name=F('category__name'))[:10]
+        )
 
-        low_stock_data = [{
-            'id': p.id,
-            'name': p.name,
-            'sku': p.sku,
-            'stock': p.stock,
-            'reorder_level': p.reorder_level,
-            'category_name': p.category.name if p.category else '',
-            'brand': p.brand,
-        } for p in low_stock_items]
+        recent_pos = (
+            PurchaseOrder.objects
+            .select_related('supplier', 'order_status')
+            .annotate(detail_count=Count('details'))
+            .order_by('-created_at')[:10]
+        )
+        recent_pos_data = [{
+            'id': po.id,
+            'supplier_name': po.supplier.name if po.supplier else '',
+            'status_name': po.order_status.name if po.order_status else 'Unknown',
+            'total_amount': float(po.total_amount or 0),
+            'details': [None] * (po.detail_count or 0),
+        } for po in recent_pos]
 
-        recent_pos = PurchaseOrder.objects.select_related(
-            'supplier', 'order_status'
-        ).order_by('-created_at')[:10]
+        order_details_prefetch = Prefetch(
+            'details',
+            queryset=OrderDetail.objects.select_related('product__category', 'product__supplier'),
+        )
 
         # Recent customer orders (Pending/Processing) that warehouse needs to handle
-        recent_customer_orders = []
         pending_processing = (
             Order.objects
             .filter(order_status__name__in=['Pending', 'Processing'])
             .select_related('customer', 'order_status')
+            .prefetch_related(order_details_prefetch)
             .annotate(detail_count=Count('details'))
             .filter(detail_count__gt=0)
             .order_by('-order_date')[:10]
         )
-        for o in pending_processing:
-            items = []
-            for d in o.details.select_related('product')[:5]:
-                try:
-                    product = display_product_for_detail(d)
-                    items.append({
-                        'product_name': product.name,
-                        'quantity': d.quantity,
-                        'product_id': product.id,
-                    })
-                except Exception:
-                    items.append({
-                        'product_name': f'Product #{d.product_id}',
-                        'quantity': d.quantity,
-                        'product_id': d.product_id,
-                    })
-            display_total = sum(
-                float((display_product_for_detail(d).selling_price if display_product_for_detail(d) else d.unit_price) * d.quantity)
-                for d in o.details.select_related('product__category', 'product__supplier').all()
-            )
-            recent_customer_orders.append({
-                'id': o.id,
-                'order_number': o.order_number,
-                'status': o.order_status.name if o.order_status else '',
-                'customer_name': f"{o.customer.first_name} {o.customer.last_name}",
-                'total_amount': display_total,
-                'date': o.order_date.isoformat() if o.order_date else '',
-                'items': items,
-                'items_count': o.detail_count,
-            })
+        recent_customer_orders = [_dashboard_order_payload(o, 'order_date') for o in pending_processing]
 
         # Shipped orders ready to deliver (only those with order details)
-        ready_to_deliver = []
         shipped_orders = (
             Order.objects
             .filter(order_status__name='Shipped')
             .select_related('customer', 'order_status')
+            .prefetch_related(order_details_prefetch)
             .annotate(detail_count=Count('details'))
             .filter(detail_count__gt=0)
             .order_by('-updated_at')[:10]
         )
-        for o in shipped_orders:
-            items = []
-            for d in o.details.select_related('product')[:5]:
-                try:
-                    product = display_product_for_detail(d)
-                    items.append({
-                        'product_name': product.name,
-                        'quantity': d.quantity,
-                        'product_id': product.id,
-                    })
-                except Exception:
-                    items.append({
-                        'product_name': f'Product #{d.product_id}',
-                        'quantity': d.quantity,
-                        'product_id': d.product_id,
-                    })
-            display_total = sum(
-                float((display_product_for_detail(d).selling_price if display_product_for_detail(d) else d.unit_price) * d.quantity)
-                for d in o.details.select_related('product__category', 'product__supplier').all()
-            )
-            ready_to_deliver.append({
-                'id': o.id,
-                'order_number': o.order_number,
-                'status': o.order_status.name if o.order_status else '',
-                'customer_name': f"{o.customer.first_name} {o.customer.last_name}",
-                'total_amount': display_total,
-                'date': o.updated_at.isoformat() if o.updated_at else '',
-                'items': items,
-                'items_count': o.detail_count,
-            })
+        ready_to_deliver = [_dashboard_order_payload(o, 'updated_at') for o in shipped_orders]
 
         # Count of shipped orders ready to deliver
         shipped_count = Order.objects.filter(
             order_status__name='Shipped'
         ).annotate(detail_count=Count('details')).filter(detail_count__gt=0).count()
 
-        return Response({
+        data = {
             'total_products':   total_products,
             'total_stock':      total_stock,
             'low_stock_count':  low_stock_count,
             'pending_purchase_orders': pending_pos,
             'low_stock_items':  low_stock_data,
-            'recent_purchase_orders': PurchaseOrderSerializer(recent_pos, many=True).data,
+            'recent_purchase_orders': recent_pos_data,
             'recent_customer_orders': recent_customer_orders,
             'ready_to_deliver': ready_to_deliver,
             'shipped_count': shipped_count,
-        })
+        }
+        cache.set('warehouse:dashboard:v4', data, 120)
+        return Response(data)
 
 
 class StockMovementsView(APIView):
@@ -298,6 +300,11 @@ class StockMovementsView(APIView):
     permission_classes = [IsWarehouseOrOwner]
 
     def get(self, request):
+        section = (request.query_params.get('section') or 'all').strip().lower()
+        valid_sections = {'all', 'purchase_orders', 'shipped_orders', 'product_updates'}
+        if section not in valid_sections:
+            section = 'all'
+
         # Customer orders: `days=30|90|…` limits by order_date; `days=0` or `lifetime` = no date filter (full history).
         days_raw = (request.query_params.get('days') or '90').strip().lower()
         order_since = None
@@ -311,11 +318,24 @@ class StockMovementsView(APIView):
             order_days = max(1, min(order_days, 3660))
             order_since = timezone.now() - timedelta(days=order_days)
 
+        customer_orders = []
+        enriched_pos = []
+        store_commission = {}
+        product_updates = []
+        try:
+            row_limit = int(request.query_params.get('limit') or 120)
+        except (TypeError, ValueError):
+            row_limit = 120
+        row_limit = max(20, min(row_limit, 300))
+        cache_key = f'warehouse:stock_movements:v4:{section}:{days_raw}:{row_limit}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         # 1. Customer orders (scoped by selected period in DB — not filtered only on the client)
         # Include all statuses except Cancelled — stock is deducted when order is placed
         active_statuses = OrderStatus.objects.exclude(name='Cancelled')
-        customer_orders = []
-        if active_statuses.exists():
+        if section in ('all', 'shipped_orders') and active_statuses.exists():
             status_ids = list(active_statuses.values_list('id', flat=True))
             order_q = Q(order_status_id__in=status_ids)
             if order_since is not None:
@@ -328,7 +348,7 @@ class StockMovementsView(APIView):
                     'details__product__supplier',
                     'payments__method',
                 )
-                .order_by('-order_date', '-id')
+                .order_by('-order_date', '-id')[:row_limit]
             )
             for o in orders:
                 items = []
@@ -385,127 +405,128 @@ class StockMovementsView(APIView):
                     'payment_status': 'Completed' if payment else 'Pending',
                 })
 
-        all_pos_qs = PurchaseOrder.objects.all()
-        if order_since is not None:
-            all_pos_qs = all_pos_qs.filter(created_at__gte=order_since)
-            
-        all_pos = (
-            all_pos_qs
-            .select_related('supplier', 'order_status')
-            .prefetch_related('details__product__supplier')
-            .order_by('-created_at')[:50]
-        )
+        if section in ('all', 'purchase_orders'):
+            all_pos_qs = PurchaseOrder.objects.all()
+            if order_since is not None:
+                all_pos_qs = all_pos_qs.filter(created_at__gte=order_since)
 
-        enriched_pos = []
-        # Commission logic:
-        #   Normal shipping  → 10% of product selling_price + shipping_cost
-        #   Free shipping    → 12% of product selling_price
-        store_commission = {}  # { store_name: { product_revenue, shipping_revenue, commission, orders } }
+            all_pos = (
+                all_pos_qs
+                .select_related('supplier', 'order_status')
+                .prefetch_related('details__product__supplier')
+                .order_by('-created_at')[:50]
+            )
 
-        for po in all_pos:
-            po_items = []
-            po_product_ids = []
-            for d in po.details.all():
-                product = display_product_for_purchase_detail(d)
-                po_product_ids.append(product.id)
-                po_items.append({
-                    'product_id': product.id,
-                    'product_name': product.name,
-                    'product_image': product.image_url or '',
-                    'product_owner': _line_item_store_name(product, d.product_id),
-                    'product_price': float(product.selling_price),
-                    'quantity': d.quantity,
-                    'unit_cost': float(product.cost_price),
-                    'total_cost': float(d.quantity * product.cost_price),
+            # Commission logic:
+            #   Normal shipping  → 10% of product selling_price + shipping_cost
+            #   Free shipping    → 12% of product selling_price
+            store_commission = {}  # { store_name: { product_revenue, shipping_revenue, commission, orders } }
+
+            for po in all_pos:
+                po_items = []
+                po_product_ids = []
+                for d in po.details.all():
+                    product = display_product_for_purchase_detail(d)
+                    po_product_ids.append(product.id)
+                    po_items.append({
+                        'product_id': product.id,
+                        'product_name': product.name,
+                        'product_image': product.image_url or '',
+                        'product_owner': _line_item_store_name(product, d.product_id),
+                        'product_price': float(product.selling_price),
+                        'quantity': d.quantity,
+                        'unit_cost': float(product.cost_price),
+                        'total_cost': float(d.quantity * product.cost_price),
+                    })
+
+                # Find originating customer order: Order with same products, created close to PO
+                originating_order = None
+                customer_name = 'N/A'
+                order_number = ''
+                order_id = None
+                order_status_name = ''
+                shipping_cost = 0.0
+                order_total = 0.0
+
+                if po_product_ids:
+                    # Look for the most recent order containing any of these products within ±1 day
+                    window_start = po.created_at - timedelta(days=1)
+                    window_end = po.created_at + timedelta(days=1)
+                    candidate = (
+                        Order.objects
+                        .filter(
+                            details__product_id__in=po_product_ids,
+                            order_date__range=(window_start, window_end)
+                        )
+                        .select_related('customer', 'order_status')
+                        .order_by('-order_date')
+                        .first()
+                    )
+                    if candidate:
+                        originating_order = candidate
+                        customer_name = f"{candidate.customer.first_name} {candidate.customer.last_name}"
+                        order_number = candidate.order_number
+                        order_id = candidate.id
+                        order_status_name = candidate.order_status.name if candidate.order_status else ''
+                        shipping_cost = float(getattr(candidate, 'shipping_cost', 0) or 0)
+                        order_total = 0.0
+                        for detail in candidate.details.select_related('product__category', 'product__supplier').all():
+                            product = display_product_for_detail(detail)
+                            unit_price = product.selling_price if product else detail.unit_price
+                            order_total += float(unit_price * detail.quantity)
+
+                po_status = po.order_status.name if po.order_status else 'Unknown'
+                store_names_in_po = list(dict.fromkeys(
+                    i['product_owner'] for i in po_items if i.get('product_owner')
+                ))
+                store_label = ', '.join(store_names_in_po) if store_names_in_po else 'No store on line items'
+
+                enriched_pos.append({
+                    'id': po.id,
+                    'supplier_name': po.supplier.name if po.supplier else '',
+                    'status_name': po_status,
+                    'total_amount': float(po.total_amount or 0),
+                    'order_date': po.order_date.isoformat() if po.order_date else '',
+                    'store_name': store_label,
+                    # Originating customer order info
+                    'customer_name': customer_name,
+                    'customer_order_id': order_id,
+                    'customer_order_number': order_number,
+                    'customer_order_status': order_status_name,
+                    'shipping_cost': shipping_cost,
+                    'order_total': order_total,
+                    'items': po_items,
+                    'items_count': len(po_items),
                 })
 
-            # Find originating customer order: Order with same products, created close to PO
-            originating_order = None
-            customer_name = 'N/A'
-            order_number = ''
-            order_id = None
-            order_status_name = ''
-            shipping_cost = 0.0
-            order_total = 0.0
+                # Commission calculation per store — only for Shipped or Delivered orders
+                if order_status_name in ('Shipped', 'Delivered'):
+                    is_free_shipping = shipping_cost == 0
+                    for item in po_items:
+                        sname = item['product_owner'] or 'Unassigned'
+                        if sname not in store_commission:
+                            store_commission[sname] = {
+                                'product_revenue': 0.0,
+                                'shipping_revenue': 0.0,
+                                'commission': 0.0,
+                                'free_shipping_commission': 0.0,
+                                'orders': 0,
+                            }
+                        item_total = item['product_price'] * item['quantity']
+                        store_commission[sname]['product_revenue'] += item_total
+                        store_commission[sname]['orders'] += 1
 
-            if po_product_ids:
-                # Look for the most recent order containing any of these products within ±1 day
-                window_start = po.created_at - timedelta(days=1)
-                window_end = po.created_at + timedelta(days=1)
-                candidate = (
-                    Order.objects
-                    .filter(
-                        details__product_id__in=po_product_ids,
-                        order_date__range=(window_start, window_end)
-                    )
-                    .select_related('customer', 'order_status')
-                    .order_by('-order_date')
-                    .first()
-                )
-                if candidate:
-                    originating_order = candidate
-                    customer_name = f"{candidate.customer.first_name} {candidate.customer.last_name}"
-                    order_number = candidate.order_number
-                    order_id = candidate.id
-                    order_status_name = candidate.order_status.name if candidate.order_status else ''
-                    shipping_cost = float(getattr(candidate, 'shipping_cost', 0) or 0)
-                    order_total = sum(
-                        float((display_product_for_detail(detail).selling_price if display_product_for_detail(detail) else detail.unit_price) * detail.quantity)
-                        for detail in candidate.details.select_related('product__category', 'product__supplier').all()
-                    )
-
-            po_status = po.order_status.name if po.order_status else 'Unknown'
-            store_names_in_po = list(dict.fromkeys(
-                i['product_owner'] for i in po_items if i.get('product_owner')
-            ))
-            store_label = ', '.join(store_names_in_po) if store_names_in_po else 'No store on line items'
-
-            enriched_pos.append({
-                'id': po.id,
-                'supplier_name': po.supplier.name if po.supplier else '',
-                'status_name': po_status,
-                'total_amount': float(po.total_amount or 0),
-                'order_date': po.order_date.isoformat() if po.order_date else '',
-                'store_name': store_label,
-                # Originating customer order info
-                'customer_name': customer_name,
-                'customer_order_id': order_id,
-                'customer_order_number': order_number,
-                'customer_order_status': order_status_name,
-                'shipping_cost': shipping_cost,
-                'order_total': order_total,
-                'items': po_items,
-                'items_count': len(po_items),
-            })
-
-            # Commission calculation per store — only for Shipped or Delivered orders
-            if order_status_name in ('Shipped', 'Delivered'):
-                is_free_shipping = shipping_cost == 0
-                for item in po_items:
-                    sname = item['product_owner'] or 'Unassigned'
-                    if sname not in store_commission:
-                        store_commission[sname] = {
-                            'product_revenue': 0.0,
-                            'shipping_revenue': 0.0,
-                            'commission': 0.0,
-                            'free_shipping_commission': 0.0,
-                            'orders': 0,
-                        }
-                    item_total = item['product_price'] * item['quantity']
-                    store_commission[sname]['product_revenue'] += item_total
-                    store_commission[sname]['orders'] += 1
-
-                    if is_free_shipping:
-                        # 12% of product price if free shipping
-                        comm = item_total * 0.12
-                        store_commission[sname]['free_shipping_commission'] += comm
-                        store_commission[sname]['commission'] += comm
-                    else:
-                        # 10% of product price + shipping per item
-                        shipping_per_item = shipping_cost / max(len(po_items), 1)
-                        comm = item_total * 0.10 + shipping_per_item
-                        store_commission[sname]['shipping_revenue'] += shipping_per_item
-                        store_commission[sname]['commission'] += comm
+                        if is_free_shipping:
+                            # 12% of product price if free shipping
+                            comm = item_total * 0.12
+                            store_commission[sname]['free_shipping_commission'] += comm
+                            store_commission[sname]['commission'] += comm
+                        else:
+                            # 10% of product price + shipping per item
+                            shipping_per_item = shipping_cost / max(len(po_items), 1)
+                            comm = item_total * 0.10 + shipping_per_item
+                            store_commission[sname]['shipping_revenue'] += shipping_per_item
+                            store_commission[sname]['commission'] += comm
 
         # Round commission values
         for sname in store_commission:
@@ -514,24 +535,25 @@ class StockMovementsView(APIView):
                     store_commission[sname][k] = round(store_commission[sname][k], 2)
 
         # 3. Recently updated products (stock changes by owners)
-        recent_products_qs = Product.objects.exclude(category__name='Legacy Catalog')
-        if order_since is not None:
-            recent_products_qs = recent_products_qs.filter(updated_at__gte=order_since)
-            
-        recent_products = (
-            recent_products_qs
-            .select_related('category')
-            .order_by('-updated_at')[:20]
-        )
-        product_updates = [{
-            'id': p.id,
-            'name': p.name,
-            'owner_name': p.owner_name or '',
-            'stock': p.stock,
-            'reorder_level': p.reorder_level,
-            'category': p.category.name if p.category else '',
-            'date': p.updated_at.isoformat() if p.updated_at else '',
-        } for p in recent_products]
+        if section in ('all', 'product_updates'):
+            recent_products_qs = Product.objects.exclude(category__name='Legacy Catalog')
+            if order_since is not None:
+                recent_products_qs = recent_products_qs.filter(updated_at__gte=order_since)
+
+            recent_products = (
+                recent_products_qs
+                .select_related('category')
+                .order_by('-updated_at')[:20]
+            )
+            product_updates = [{
+                'id': p.id,
+                'name': p.name,
+                'owner_name': p.owner_name or '',
+                'stock': p.stock,
+                'reorder_level': p.reorder_level,
+                'category': p.category.name if p.category else '',
+                'date': p.updated_at.isoformat() if p.updated_at else '',
+            } for p in recent_products]
 
         # Aggregate shipping cost by store
         store_shipping_summary = {}
@@ -541,10 +563,12 @@ class StockMovementsView(APIView):
                 store_shipping_summary.get(store, 0) + ord_data.get('shipping_cost', 0)
             )
 
-        return Response({
+        data = {
             'shipped_orders': customer_orders,
             'enriched_purchase_orders': enriched_pos,
             'product_updates': product_updates,
             'store_shipping_summary': store_shipping_summary,
             'store_commission': store_commission,
-        })
+        }
+        cache.set(cache_key, data, 90)
+        return Response(data)

@@ -35,4 +35,12 @@ else
   echo "=== Skipping seed data. Set RUN_SEED_DATA=true for one deploy if seeding is needed. ==="
 fi
 
+if [ "${RUN_SYNC_MARKET_VARIANTS:-true}" = "true" ]; then
+  export DATABASE_URL=${DIRECT_URL:-$DATABASE_URL}
+  echo "=== Syncing market-offer variants and enforcing 5-15% price advantage ==="
+  python manage.py sync_market_offer_variants \
+    && echo "=== sync_market_offer_variants: OK ===" \
+    || echo "=== WARNING: sync_market_offer_variants failed — check logs above ==="
+fi
+
 echo "=== Build complete ==="

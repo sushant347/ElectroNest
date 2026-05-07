@@ -27,6 +27,20 @@ const ORDER_STATUS_COLORS = {
 };
 
 const PIE_COLORS = ['#F97316', '#7C3AED', '#16A34A', '#2563EB', '#DB2777', '#0891B2', '#D97706', '#6366F1', '#059669', '#DC2626'];
+const EMPTY_MOVEMENTS = {
+  shipped_orders: [],
+  enriched_purchase_orders: [],
+  product_updates: [],
+  store_shipping_summary: {},
+  store_commission: {},
+};
+const buildStockMovementParams = (section, days = 90) => ({ section, days });
+const hasMovementRows = (movements, section) => {
+  if (section === 'purchase_orders') return (movements.enriched_purchase_orders || []).length > 0;
+  if (section === 'shipped_orders') return (movements.shipped_orders || []).length > 0;
+  if (section === 'product_updates') return (movements.product_updates || []).length > 0;
+  return false;
+};
 
 /* ── SVG Donut Chart for Warehouse Commission (with hover tooltip) ── */
 function polarToCartesian(cx, cy, r, angleDeg) {
@@ -272,8 +286,11 @@ function StoreShippingChart({ summary }) {
 }
 
 export default function StockMovements() {
-  const [movements, setMovements] = useState({ shipped_orders: [], enriched_purchase_orders: [], product_updates: [], store_shipping_summary: {}, store_commission: {} });
-  const [loading, setLoading] = useState(true);
+  const initialMovementsRef = useRef(warehouseAPI.peekStockMovements?.(buildStockMovementParams('purchase_orders', 90)) || null);
+  const [movements, setMovements] = useState(() => ({ ...EMPTY_MOVEMENTS, ...(initialMovementsRef.current || {}) }));
+  const movementsRef = useRef({ ...EMPTY_MOVEMENTS, ...(initialMovementsRef.current || {}) });
+  const [loading, setLoading] = useState(!initialMovementsRef.current);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('purchase_orders');
@@ -289,10 +306,15 @@ export default function StockMovements() {
   const [coMovementsLoading, setCoMovementsLoading] = useState(false);
   const coOrderDaysRef = useRef(90);
   const coPeriodFilterBoot = useRef(false);
+  const loadedTabs = useRef(new Set(initialMovementsRef.current ? ['purchase_orders'] : []));
 
   const CO_PER_PAGE = 20;
   /** Store dropdown shows at most this many names (top by activity); "All Stores" still lists every store in the table. */
   const STORE_FILTER_LIMIT = 10;
+
+  useEffect(() => {
+    movementsRef.current = movements;
+  }, [movements]);
 
   useEffect(() => {
     coOrderDaysRef.current = coOrderDays;
@@ -300,17 +322,18 @@ export default function StockMovements() {
 
   const fetchMovementsOnly = useCallback(async () => {
     const days = coOrderDaysRef.current;
-    setCoMovementsLoading(true);
+    const params = buildStockMovementParams('shipped_orders', days);
+    const cached = warehouseAPI.peekStockMovements?.(params);
+    if (cached) {
+      setMovements(prev => ({ ...prev, ...(cached || {}) }));
+      loadedTabs.current.add('shipped_orders');
+    }
+    setCoMovementsLoading(!cached);
     setError('');
-    setMovements((prev) => ({
-      ...prev,
-      shipped_orders: [],
-      store_shipping_summary: {},
-      store_commission: {},
-    }));
     try {
-      const movRes = await warehouseAPI.getStockMovements({ days });
-      setMovements(movRes.data || {});
+      const movRes = await warehouseAPI.getStockMovements(params);
+      setMovements(prev => ({ ...prev, ...(movRes.data || {}) }));
+      loadedTabs.current.add('shipped_orders');
     } catch (err) {
       console.error('getStockMovements failed:', err?.response?.data || err?.message);
       setError('Failed to load customer orders for the selected period.');
@@ -319,25 +342,47 @@ export default function StockMovements() {
     }
   }, []);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (section = 'purchase_orders', force = true) => {
+    const days = coOrderDaysRef.current;
+    const params = buildStockMovementParams(section, days);
+    const cached = warehouseAPI.peekStockMovements?.(params);
+    if (cached) {
+      setMovements(prev => ({ ...prev, ...(cached || {}) }));
+      loadedTabs.current.add(section);
+      setLoading(false);
+    }
+    if (!force && loadedTabs.current.has(section)) return;
+    if (!cached && !hasMovementRows(movementsRef.current, section)) setLoading(true);
+    setRefreshing(true);
     setError('');
     try {
-      const days = coOrderDaysRef.current;
-      const movRes = await warehouseAPI.getStockMovements({ days }).catch((err) => {
+      const movRes = await warehouseAPI.getStockMovements(params).catch((err) => {
         console.error('getStockMovements failed:', err?.response?.data || err?.message);
         return { data: {} };
       });
-      setMovements(movRes.data || {});
+      setMovements(prev => ({ ...prev, ...(movRes.data || {}) }));
+      loadedTabs.current.add(section);
     } catch (err) {
       console.error('Failed to fetch stock movements:', err);
       setError('Failed to load stock movements.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData('purchase_orders', !initialMovementsRef.current); }, [fetchData]);
+
+  const openTab = (key) => {
+    setActiveTab(key);
+    setSearch('');
+    setPoStoreFilter('all');
+    setPoStatusFilter('all');
+    setCoStatusFilter('all');
+    setCoStoreFilter('all');
+    setCoPage(1);
+    fetchData(key, false);
+  };
 
   useEffect(() => {
     if (!coPeriodFilterBoot.current) {
@@ -353,13 +398,14 @@ export default function StockMovements() {
     return `No customer orders in the last ${coOrderDays} days`;
   }, [coOrderDays]);
 
+  const showSkeleton = loading && !hasMovementRows(movements, activeTab);
 
   const handleMarkDelivered = async (orderId) => {
     setDeliveringId(orderId);
     try {
       await warehouseAPI.markOrderDelivered(orderId);
       setViewOrder(null);
-      fetchData();
+      fetchData(activeTab);
     } catch (err) {
       alert(err.response?.data?.detail || 'Failed to mark as delivered');
     } finally {
@@ -518,7 +564,9 @@ export default function StockMovements() {
           <h1 className="sm-title"><Truck size={24} /> Stock Movements</h1>
           <p className="sm-subtitle">Track all stock movements: incoming, outgoing, and product updates</p>
         </div>
-        <button className="sm-refresh" onClick={fetchData}><RefreshCw size={16} /> Refresh</button>
+        <button className="sm-refresh" onClick={() => fetchData(activeTab)} disabled={refreshing}>
+          <RefreshCw size={16} className={refreshing ? 'spin' : ''} /> Refresh
+        </button>
       </div>
 
       {/* Main Tabs */}
@@ -527,7 +575,7 @@ export default function StockMovements() {
           <button
             key={t.key}
             className={`sm-tab ${activeTab === t.key ? 'active' : ''}`}
-            onClick={() => { setActiveTab(t.key); setSearch(''); setPoStoreFilter('all'); setPoStatusFilter('all'); setCoStatusFilter('all'); setCoStoreFilter('all'); setCoPage(1); }}
+            onClick={() => openTab(t.key)}
             title={t.desc}
           >
             {t.key === 'purchase_orders' && <ArrowDownLeft size={15} />}
@@ -623,9 +671,9 @@ export default function StockMovements() {
         )}
       </div>
 
-      {error && <div className="sm-error"><AlertCircle size={16} /> {error} <button onClick={fetchData} className="sm-retry">Retry</button></div>}
+      {error && <div className="sm-error"><AlertCircle size={16} /> {error} <button onClick={() => fetchData(activeTab)} className="sm-retry">Retry</button></div>}
 
-      {loading ? (
+      {showSkeleton ? (
         activeTab === 'shipped_orders' ? (
           <div className="sm-table-wrap sm-shimmer-table-wrap">
             <table className="sm-table">
@@ -798,7 +846,7 @@ export default function StockMovements() {
           )}
 
           {/* Commission Chart — on Purchase Orders tab */}
-          {activeTab === 'purchase_orders' && !loading && commissionData.length > 0 && (
+          {activeTab === 'purchase_orders' && !showSkeleton && commissionData.length > 0 && (
             <CommissionPieChart data={commissionData} />
           )}
 

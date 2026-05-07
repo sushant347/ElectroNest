@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Package, TrendingUp, AlertTriangle, Truck, RefreshCw, AlertCircle, Eye } from 'lucide-react';
 import { warehouseAPI } from '../../services/api';
 import { HeaderSkeleton, CardGridSkeleton } from '../../components/Common/SkeletonLoader';
@@ -7,17 +7,23 @@ import { HeaderSkeleton, CardGridSkeleton } from '../../components/Common/Skelet
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
 export default function WarehouseDashboard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const initialDashboardRef = useRef(warehouseAPI.peekDashboard?.() || null);
+  const dataRef = useRef(initialDashboardRef.current);
+  const [data, setData] = useState(initialDashboardRef.current);
+  const [loading, setLoading] = useState(!initialDashboardRef.current);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [shippedOrders, setShippedOrders] = useState([]);
+  const [shippedOrders, setShippedOrders] = useState(initialDashboardRef.current?.ready_to_deliver || []);
   const [viewOrder, setViewOrder] = useState(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async ({ background = false } = {}) => {
+    const hasUsableData = Boolean(dataRef.current);
+    if (!background && !hasUsableData) setLoading(true);
+    if (background || hasUsableData) setRefreshing(true);
     setError('');
     try {
       const dashRes = await warehouseAPI.getDashboard();
+      dataRef.current = dashRes.data;
       setData(dashRes.data);
       // Use ready_to_deliver from the dashboard API (server-side filtered with real details)
       setShippedOrders(dashRes.data?.ready_to_deliver || []);
@@ -26,16 +32,17 @@ export default function WarehouseDashboard() {
       setError('Failed to load dashboard data. Make sure the backend server is running.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 60000);
+    fetchData({ background: Boolean(dataRef.current) });
+    const interval = setInterval(() => fetchData({ background: true }), 60000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div style={{ padding: '28px 32px 40px', maxWidth: 1400, margin: '0 auto' }}>
         <HeaderSkeleton titleWidth={240} subtitleWidth={280} />
@@ -47,14 +54,14 @@ export default function WarehouseDashboard() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
         <div style={{ textAlign: 'center', maxWidth: 420 }}>
           <AlertCircle size={40} color="#EF4444" />
           <h3 style={{ color: '#1F2937', margin: '12px 0 6px' }}>Failed to Load</h3>
           <p style={{ color: '#6B7280', fontSize: '0.88rem', marginBottom: 16 }}>{error}</p>
-          <button onClick={fetchData} style={{ padding: '10px 24px', background: '#F97316', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => fetchData()} style={{ padding: '10px 24px', background: '#F97316', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <RefreshCw size={16} /> Retry
           </button>
         </div>
@@ -74,7 +81,7 @@ export default function WarehouseDashboard() {
             <h1 className="wh-page-title">Warehouse Dashboard</h1>
             <p className="wh-page-subtitle">Real-time inventory overview & analytics</p>
           </div>
-          <button className="wh-refresh-btn" onClick={fetchData} title="Refresh data"><RefreshCw size={16} /></button>
+          <button className="wh-refresh-btn" onClick={() => fetchData({ background: true })} title="Refresh data" disabled={refreshing}><RefreshCw size={16} className={refreshing ? 'spin' : ''} /></button>
         </div>
 
         <div className="wh-stats-grid">
@@ -230,6 +237,8 @@ export default function WarehouseDashboard() {
         .wh-page-title { margin: 0; font-size: 1.6rem; font-weight: 800; color: #111827; }
         .wh-page-subtitle { margin: 4px 0 0 0; font-size: 0.88rem; color: #6B7280; }
         .wh-refresh-btn { width: 38px; height: 38px; border-radius: 10px; border: 1px solid #E5E7EB; background: white; color: #6B7280; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+        .spin { animation: spinAnim 1s linear infinite; }
+        @keyframes spinAnim { from { transform: rotate(0); } to { transform: rotate(360deg); } }
         .wh-refresh-btn:hover { border-color: #F97316; color: #F97316; }
         .wh-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 28px; }
         .wh-bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }

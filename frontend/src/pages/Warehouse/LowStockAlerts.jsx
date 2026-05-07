@@ -1,30 +1,43 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertTriangle, RefreshCw, AlertCircle, Package, Send, CheckCircle } from 'lucide-react';
 import { warehouseAPI } from '../../services/api';
 import { CardGridSkeleton } from '../../components/Common/SkeletonLoader';
 
 export default function LowStockAlerts() {
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialAlertsRef = useRef(warehouseAPI.peekLowStockProducts?.() || null);
+  const [alerts, setAlerts] = useState(initialAlertsRef.current || []);
+  const alertsRef = useRef(initialAlertsRef.current || []);
+  const [loading, setLoading] = useState(!initialAlertsRef.current);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [notifying, setNotifying] = useState({});
   const [notified, setNotified] = useState({});
 
-  const fetchAlerts = useCallback(async () => {
-    setLoading(true);
+  const fetchAlerts = useCallback(async ({ background = false } = {}) => {
+    const cached = warehouseAPI.peekLowStockProducts?.();
+    if (cached) {
+      alertsRef.current = cached;
+      setAlerts(cached);
+      setLoading(false);
+    } else if (!background && alertsRef.current.length === 0) {
+      setLoading(true);
+    }
+    setRefreshing(true);
     setError('');
     try {
       const res = await warehouseAPI.getLowStockProducts();
+      alertsRef.current = res.data || [];
       setAlerts(res.data || []);
     } catch (err) {
       console.error('Failed to fetch low stock alerts:', err);
       setError('Failed to load low stock data.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
+  useEffect(() => { fetchAlerts({ background: alertsRef.current.length > 0 }); }, [fetchAlerts]);
 
   const handleNotifyOwner = async (productId, productName) => {
     setNotifying(prev => ({ ...prev, [productId]: true }));
@@ -45,14 +58,16 @@ export default function LowStockAlerts() {
           <h1 className="lsa-title"><AlertTriangle size={24} color="#D97706" /> Low Stock Alerts</h1>
           <p className="lsa-subtitle">{alerts.length} products at or below reorder level</p>
         </div>
-        <button className="lsa-refresh" onClick={fetchAlerts}><RefreshCw size={16} /> Refresh</button>
+        <button className="lsa-refresh" onClick={() => fetchAlerts({ background: true })} disabled={refreshing}>
+          <RefreshCw size={16} className={refreshing ? 'spin' : ''} /> Refresh
+        </button>
       </div>
 
       {error && (
-        <div className="lsa-error"><AlertCircle size={16} /> {error} <button onClick={fetchAlerts} className="lsa-retry">Retry</button></div>
+        <div className="lsa-error"><AlertCircle size={16} /> {error} <button onClick={() => fetchAlerts()} className="lsa-retry">Retry</button></div>
       )}
 
-      {loading ? (
+      {loading && alerts.length === 0 ? (
         <CardGridSkeleton cards={6} columns="repeat(auto-fill, minmax(320px, 1fr))" minHeight={190} />
       ) : alerts.length === 0 ? (
         <div className="lsa-loading"><Package size={40} color="#16A34A" /><p style={{ color: '#16A34A', fontWeight: 600 }}>All products are well stocked!</p></div>

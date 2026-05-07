@@ -8,6 +8,8 @@ backend/media/
 backend/staticfiles/
 backend/data_backup.json
 backend/.env
+backend/*.log
+frontend/*.log
 
 # Node
 frontend/node_modules/

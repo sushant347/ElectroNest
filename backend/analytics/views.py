@@ -2,7 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from django.db.models import Sum, Count, Avg, F, Case, When, Value, DecimalField
+from django.core.cache import cache
+from django.db.models import Sum, Count, Avg, F, Case, When, Value, DecimalField, ExpressionWrapper
 from django.db.models.functions import TruncDay, TruncMonth
 from django.utils import timezone
 from datetime import timedelta
@@ -38,6 +39,23 @@ def _wants_meta(request):
     return raw in ('1', 'true', 'yes')
 
 
+def _cache_key(request, name, extra=''):
+    user = getattr(request, 'user', None)
+    role = getattr(user, 'role', 'customer')
+    uid = getattr(user, 'id', 'anon')
+    return f'analytics:{name}:{role}:{uid}:{extra}'
+
+
+def _cached_response(request, name, extra, builder, ttl=45):
+    key = _cache_key(request, name, extra)
+    cached = cache.get(key)
+    if cached is not None:
+        return Response(cached)
+    data = builder()
+    cache.set(key, data, ttl)
+    return Response(data)
+
+
 def safe_profit_expr():
     """
     Compute profit safely: quantity * (unit_price - bounded_cost_price).
@@ -51,6 +69,19 @@ def safe_profit_expr():
         output_field=DecimalField(),
     )
     return F('quantity') * (F('unit_price') - bounded_cost)
+
+
+def revenue_expr():
+    return ExpressionWrapper(F('quantity') * F('unit_price'), output_field=DecimalField(max_digits=14, decimal_places=2))
+
+
+def _owner_filtered_details(request, qs):
+    store = get_owner_store_name(request.user)
+    if not store:
+        store = request.query_params.get('owner_name', '').strip() or None
+    if store:
+        qs = qs.filter(product__owner_name__icontains=store)
+    return qs
 
 
 def _display_detail_totals(qs, store=None):
@@ -85,60 +116,48 @@ class SalesOverviewView(APIView):
 
     def get(self, request):
         days      = int(request.query_params.get('days', 3650))
-        now       = timezone.now()
-        from_date = now - timedelta(days=days)
-        prev_from = from_date - timedelta(days=days)
+        def build():
+            now       = timezone.now()
+            from_date = now - timedelta(days=days)
+            prev_from = from_date - timedelta(days=days)
 
-        store = get_owner_store_name(request.user)
+            base_qs = OrderDetail.objects.exclude(order__order_status__name='Cancelled')
+            curr_qs = _owner_filtered_details(request, base_qs.filter(order__order_date__gte=from_date))
+            prev_qs = _owner_filtered_details(request, base_qs.filter(order__order_date__gte=prev_from, order__order_date__lt=from_date))
 
-        # Compute revenue and profit from OrderDetails (accurate per-product)
-        curr_detail_qs = (
-            OrderDetail.objects
-            .filter(order__order_date__gte=from_date)
-            .exclude(order__order_status__name='Cancelled')
-        )
-        prev_detail_qs = (
-            OrderDetail.objects
-            .filter(order__order_date__gte=prev_from, order__order_date__lt=from_date)
-            .exclude(order__order_status__name='Cancelled')
-        )
-        curr_totals = _display_detail_totals(curr_detail_qs, store=store)
-        prev_totals = _display_detail_totals(prev_detail_qs, store=store)
+            curr = curr_qs.aggregate(
+                revenue=Sum(revenue_expr()),
+                profit=Sum(safe_profit_expr()),
+                orders=Count('order_id', distinct=True),
+                customers=Count('order__customer_id', distinct=True),
+            )
+            prev = prev_qs.aggregate(
+                revenue=Sum(revenue_expr()),
+                orders=Count('order_id', distinct=True),
+                customers=Count('order__customer_id', distinct=True),
+            )
 
-        curr_revenue = curr_totals['revenue']
-        curr_profit  = curr_totals['profit']
-        prev_revenue = prev_totals['revenue']
+            def pct_change(curr_value, prev_value):
+                curr_value = float(curr_value or 0)
+                prev_value = float(prev_value or 0)
+                return 0 if prev_value == 0 else round(((curr_value - prev_value) / prev_value) * 100, 1)
 
-        curr_orders    = len(curr_totals['order_ids'])
-        prev_orders    = len(prev_totals['order_ids'])
-        curr_customers = len(curr_totals['customer_ids'])
-        prev_customers = len(prev_totals['customer_ids'])
-
-        def pct_change(curr, prev):
-            if prev == 0:
-                return 0
-            return round(((curr - prev) / prev) * 100, 1)
-
-        # Total customers from legacy Customers table (single query)
-        from django.db.models import Count as _Count
-        cust_agg = Customer.objects.aggregate(
-            total=_Count('id'),
-            active=_Count(Case(When(is_active=True, then=Value(1)), output_field=DecimalField())),
-        )
-        total_db_customers = cust_agg['total']
-        active_db_customers = cust_agg['active']
-
-        return Response({
-            'total_revenue':    curr_revenue,
-            'total_profit':     curr_profit,
-            'total_orders':     curr_orders,
-            'total_customers':  total_db_customers,
-            'active_customers': active_db_customers,
-            'ordering_customers': curr_customers,
-            'revenue_change':   pct_change(curr_revenue, prev_revenue),
-            'orders_change':    pct_change(curr_orders, prev_orders),
-            'customers_change': pct_change(curr_customers, prev_customers),
-        })
+            cust_agg = Customer.objects.aggregate(
+                total=Count('id'),
+                active=Count(Case(When(is_active=True, then=Value(1)), output_field=DecimalField())),
+            )
+            return {
+                'total_revenue':    float(curr['revenue'] or 0),
+                'total_profit':     float(curr['profit'] or 0),
+                'total_orders':     curr['orders'] or 0,
+                'total_customers':  cust_agg['total'] or 0,
+                'active_customers': cust_agg['active'] or 0,
+                'ordering_customers': curr['customers'] or 0,
+                'revenue_change':   pct_change(curr['revenue'], prev['revenue']),
+                'orders_change':    pct_change(curr['orders'], prev['orders']),
+                'customers_change': pct_change(curr['customers'], prev['customers']),
+            }
+        return _cached_response(request, 'sales_overview', days, build)
 
 
 class RevenueTrendView(APIView):
@@ -147,44 +166,26 @@ class RevenueTrendView(APIView):
     def get(self, request):
         days   = int(request.query_params.get('days', 3650))
         period = request.query_params.get('period', 'daily')
-        from_date = timezone.now() - timedelta(days=days)
-
-        store = get_owner_store_name(request.user)
-        if not store:
-            store = request.query_params.get('owner_name', '').strip() or None
-        trunc = TruncDay if period == 'daily' else TruncMonth
-
-        # Compute both revenue and profit from OrderDetails (per-product accurate)
-        detail_qs = (
-            OrderDetail.objects
-            .filter(order__order_date__gte=from_date)
-            .exclude(order__order_status__name='Cancelled')
-        )
-        fmt = '%Y-%m-%d' if period == 'daily' else '%Y-%m'
-        buckets = {}
-        for detail in detail_qs.select_related('order', 'product__category', 'product__supplier'):
-            product = display_product_for_detail(detail)
-            if not product:
-                continue
-            if store and store.lower() not in (product.owner_name or '').lower():
-                continue
-            raw_period = detail.order.order_date.date().replace(day=1) if period == 'monthly' else detail.order.order_date.date()
-            if raw_period not in buckets:
-                buckets[raw_period] = {'revenue': 0.0, 'profit': 0.0, 'orders': set()}
-            qty = detail.quantity or 0
-            unit_price = float(product.selling_price or detail.unit_price or 0)
-            cost_price = min(max(float(product.cost_price or 0), 0), unit_price)
-            buckets[raw_period]['revenue'] += qty * unit_price
-            buckets[raw_period]['profit'] += qty * (unit_price - cost_price)
-            buckets[raw_period]['orders'].add(detail.order_id)
-
-        return Response([{
-            'period':  key.strftime(fmt),
-            'month':   key.strftime('%b %Y') if period == 'monthly' else key.strftime(fmt),
-            'revenue': round(value['revenue'], 2),
-            'profit':  round(value['profit'], 2),
-            'orders':  len(value['orders']),
-        } for key, value in sorted(buckets.items())])
+        def build():
+            from_date = timezone.now() - timedelta(days=days)
+            trunc = TruncDay if period == 'daily' else TruncMonth
+            fmt = '%Y-%m-%d' if period == 'daily' else '%Y-%m'
+            detail_qs = _owner_filtered_details(request, OrderDetail.objects.filter(order__order_date__gte=from_date).exclude(order__order_status__name='Cancelled'))
+            rows = (
+                detail_qs
+                .annotate(period_value=trunc('order__order_date'))
+                .values('period_value')
+                .annotate(revenue=Sum(revenue_expr()), profit=Sum(safe_profit_expr()), orders=Count('order_id', distinct=True))
+                .order_by('period_value')
+            )
+            return [{
+                'period':  row['period_value'].strftime(fmt),
+                'month':   row['period_value'].strftime('%b %Y') if period == 'monthly' else row['period_value'].strftime(fmt),
+                'revenue': round(float(row['revenue'] or 0), 2),
+                'profit':  round(float(row['profit'] or 0), 2),
+                'orders':  row['orders'] or 0,
+            } for row in rows]
+        return _cached_response(request, 'revenue_trend', f'{days}:{period}', build)
 
 
 class TopProductsView(APIView):
@@ -192,41 +193,27 @@ class TopProductsView(APIView):
 
     def get(self, request):
         days      = int(request.query_params.get('days', 3650))
-        from_date = timezone.now() - timedelta(days=days)
-
-        top_qs = (
-            OrderDetail.objects
-            .filter(order__order_date__gte=from_date)
-            .exclude(order__order_status__name='Cancelled')
-        )
-        store = get_owner_store_name(request.user)
-        if not store:
-            store = request.query_params.get('owner_name', '').strip() or None
-        product_map = {}
-        for detail in top_qs.select_related('product__category', 'product__supplier'):
-            product = display_product_for_detail(detail)
-            if not product:
-                continue
-            if store and store.lower() not in (product.owner_name or '').lower():
-                continue
-            key = product.id
-            if key not in product_map:
-                product_map[key] = {
-                    'product_id': product.id,
-                    'name': product.name,
-                    'brand': product.brand,
-                    'category': product.category.name if product.category else '',
-                    'owner_name': product.owner_name,
-                    'description': product.description,
-                    'image_url': product.image_url,
-                    'total_quantity_sold': 0,
-                    'total_revenue': 0.0,
-                }
-            product_map[key]['total_quantity_sold'] += detail.quantity or 0
-            product_map[key]['total_revenue'] += float((detail.quantity or 0) * (product.selling_price or detail.unit_price or 0))
-
-        data = sorted(product_map.values(), key=lambda item: item['total_revenue'], reverse=True)[:50]
-        return Response([{**item, 'rank': idx + 1} for idx, item in enumerate(data)])
+        def build():
+            from_date = timezone.now() - timedelta(days=days)
+            qs = _owner_filtered_details(request, OrderDetail.objects.filter(order__order_date__gte=from_date).exclude(order__order_status__name='Cancelled'))
+            rows = (
+                qs.values('product_id', 'product__name', 'product__brand', 'product__category__name', 'product__owner_name', 'product__description', 'product__image_url')
+                .annotate(total_quantity_sold=Sum('quantity'), total_revenue=Sum(revenue_expr()))
+                .order_by('-total_revenue')[:50]
+            )
+            return [{
+                'rank': idx + 1,
+                'product_id': row['product_id'],
+                'name': row['product__name'] or '',
+                'brand': row['product__brand'] or '',
+                'category': row['product__category__name'] or '',
+                'owner_name': row['product__owner_name'] or '',
+                'description': row['product__description'] or '',
+                'image_url': row['product__image_url'] or '',
+                'total_quantity_sold': row['total_quantity_sold'] or 0,
+                'total_revenue': float(row['total_revenue'] or 0),
+            } for idx, row in enumerate(rows)]
+        return _cached_response(request, 'top_products', days, build)
 
 
 class CategoryPerformanceView(APIView):
@@ -234,43 +221,21 @@ class CategoryPerformanceView(APIView):
 
     def get(self, request):
         days      = int(request.query_params.get('days', 3650))
-        from_date = timezone.now() - timedelta(days=days)
-
-        qs = (
-            OrderDetail.objects
-            .filter(order__order_date__gte=from_date)
-            .exclude(order__order_status__name='Cancelled')
-        )
-
-        # Owner sees only their own products' category performance
-        if hasattr(request, 'user') and request.user.is_authenticated and getattr(request.user, 'role', None) == 'owner':
-            store_name = f"{request.user.first_name} {request.user.last_name}".strip()
-            if store_name:
-                qs = qs.filter(product__owner_name__icontains=store_name)
-
-        category_map = {}
-        for detail in qs.select_related('product__category', 'product__supplier'):
-            product = display_product_for_detail(detail)
-            category = product.category.name if product and product.category else 'Uncategorized'
-            if category not in category_map:
-                category_map[category] = {
-                    'category_name': category,
-                    'total_revenue': 0.0,
-                    'order_ids': set(),
-                    'product_ids': set(),
-                }
-            category_map[category]['total_revenue'] += float((detail.quantity or 0) * (product.selling_price or detail.unit_price or 0))
-            category_map[category]['order_ids'].add(detail.order_id)
-            if product:
-                category_map[category]['product_ids'].add(product.id)
-
-        data = sorted(category_map.values(), key=lambda item: item['total_revenue'], reverse=True)
-        return Response([{
-            'category_name': item['category_name'],
-            'total_revenue': item['total_revenue'],
-            'total_orders': len(item['order_ids']),
-            'product_count': len(item['product_ids']),
-        } for item in data])
+        def build():
+            from_date = timezone.now() - timedelta(days=days)
+            qs = _owner_filtered_details(request, OrderDetail.objects.filter(order__order_date__gte=from_date).exclude(order__order_status__name='Cancelled'))
+            rows = (
+                qs.values('product__category__name')
+                .annotate(total_revenue=Sum(revenue_expr()), total_orders=Count('order_id', distinct=True), product_count=Count('product_id', distinct=True))
+                .order_by('-total_revenue')
+            )
+            return [{
+                'category_name': row['product__category__name'] or 'Uncategorized',
+                'total_revenue': float(row['total_revenue'] or 0),
+                'total_orders': row['total_orders'] or 0,
+                'product_count': row['product_count'] or 0,
+            } for row in rows]
+        return _cached_response(request, 'category_performance', days, build)
 
 
 class PaymentMethodsView(APIView):
@@ -319,22 +284,25 @@ class LowStockView(APIView):
     permission_classes = [IsOwnerOrAdmin]
 
     def get(self, request):
-        products = Product.objects.filter(stock__lte=F('reorder_level')).select_related('category')
-        store = get_owner_store_name(request.user)
-        if store:
-            products = products.filter(owner_name__icontains=store)
+        def build():
+            products = Product.objects.filter(stock__lte=F('reorder_level')).select_related('category')
+            store = get_owner_store_name(request.user)
+            if store:
+                products = products.filter(owner_name__icontains=store)
 
-        return Response([{
-            'id':            p.id,
-            'product_id':    p.id,
-            'name':          p.name,
-            'category_name': p.category.name if p.category else '',
-            'brand_name':    p.brand,
-            'owner_name':    p.owner_name,
-            'stock':         p.stock,
-            'stock_quantity': p.stock,
-            'reorder_level': p.reorder_level,
-        } for p in products])
+            return [{
+                'id':            p.id,
+                'product_id':    p.id,
+                'name':          p.name,
+                'category_name': p.category.name if p.category else '',
+                'brand_name':    p.brand,
+                'owner_name':    p.owner_name,
+                'stock':         p.stock,
+                'stock_quantity': p.stock,
+                'reorder_level': p.reorder_level,
+            } for p in products]
+
+        return _cached_response(request, 'low_stock', 'v2', build, ttl=120)
 
 
 class AnalyticsJobStatusView(APIView):

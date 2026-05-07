@@ -267,9 +267,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    fetchCustomers();
     return () => { if (refreshTimer) clearInterval(refreshTimer); };
-  }, [fetchData, fetchCustomers]);
+  }, [fetchData]);
 
   /* ── Export helper ── */
   const exportChart = (key) => {

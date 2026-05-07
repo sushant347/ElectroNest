@@ -3,7 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
-from django.db.models import Sum, Count, F, Q
+from django.core.cache import cache
+from django.db.models import Sum, Count, F, Q, DecimalField, ExpressionWrapper
 from django.db.models.functions import TruncDay
 from django.utils import timezone
 from datetime import timedelta
@@ -15,7 +16,6 @@ from .serializers import (AuditLogSerializer, AdminUserSerializer,
 from .permissions import IsAdminRole
 from accounts.models import CustomUser
 from products.models import Supplier, Customer
-from products.catalog_replacement import display_product_for_detail
 from orders.models import Order
 from rest_framework import serializers as drf_serializers
 
@@ -161,9 +161,12 @@ class AdminDashboardView(APIView):
         from products.models import Customer, Product, Category
         from orders.models import OrderDetail
 
+        cached = cache.get('admin:dashboard:v3')
+        if cached is not None:
+            return Response(cached)
+
         total_users      = CustomUser.objects.count()
         total_orders     = Order.objects.count()
-        total_revenue    = 0
         active_suppliers = Supplier.objects.filter(is_active=True).count()
 
         # ── Customer data from legacy Customers table ──
@@ -193,40 +196,30 @@ class AdminDashboardView(APIView):
             .order_by('-count')
         )
 
-        # ── Top products/category revenue, with retired order items displayed as new catalog products ──
-        detail_rows = (
-            OrderDetail.objects
-            .exclude(order__order_status__name='Cancelled')
-            .select_related('product__category', 'product__supplier')
-        )
-        top_map = {}
-        category_map = {}
-        for detail in detail_rows:
-            product = display_product_for_detail(detail)
-            if not product:
-                continue
-            revenue = float((detail.quantity or 0) * (product.selling_price or detail.unit_price or 0))
-            total_revenue += revenue
-            key = product.id
-            if key not in top_map:
-                top_map[key] = {
-                    'name': product.name,
-                    'brand': product.brand or '',
-                    'category': product.category.name if product.category else '',
-                    'revenue': 0.0,
-                    'units_sold': 0,
-                }
-            top_map[key]['revenue'] += revenue
-            top_map[key]['units_sold'] += detail.quantity or 0
-
-            category = product.category.name if product.category else 'Uncategorized'
-            category_map[category] = category_map.get(category, 0.0) + revenue
-
-        top_products = sorted(top_map.values(), key=lambda item: item['revenue'], reverse=True)[:5]
-        category_revenue = [
-            {'category': category, 'revenue': revenue}
-            for category, revenue in sorted(category_map.items(), key=lambda item: item[1], reverse=True)
-        ]
+        revenue_expr = ExpressionWrapper(F('quantity') * F('unit_price'), output_field=DecimalField(max_digits=14, decimal_places=2))
+        detail_rows = OrderDetail.objects.exclude(order__order_status__name='Cancelled')
+        total_revenue = float(detail_rows.aggregate(total=Sum(revenue_expr))['total'] or 0)
+        top_products = [{
+            'name': row['product__name'] or '',
+            'brand': row['product__brand'] or '',
+            'category': row['product__category__name'] or '',
+            'revenue': float(row['revenue'] or 0),
+            'units_sold': row['units_sold'] or 0,
+        } for row in (
+            detail_rows
+            .values('product_id', 'product__name', 'product__brand', 'product__category__name')
+            .annotate(revenue=Sum(revenue_expr), units_sold=Sum('quantity'))
+            .order_by('-revenue')[:5]
+        )]
+        category_revenue = [{
+            'category': row['product__category__name'] or 'Uncategorized',
+            'revenue': float(row['revenue'] or 0),
+        } for row in (
+            detail_rows
+            .values('product__category__name')
+            .annotate(revenue=Sum(revenue_expr))
+            .order_by('-revenue')
+        )]
 
         role_dist = (
             CustomUser.objects.values('role')
@@ -249,7 +242,7 @@ class AdminDashboardView(APIView):
         except Exception:
             recent_logs = []
 
-        return Response({
+        data = {
             'total_users':       total_users,
             'total_orders':      total_orders,
             'total_revenue':     float(total_revenue),
@@ -278,7 +271,9 @@ class AdminDashboardView(APIView):
                 'count': item['count'],
             } for item in reg_trend],
             'recent_activity': AuditLogSerializer(recent_logs, many=True).data,
-        })
+        }
+        cache.set('admin:dashboard:v3', data, 45)
+        return Response(data)
 
 
 class CustomerSerializer(drf_serializers.ModelSerializer):

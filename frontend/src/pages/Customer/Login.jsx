@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, MapPin, ArrowRight, Phone, Calendar, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { authAPI } from '../../services/api';
+import { authAPI, warehouseAPI } from '../../services/api';
 import config from '../../Config/Config';
 
 // Province/State data by country
@@ -14,6 +14,17 @@ const COUNTRY_CODES = [
   { code: '+977', country: 'Nepal', flag: '🇳🇵' },
   { code: '+91', country: 'India', flag: '🇮🇳' },
 ];
+
+const prewarmWarehouseEntry = () => {
+  Promise.allSettled([
+    warehouseAPI.getDashboard(),
+    import('../../components/warehouse/WarehouseLayout'),
+    import('../Warehouse/Dashboard'),
+  ]);
+  setTimeout(() => {
+    warehouseAPI.getNotifications().catch(() => {});
+  }, 1200);
+};
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -154,17 +165,16 @@ export default function Login() {
       if (userData.first_name && !userData.firstName) userData.firstName = userData.first_name;
       if (userData.last_name && !userData.lastName) userData.lastName = userData.last_name;
       login(userData);
+      if (userData.role === 'warehouse') prewarmWarehouseEntry();
 
       // ── Redirect based on role ──
-      if (userData.role === 'owner') {
-        navigate('/owner/dashboard');
-      } else if (userData.role === 'warehouse') {
-        navigate('/warehouse/dashboard');
-      } else if (userData.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/');
-      }
+      const roleHome = {
+        owner: '/owner/dashboard',
+        warehouse: '/warehouse/dashboard',
+        admin: '/admin/dashboard',
+        customer: '/',
+      };
+      navigate(roleHome[userData.role] || '/', { replace: true });
     } catch (err) {
       const status = err.response?.status;
       const raw = err.response?.data;

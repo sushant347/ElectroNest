@@ -12,7 +12,7 @@ from products.management.commands.import_gadgetbyte_catalog import (
     _stock_for,
     _discounted_price,
 )
-from products.models import Product, ProductVariant, MarketPriceSnapshot
+from products.models import Product, ProductVariant
 
 
 BLOCKED_SPEC_KEYS = {'source', 'source url', 'source_url'}
@@ -67,15 +67,6 @@ class Command(BaseCommand):
         variant_count = 0
         for product in products:
             seed = product.sku or product.id or product.name
-            latest_market = (
-                MarketPriceSnapshot.objects
-                .filter(product=product, market_price__isnull=False)
-                .order_by('-month')
-                .first()
-            )
-            if latest_market and latest_market.market_price:
-                product.selling_price = _discounted_price(latest_market.market_price, seed)
-                product.cost_price = max(Decimal('1.00'), (product.selling_price * Decimal('0.82')).quantize(Decimal('0.01')))
             product.stock = _stock_for(seed, min_stock, max_stock)
             product.reorder_level = min(6, max(1, product.stock // 3))
             product.owner_name = _owner_for(seed, owners)

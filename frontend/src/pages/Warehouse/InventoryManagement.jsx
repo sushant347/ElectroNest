@@ -1,37 +1,69 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Package, Search, RefreshCw, AlertCircle, ChevronDown } from 'lucide-react';
 import { warehouseAPI } from '../../services/api';
 import { TableSkeleton } from '../../components/Common/SkeletonLoader';
 
 const fmtNPR = (v) => `NPR ${Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const PAGE_SIZE = 20;
+const buildInventoryParams = (page, search) => {
+  const params = { page, page_size: PAGE_SIZE, compact: 1 };
+  if (search?.trim()) params.search = search.trim();
+  return params;
+};
 
 export default function InventoryManagement() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialParamsRef = useRef(buildInventoryParams(1, ''));
+  const initialProductsRef = useRef(warehouseAPI.peekProducts?.(initialParamsRef.current) || null);
+  const [products, setProducts] = useState(() => initialProductsRef.current?.results || initialProductsRef.current || []);
+  const productsRef = useRef(initialProductsRef.current?.results || initialProductsRef.current || []);
+  const [loading, setLoading] = useState(!initialProductsRef.current);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [totalPages, setTotalPages] = useState(() => (
+    initialProductsRef.current?.count ? Math.ceil(initialProductsRef.current.count / PAGE_SIZE) : 1
+  ));
 
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
+  const applyProducts = useCallback((data) => {
+    const rows = data.results || data || [];
+    productsRef.current = rows;
+    setProducts(rows);
+    if (data.count) setTotalPages(Math.ceil(data.count / PAGE_SIZE));
+  }, []);
+
+  const fetchProducts = useCallback(async ({ background = false } = {}) => {
+    const params = buildInventoryParams(page, debouncedSearch);
+    const cached = warehouseAPI.peekProducts?.(params);
+    if (cached) {
+      applyProducts(cached);
+      setLoading(false);
+    } else if (!background && productsRef.current.length === 0) {
+      setLoading(true);
+    }
+    setRefreshing(true);
     setError('');
     try {
-      const params = { page, page_size: 20, compact: 1 };
-      if (search) params.search = search;
       const res = await warehouseAPI.getProducts(params);
-      const data = res.data;
-      setProducts(data.results || data || []);
-      if (data.count) setTotalPages(Math.ceil(data.count / 20));
+      applyProducts(res.data);
     } catch (err) {
       console.error('Failed to fetch inventory:', err);
       setError('Failed to load inventory. Please try again.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [page, search]);
+  }, [applyProducts, debouncedSearch, page]);
 
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => { fetchProducts({ background: productsRef.current.length > 0 }); }, [fetchProducts]);
 
   return (
     <div className="inv-page">
@@ -40,7 +72,9 @@ export default function InventoryManagement() {
           <h1 className="inv-title">Inventory Management</h1>
           <p className="inv-subtitle">Monitor and manage product stock levels</p>
         </div>
-        <button className="inv-refresh" onClick={fetchProducts}><RefreshCw size={16} /> Refresh</button>
+        <button className="inv-refresh" onClick={() => fetchProducts({ background: true })} disabled={refreshing}>
+          <RefreshCw size={16} className={refreshing ? 'spin' : ''} /> Refresh
+        </button>
       </div>
 
       {/* Search */}
@@ -58,11 +92,11 @@ export default function InventoryManagement() {
       {error && (
         <div className="inv-error">
           <AlertCircle size={16} /> {error}
-          <button onClick={fetchProducts} className="inv-retry">Retry</button>
+          <button onClick={() => fetchProducts()} className="inv-retry">Retry</button>
         </div>
       )}
 
-      {loading ? (
+      {loading && products.length === 0 ? (
         <TableSkeleton rows={8} columns={8} />
       ) : (
         <>

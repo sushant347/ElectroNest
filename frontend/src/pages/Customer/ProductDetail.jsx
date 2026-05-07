@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useId } from 'react';
+import { Fragment, useState, useEffect, useRef, useId } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, ShoppingCart, Heart, Truck, ShieldCheck,
@@ -13,6 +13,9 @@ import { HeaderSkeleton, CardGridSkeleton, SkeletonText } from '../../components
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const formatPrice = (p) => new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 }).format(p);
+const cleanVariantTitle = (title) => /^option\s+\d+$/i.test(String(title || '').trim())
+  ? 'Product Details'
+  : (title || 'Product Details');
 
 const STAR_PTS = "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2";
 
@@ -51,9 +54,10 @@ function StarRow({ rating, size = 16, color = '#FBBF24' }) {
 }
 
 /* ── Price Comparison Chart ── */
-function PriceComparisonChart({ productId }) {
+function PriceComparisonChart({ productId, selectedVariantId }) {
   const [priceState, setPriceState] = useState({ productId: null, data: null, loading: false });
   const [isOpen, setIsOpen] = useState(false);
+  const [activeVariantKey, setActiveVariantKey] = useState('selected');
 
   const data = priceState.productId === productId ? priceState.data : null;
   const loading = priceState.productId === productId && priceState.loading;
@@ -72,18 +76,27 @@ function PriceComparisonChart({ productId }) {
     if (nextOpen) loadPriceHistory();
   };
 
-  const priceHistory = Array.isArray(data?.price_history) ? data.price_history : [];
+  const variantSeries = Array.isArray(data?.variant_price_history) ? data.variant_price_history : [];
+  const selectedSeries = variantSeries.find(item => String(item.variant_id) === String(selectedVariantId)) || variantSeries[0] || null;
+  const selectedChartKey = selectedSeries?.key || 'base';
+  const chartMode = activeVariantKey === 'selected' ? selectedChartKey : activeVariantKey;
+  const isAllVariants = chartMode === 'all';
+  const activeSeries = isAllVariants ? null : (variantSeries.find(item => String(item.key) === String(chartMode)) || selectedSeries);
+  const priceHistory = isAllVariants
+    ? (Array.isArray(data?.all_variant_price_history) ? data.all_variant_price_history : [])
+    : (Array.isArray(activeSeries?.price_history) ? activeSeries.price_history : Array.isArray(data?.price_history) ? data.price_history : []);
   const hasLiveMarketData = ['gadgetbyte_api', 'live_market_api', 'international_market_api'].includes(data?.market_source) && priceHistory.length > 0;
   const savings = Number(data?.savings_percent || 0);
-  const marketPrice = Number(data?.market_price || 0);
-  const yourPrice = Number(data?.current_selling_price || 0);
+  const marketPrice = Number(activeSeries?.market_price || data?.market_price || 0);
+  const yourPrice = Number(activeSeries?.store_price || data?.current_selling_price || 0);
   const spread = Math.max(0, marketPrice - yourPrice);
   const marketOffers = Array.isArray(data?.market_offers) ? data.market_offers : [];
   const isLiveMarket = data?.market_source === 'live_market_api';
   const isInternationalMarket = data?.market_source === 'international_market_api';
   const isGadgetByteMarket = data?.market_source === 'gadgetbyte_api';
   const volatility = Number(data?.market_volatility_percent || 0);
-  const advantage = Number(data?.price_advantage_percent || savings || 0);
+  const advantage = Number(activeSeries?.savings_percent ?? data?.price_advantage_percent ?? savings ?? 0);
+  const chartColors = ['#ef4444', '#0ea5e9', '#16a34a', '#8b5cf6', '#f97316', '#0891b2', '#be123c', '#4f46e5'];
 
   return (
     <div className="price-insights-wrap" style={{
@@ -162,23 +175,51 @@ function PriceComparisonChart({ productId }) {
         </div>
       ) : (
         <>
+      {variantSeries.length > 0 && (
+        <div style={s.priceVariantScroller}>
+          <button
+            type="button"
+            onClick={() => setActiveVariantKey('all')}
+            style={{ ...s.priceVariantChip, ...(isAllVariants ? s.priceVariantChipActive : {}) }}
+          >
+            All configurations
+          </button>
+          {variantSeries.map((variant) => {
+            const active = !isAllVariants && String(activeSeries?.key) === String(variant.key);
+            return (
+              <button
+                key={variant.key}
+                type="button"
+                onClick={() => setActiveVariantKey(String(variant.key))}
+                style={{ ...s.priceVariantChip, ...(active ? s.priceVariantChipActive : {}) }}
+              >
+                <span style={s.priceVariantTitle}>{cleanVariantTitle(variant.title)}</span>
+                <span style={s.priceVariantMeta}>
+                  Store {formatPrice(variant.store_price)} · Market {formatPrice(variant.market_price)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div style={{ display: 'grid', gap: 10, marginTop: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         <div style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: 12, padding: '10px 12px' }}>
-          <div style={{ fontSize: 11, color: '#9a3412', marginBottom: 4 }}>Your Price</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#c2410c' }}>{formatPrice(yourPrice)}</div>
+          <div style={{ fontSize: 11, color: '#9a3412', marginBottom: 4 }}>{isAllVariants ? 'Store Price Range' : 'Your Price'}</div>
+          <div style={s.priceMetricValue}>{isAllVariants ? `${formatPrice(Math.min(...variantSeries.map(v => Number(v.store_price || 0))))} - ${formatPrice(Math.max(...variantSeries.map(v => Number(v.store_price || 0))))}` : formatPrice(yourPrice)}</div>
         </div>
         <div style={{ background: '#fff', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 12px' }}>
-          <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 4 }}>Market Price</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#dc2626' }}>{formatPrice(marketPrice)}</div>
+          <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 4 }}>{isAllVariants ? 'Market Price Range' : 'Market Price'}</div>
+          <div style={{ ...s.priceMetricValue, color: '#dc2626' }}>{isAllVariants ? `${formatPrice(Math.min(...variantSeries.map(v => Number(v.market_price || 0))))} - ${formatPrice(Math.max(...variantSeries.map(v => Number(v.market_price || 0))))}` : formatPrice(marketPrice)}</div>
           <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{isGadgetByteMarket ? 'Fetched from GadgetByte' : isInternationalMarket ? 'International market converted' : isLiveMarket ? 'Fetched from Nepal market' : 'Live data unavailable'}</div>
         </div>
         <div style={{ background: '#fff', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#166534', marginBottom: 4 }}>You Save</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#15803d' }}>{formatPrice(spread)}</div>
+          <div style={{ ...s.priceMetricValue, color: '#15803d' }}>{isAllVariants ? 'See chart' : formatPrice(spread)}</div>
         </div>
         <div style={{ background: '#fff', border: '1px solid #c7d2fe', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: '#3730a3', marginBottom: 4 }}>Price Advantage</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#4338ca' }}>{Math.max(0, advantage).toFixed(1)}%</div>
+          <div style={{ ...s.priceMetricValue, color: '#4338ca' }}>{isAllVariants ? '5-15%' : `${Math.max(0, advantage).toFixed(1)}%`}</div>
         </div>
       </div>
 
@@ -186,7 +227,11 @@ function PriceComparisonChart({ productId }) {
         <div>
           <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>Market vs Platform Trend</div>
           <div style={{ fontSize: 12, color: '#64748b' }}>
-            {isGadgetByteMarket
+            {isAllVariants
+              ? 'Showing every configuration separately so higher-spec prices are not averaged into lower-spec models.'
+              : activeSeries?.title
+              ? `Showing ${cleanVariantTitle(activeSeries.title)} against its matching market offer.`
+              : isGadgetByteMarket
               ? `Using GadgetByte Nepal as the 3-month market baseline with ${volatility.toFixed(1)}% market spread.`
               : isInternationalMarket
               ? `Using nearest international offer${marketOffers.length === 1 ? '' : 's'} converted at $1 = NPR 140.`
@@ -209,6 +254,7 @@ function PriceComparisonChart({ productId }) {
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
+                alignItems: 'flex-start',
                 gap: 12,
                 textDecoration: 'none',
                 color: 'inherit',
@@ -218,10 +264,10 @@ function PriceComparisonChart({ productId }) {
                 background: '#fff',
               }}
             >
-              <span style={{ fontSize: 12, color: '#475569', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 12, color: '#475569', fontWeight: 700, minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.35 }}>
                 {offer.store}: {offer.name}
               </span>
-              <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 800, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {formatPrice(offer.price)}
                 {offer.currency === 'USD' && offer.original_price ? ` ($${Number(offer.original_price).toLocaleString()})` : ''}
               </span>
@@ -231,18 +277,27 @@ function PriceComparisonChart({ productId }) {
       )}
 
       <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 12, height: 3, borderRadius: 2, background: '#ef4444' }} />
-          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Market Price</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 12, height: 3, borderRadius: 2, background: '#0ea5e9' }} />
-          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Platform Price</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 12, height: 12, borderRadius: 2, background: 'rgba(249,115,22,0.18)', border: '1px solid rgba(249,115,22,0.35)' }} />
-          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Market Volatility</span>
-        </div>
+        {isAllVariants ? variantSeries.map((variant, idx) => (
+          <div key={variant.key} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <div style={{ width: 12, height: 3, borderRadius: 2, background: chartColors[idx % chartColors.length], flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700, overflowWrap: 'anywhere' }}>{cleanVariantTitle(variant.title)}</span>
+          </div>
+        )) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 12, height: 3, borderRadius: 2, background: '#ef4444' }} />
+              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Market Price</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 12, height: 3, borderRadius: 2, background: '#0ea5e9' }} />
+              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Platform Price</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 12, height: 12, borderRadius: 2, background: 'rgba(249,115,22,0.18)', border: '1px solid rgba(249,115,22,0.35)' }} />
+              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Market Volatility</span>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="price-chart-box" style={{ width: '100%', height: 280 }}>
@@ -277,6 +332,12 @@ function PriceComparisonChart({ productId }) {
               labelStyle={{ fontWeight: 700, color: '#1e293b', marginBottom: 4 }}
               itemStyle={{ fontSize: 13, fontWeight: 600 }}
               formatter={(value, name) => {
+                const key = String(name || '');
+                const allMatch = key.match(/^(market|our)_(\d+)$/);
+                if (allMatch) {
+                  const variant = variantSeries[Number(allMatch[2])];
+                  return [formatPrice(value), `${cleanVariantTitle(variant?.title || 'Configuration')} ${allMatch[1] === 'our' ? 'Store' : 'Market'}`];
+                }
                 if (name === 'our_price') return [formatPrice(value), 'Platform Price'];
                 if (name === 'market_band') return [value.map(formatPrice).join(' - '), 'Market Volatility'];
                 return [formatPrice(value), 'Market Price'];
@@ -286,9 +347,18 @@ function PriceComparisonChart({ productId }) {
                 return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`;
               }}
             />
-            <Area type="monotone" dataKey="market_band" fill="url(#marketFillNew)" stroke="none" dot={false} activeDot={false} />
-            <Line type="monotone" dataKey="market_price" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 2, fill: '#ef4444' }} activeDot={{ r: 5 }} />
-            <Line type="monotone" dataKey="our_price" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 3, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+            {isAllVariants ? variantSeries.map((variant, idx) => (
+              <Fragment key={variant.key}>
+                <Line type="monotone" dataKey={`market_${idx}`} stroke={chartColors[idx % chartColors.length]} strokeWidth={2.4} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey={`our_${idx}`} stroke={chartColors[idx % chartColors.length]} strokeWidth={2.4} strokeDasharray="5 4" dot={{ r: 2 }} activeDot={{ r: 5 }} />
+              </Fragment>
+            )) : (
+              <>
+                <Area type="monotone" dataKey="market_band" fill="url(#marketFillNew)" stroke="none" dot={false} activeDot={false} />
+                <Line type="monotone" dataKey="market_price" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 2, fill: '#ef4444' }} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="our_price" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 3, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+              </>
+            )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -298,10 +368,10 @@ function PriceComparisonChart({ productId }) {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
       }}>
         <div style={{ fontSize: 12, color: '#64748b' }}>
-          Current: <strong style={{ color: '#0ea5e9' }}>{formatPrice(data.current_selling_price)}</strong>
+          Current: <strong style={{ color: '#0ea5e9' }}>{isAllVariants ? 'All configurations' : formatPrice(yourPrice)}</strong>
         </div>
         <div style={{ fontSize: 12, color: '#64748b' }}>
-          Market Price: <strong style={{ color: '#ef4444' }}>{formatPrice(data.market_price)}</strong>
+          Market Price: <strong style={{ color: '#ef4444' }}>{isAllVariants ? `${variantSeries.length} offers` : formatPrice(marketPrice)}</strong>
         </div>
         <div style={{ fontSize: 12, color: '#64748b' }}>
           Volatility: <strong style={{ color: '#f97316' }}>{volatility.toFixed(1)}%</strong>
@@ -484,13 +554,13 @@ const normalize = (p) => {
     sku: p.sku || '',
     reorderLevel: p.reorder_level || 10,
     unitsSold: p.units_sold || 0,
-    variants: Array.isArray(p.variants) ? p.variants.map(v => {
+    variants: Array.isArray(p.variants) ? p.variants.filter(v => v.is_active !== false).map(v => {
       const vPrice = parseFloat(v.price || 0);
       const vDisc = v.discount_price != null && v.discount_price !== '' ? parseFloat(v.discount_price) : null;
       const vOnSale = vDisc !== null && vDisc > 0 && vDisc < vPrice;
       return {
         id: v.id,
-        title: v.title || 'Standard',
+        title: cleanVariantTitle(v.title),
         sku: v.sku || '',
         color: v.color || '',
         specs: v.specs || '',
@@ -955,7 +1025,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
     ...product,
     cartKey: `${product.id}:${selectedVariant?.id || 'base'}`,
     variantId: selectedVariant?.id || null,
-    variantLabel: selectedVariant?.title || '',
+    variantLabel: selectedVariant ? cleanVariantTitle(selectedVariant.title) : '',
     price: activePrice,
     origPrice: activeOrigPrice,
     onSale: activeOnSale,
@@ -1111,7 +1181,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
         <CouponCarousel coupons={coupons} storeName={product.ownerName} />
 
         {/* ── Price Comparison Graph ── */}
-        <PriceComparisonChart productId={product.id} />
+        <PriceComparisonChart productId={product.id} selectedVariantId={selectedVariant?.id} />
 
         {displayDescription && isDescriptionOpen && (
           <section ref={descriptionRef} style={s.descriptionBanner}>
@@ -1332,7 +1402,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
                         }}
                         disabled={variant.stock <= 0}
                       >
-                        <span style={s.variantTitle}>{variant.title}</span>
+                        <span style={s.variantTitle}>{cleanVariantTitle(variant.title)}</span>
                         {variant.specs && <span style={s.variantSpecs}>{variant.specs}</span>}
                         <span style={s.variantMeta}>{variant.stock > 0 ? 'Available' : 'Out of stock'} · {formatPrice(variant.price)}</span>
                       </button>
@@ -1550,15 +1620,21 @@ const s = {
   descriptionTitle: { fontSize: 20, lineHeight: 1.25, fontWeight: 800, color: '#1e293b', margin: 0 },
   descriptionCloseBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', borderRadius: 9, padding: '8px 11px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
   descriptionFullText: { margin: 0, fontSize: 15, color: '#475569', lineHeight: 1.8, whiteSpace: 'pre-line' },
+  priceVariantScroller: { display: 'flex', gap: 10, marginTop: 14, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'thin' },
+  priceVariantChip: { flex: '0 0 210px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#334155', borderRadius: 10, padding: '9px 10px', minHeight: 58, display: 'grid', gap: 3, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' },
+  priceVariantChipActive: { borderColor: '#F97316', background: '#fff7ed', boxShadow: '0 0 0 3px rgba(249,115,22,0.10)' },
+  priceVariantTitle: { fontSize: 12, fontWeight: 800, lineHeight: 1.25, overflowWrap: 'anywhere', color: '#1e293b' },
+  priceVariantMeta: { fontSize: 10, fontWeight: 700, lineHeight: 1.25, color: '#64748b', overflowWrap: 'anywhere' },
+  priceMetricValue: { fontSize: 18, lineHeight: 1.25, fontWeight: 800, color: '#c2410c', overflowWrap: 'anywhere' },
   variantBox: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc', display: 'grid', gap: 12 },
   variantHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, fontSize: 13, fontWeight: 800, color: '#334155' },
   variantGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 },
-  variantBtn: { border: '1.5px solid #cbd5e1', background: '#fff', borderRadius: 10, padding: '10px 12px', textAlign: 'left', cursor: 'pointer', display: 'grid', gap: 4, minHeight: 76, fontFamily: 'inherit' },
+  variantBtn: { border: '1.5px solid #cbd5e1', background: '#fff', borderRadius: 10, padding: '10px 12px', textAlign: 'left', cursor: 'pointer', display: 'grid', gap: 4, minHeight: 76, fontFamily: 'inherit', minWidth: 0 },
   variantBtnActive: { borderColor: '#F97316', boxShadow: '0 0 0 3px rgba(249,115,22,0.12)', background: '#fff7ed' },
   variantBtnDisabled: { opacity: 0.45, cursor: 'not-allowed' },
-  variantTitle: { fontSize: 13, color: '#1e293b', fontWeight: 800 },
-  variantSpecs: { fontSize: 11, color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  variantMeta: { fontSize: 11, color: '#F97316', fontWeight: 700 },
+  variantTitle: { fontSize: 13, color: '#1e293b', fontWeight: 800, overflowWrap: 'anywhere', lineHeight: 1.25 },
+  variantSpecs: { fontSize: 11, color: '#64748b', fontWeight: 600, overflowWrap: 'anywhere', lineHeight: 1.3 },
+  variantMeta: { fontSize: 11, color: '#F97316', fontWeight: 700, overflowWrap: 'anywhere', lineHeight: 1.25 },
   actionsRow: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 4 },
   qtyWrap: { display: 'flex', alignItems: 'center', gap: 0, border: '1.5px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' },
   qtyBtn: { width: 36, height: 38, background: '#f8fafc', border: 'none', fontSize: 18, cursor: 'pointer', color: '#334155', fontWeight: 600 },

@@ -43,6 +43,10 @@ class Command(BaseCommand):
         ])
         if not options['skip_market_refresh']:
             steps.append(('refresh_market_prices', {}))
+        steps.append(('sync_market_offer_variants', {
+            'min_stock': options['min_stock'],
+            'max_stock': options['max_stock'],
+        }))
         steps.append(('check', {}))
 
         for name, kwargs in steps:

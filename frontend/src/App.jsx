@@ -10,6 +10,10 @@ import ErrorBoundary from './components/Common/ErrorBoundary'
 import { useAuth } from './context/AuthContext'
 import { customerAPI } from './services/api'
 
+const cleanVariantTitle = (title) => /^option\s+\d+$/i.test(String(title || '').trim())
+  ? 'Product Details'
+  : (title || '')
+
 const Home = lazy(() => import('./pages/Home'))
 const AboutUs = lazy(() => import('./pages/AboutUs'))
 const Wishlist = lazy(() => import('./pages/Customer/Wishlist'))
@@ -126,7 +130,7 @@ export default function App() {
       cartItemId: item.id,
       name: p.name || p.ProductName || '',
       variantId,
-      variantLabel: v?.title || '',
+      variantLabel: cleanVariantTitle(v?.title),
       category: p.category_name || '',
       price: v ? (onSale ? variantDisc : variantPrice) : (onSale ? disc : selling),
       origPrice: onSale ? (v ? variantPrice : selling) : null,

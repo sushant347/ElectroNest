@@ -40,7 +40,18 @@ export default function WarehouseNavbar() {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { fetchNotifications(); const t = setInterval(fetchNotifications, 30000); return () => clearInterval(t); }, [fetchNotifications]);
+  useEffect(() => {
+    const first = setTimeout(fetchNotifications, 1400);
+    const t = setInterval(fetchNotifications, 60000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    if (showNotifs && notifications.length === 0) fetchNotifications();
+  }, [showNotifs, notifications.length, fetchNotifications]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {

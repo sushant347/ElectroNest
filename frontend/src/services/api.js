@@ -25,11 +25,12 @@ const readStoredGet = (key) => {
   if (memory) getCache.delete(key);
 
   try {
-    const raw = sessionStorage.getItem(`api:${key}`);
+    const raw = sessionStorage.getItem(`api:${key}`) || localStorage.getItem(`api:${key}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed.expiresAt <= now) {
       sessionStorage.removeItem(`api:${key}`);
+      localStorage.removeItem(`api:${key}`);
       return null;
     }
     getCache.set(key, parsed);
@@ -43,6 +44,7 @@ const writeStoredGet = (key, data, ttl = GET_CACHE_TTL) => {
   const entry = { data, expiresAt: Date.now() + ttl };
   getCache.set(key, entry);
   try { sessionStorage.setItem(`api:${key}`, JSON.stringify(entry)); } catch { /* storage can be full/private */ }
+  try { localStorage.setItem(`api:${key}`, JSON.stringify(entry)); } catch { /* storage can be full/private */ }
 };
 
 export const peekCachedGet = (url, params) => readStoredGet(makeGetCacheKey(url, params));
@@ -77,6 +79,11 @@ const clearGetCache = () => {
     Object.keys(sessionStorage)
       .filter(key => key.startsWith('api:'))
       .forEach(key => sessionStorage.removeItem(key));
+  } catch { /* ignore storage access errors */ }
+  try {
+    Object.keys(localStorage)
+      .filter(key => key.startsWith('api:'))
+      .forEach(key => localStorage.removeItem(key));
   } catch { /* ignore storage access errors */ }
 };
 
@@ -281,13 +288,17 @@ export const ownerAPI = {
   deleteCoupon: (id) => api.delete(`/coupons/${id}/`),
 };
 
+const warehouseMovementParams = (params) => ({ limit: 120, ...(params || {}) });
+
 // ── Warehouse API Endpoints ──
 export const warehouseAPI = {
   // Dashboard
-  getDashboard: () => cachedGet('/warehouse/dashboard/'),
+  getDashboard: () => cachedGet('/warehouse/dashboard/', {}, 300_000),
+  peekDashboard: () => peekCachedGet('/warehouse/dashboard/'),
 
   // Stock Movements (detailed: shipped orders, received POs, product updates)
-  getStockMovements: (params) => cachedGet('/warehouse/stock-movements/', { params }),
+  getStockMovements: (params) => cachedGet('/warehouse/stock-movements/', { params: warehouseMovementParams(params) }, 300_000),
+  peekStockMovements: (params) => peekCachedGet('/warehouse/stock-movements/', warehouseMovementParams(params)),
 
   // Purchase Orders
   getPurchaseOrders: (params) => cachedGet('/warehouse/purchase-orders/', { params }),
@@ -296,14 +307,16 @@ export const warehouseAPI = {
   receivePurchaseOrder: (id) => api.patch(`/warehouse/purchase-orders/${id}/receive/`),
 
   // Low Stock (from analytics)
-  getLowStockProducts: (params) => cachedGet('/analytics/low-stock/', { params }),
+  getLowStockProducts: (params) => cachedGet('/analytics/low-stock/', { params }, 300_000),
+  peekLowStockProducts: (params) => peekCachedGet('/analytics/low-stock/', params),
 
   // Suppliers & Products (for dropdowns)
   getSuppliers: (params) => cachedGet('/suppliers/', { params }),
-  getProducts: (params) => cachedGet('/products/', { params }),
+  getProducts: (params) => cachedGet('/products/', { params }, 300_000),
+  peekProducts: (params) => peekCachedGet('/products/', params),
 
   // Inventory items (alias for products with stock info)
-  getInventoryItems: (params) => cachedGet('/products/', { params }),
+  getInventoryItems: (params) => cachedGet('/products/', { params }, 300_000),
 
   // Owners (users with owner role)
   getOwners: () => cachedGet('/admin/users/', { params: { role: 'owner' } }),
@@ -397,7 +410,7 @@ export const customerAPI = {
 // ── Admin API Endpoints ──
 export const adminAPI = {
   // Dashboard
-  getDashboard: () => cachedGet('/admin/dashboard/'),
+  getDashboard: () => cachedGet('/admin/dashboard/', {}, 180_000),
 
   // User Management
   getUsers: (params) => cachedGet('/admin/users/', { params }),

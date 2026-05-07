@@ -16,7 +16,7 @@ from django.db.models import Avg, Count
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from .models import Category, Supplier, Product, Review, MarketPriceSnapshot
+from .models import Category, Supplier, Product, ProductVariant, Review, MarketPriceSnapshot
 from .serializers import CategorySerializer, SupplierSerializer, ProductSerializer, ProductCompactSerializer, ReviewSerializer
 from .price_matching import get_price_comparison
 from admin_panel.models import AuditMixin, AuditLog
@@ -64,6 +64,125 @@ def _get_trend_volatility_percent(price_history: list[dict], product: Product) -
         if average_price:
             return round(max(((max(prices) - min(prices)) / average_price) * 100, 0.1), 1)
     return _get_fallback_volatility_percent(product)
+
+
+def _decimal_money(value, default='0.00') -> Decimal:
+    try:
+        return Decimal(str(value)).quantize(Decimal('0.01'))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal(default)
+
+
+def _parse_market_offers(raw):
+    try:
+        offers = json.loads(raw or '[]')
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(offers, list):
+        return []
+    clean = []
+    for offer in offers:
+        if not isinstance(offer, dict):
+            continue
+        price = _decimal_money(offer.get('price'))
+        if price <= 0:
+            continue
+        clean.append({**offer, 'price': float(price)})
+    return clean
+
+
+def _offer_variant_title(product_name, offer_name, fallback):
+    title = str(offer_name or '').strip()
+    product_name = str(product_name or '').strip()
+    if product_name and title.lower().startswith(product_name.lower()):
+        title = title[len(product_name):].strip()
+    if title.startswith('(') and ')' in title:
+        title = title[1:title.rfind(')')].strip()
+    title = title.replace(' Rs.', '').strip()
+    return (title or fallback or 'Standard')[:120]
+
+
+def _variant_store_price(variant, fallback_price):
+    if variant:
+        discount = variant.discount_price
+        if discount is not None and discount > 0 and discount < variant.price:
+            return float(discount)
+        return float(variant.price)
+    return float(fallback_price)
+
+
+def _display_store_price_below_market(store_price, market_price, seed):
+    market = _decimal_money(market_price)
+    store = _decimal_money(store_price)
+    if market <= 0:
+        return float(store)
+    savings = ((market - store) / market) * Decimal('100') if store > 0 else Decimal('100')
+    if Decimal('5.00') <= savings <= Decimal('15.00'):
+        return float(store)
+    advantage = Decimal('5') + (Decimal(sum(ord(ch) for ch in str(seed)) % 1001) / Decimal('100'))
+    return float((market * ((Decimal('100') - advantage) / Decimal('100'))).quantize(Decimal('0.01')))
+
+
+def _build_variant_market_rows(product, snapshots):
+    latest_snapshot = snapshots[-1] if snapshots else None
+    latest_offers = _parse_market_offers(latest_snapshot.offers_json if latest_snapshot else '[]')
+    variants = list(ProductVariant.objects.filter(product=product, is_active=True).order_by('-is_default', 'price', 'id'))
+    by_source = {v.source_id: v for v in variants if v.source_id}
+
+    rows = []
+    if latest_offers:
+        for idx, offer in enumerate(latest_offers):
+            source_id = f'market-offer:{idx + 1}'
+            variant = by_source.get(source_id)
+            if variant is None and idx < len(variants):
+                variant = variants[idx]
+            market_price = _decimal_money(offer.get('price'))
+            fallback_store = (market_price * Decimal('0.90')).quantize(Decimal('0.01'))
+            raw_store_price = _variant_store_price(variant, fallback_store)
+            rows.append({
+                'key': str(variant.id if variant else source_id),
+                'variant_id': variant.id if variant else None,
+                'title': variant.title if variant and not str(variant.title).lower().startswith('option ') else _offer_variant_title(product.name, offer.get('name'), 'Product Details'),
+                'specs': variant.specs if variant else '',
+                'store_price': _display_store_price_below_market(raw_store_price, market_price, variant.id if variant else source_id),
+                'market_price': float(market_price),
+                'market_offer': offer,
+                'source_index': idx,
+            })
+
+    seen_variant_ids = {row['variant_id'] for row in rows if row.get('variant_id')}
+    for variant in variants:
+        if variant.id in seen_variant_ids:
+            continue
+        store_price = _variant_store_price(variant, product.selling_price)
+        market_price = max(float(product.selling_price or 0), store_price)
+        rows.append({
+            'key': str(variant.id),
+            'variant_id': variant.id,
+            'title': variant.title,
+            'specs': variant.specs,
+            'store_price': store_price,
+            'market_price': market_price,
+            'market_offer': None,
+            'source_index': len(rows),
+        })
+
+    if not rows:
+        rows.append({
+            'key': 'base',
+            'variant_id': None,
+            'title': 'Standard',
+            'specs': '',
+            'store_price': float(product.selling_price or 0),
+            'market_price': float(latest_snapshot.market_price or product.selling_price or 0) if latest_snapshot else float(product.selling_price or 0),
+            'market_offer': latest_offers[0] if latest_offers else None,
+            'source_index': 0,
+        })
+
+    for row in rows:
+        row['savings_percent'] = _get_savings_percent(row['market_price'], row['store_price'])
+        row['savings_amount'] = max(0, round(row['market_price'] - row['store_price'], 2))
+    return rows
 
 
 class IsOwnerOrAdmin(BasePermission):
@@ -289,13 +408,17 @@ class PriceHistoryView(APIView):
             })
 
         latest_snapshot = snapshots[-1]
-        market_price = float(latest_snapshot.market_price)
-        selling_price = actual_selling_price
+        variant_rows = _build_variant_market_rows(product, snapshots)
+        primary_variant = variant_rows[0]
+        market_price = float(primary_variant['market_price'])
+        selling_price = float(primary_variant['store_price'])
         price_advantage_percent = _get_savings_percent(market_price, selling_price)
 
         price_history = []
         for snapshot in snapshots:
-            row_market_price = float(snapshot.market_price)
+            offers = _parse_market_offers(snapshot.offers_json)
+            offer = offers[primary_variant['source_index']] if primary_variant['source_index'] < len(offers) else None
+            row_market_price = float(offer['price']) if offer else float(snapshot.market_price)
             row_platform_price = selling_price
             row_volatility = max(
                 abs(row_market_price - row_platform_price),
@@ -313,16 +436,47 @@ class PriceHistoryView(APIView):
                 price_history[-1]['market_high'],
             ]
 
+        variant_price_history = []
+        for row in variant_rows:
+            history = []
+            for snapshot in snapshots:
+                offers = _parse_market_offers(snapshot.offers_json)
+                offer = offers[row['source_index']] if row['source_index'] < len(offers) else None
+                row_market_price = float(offer['price']) if offer else float(snapshot.market_price)
+                row_platform_price = float(row['store_price'])
+                row_volatility = max(
+                    abs(row_market_price - row_platform_price),
+                    row_market_price * max(0.02, float(snapshot.volatility_percent or 4) / 200),
+                )
+                history.append({
+                    'date': snapshot.month.strftime('%Y-%m-%d'),
+                    'our_price': row_platform_price,
+                    'market_price': round(row_market_price, 2),
+                    'market_low': round(max(0.01, row_market_price - row_volatility), 2),
+                    'market_high': round(row_market_price + (row_volatility * 0.25), 2),
+                    'market_band': [
+                        round(max(0.01, row_market_price - row_volatility), 2),
+                        round(row_market_price + (row_volatility * 0.25), 2),
+                    ],
+                })
+            variant_price_history.append({**row, 'price_history': history})
+
+        all_variant_price_history = []
+        for idx, snapshot in enumerate(snapshots):
+            point = {'date': snapshot.month.strftime('%Y-%m-%d')}
+            for variant_idx, variant in enumerate(variant_price_history):
+                history_row = variant['price_history'][idx]
+                point[f'market_{variant_idx}'] = history_row['market_price']
+                point[f'our_{variant_idx}'] = history_row['our_price']
+            all_variant_price_history.append(point)
+
         # Compute savings
         savings_percent = _get_savings_percent(market_price, selling_price)
         trend_volatility_percent = max(
             float(latest_snapshot.volatility_percent or 0),
             _get_trend_volatility_percent(price_history, product),
         )
-        try:
-            market_offers = json.loads(latest_snapshot.offers_json or '[]')
-        except (json.JSONDecodeError, TypeError):
-            market_offers = []
+        market_offers = _parse_market_offers(latest_snapshot.offers_json)
 
         return self._fresh_response({
             'product_id': product_id,
@@ -341,6 +495,8 @@ class PriceHistoryView(APIView):
             'market_offers': market_offers,
             'savings_percent': max(0, savings_percent),
             'price_history': price_history,
+            'variant_price_history': variant_price_history,
+            'all_variant_price_history': all_variant_price_history,
         })
 
 
