@@ -153,8 +153,6 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
   const [sortBy, setSortBy] = useState('')
   const [selBrands, setSelBrands] = useState([])
   const [selStores, setSelStores] = useState([])
-  const allBrands = [...new Set(prods.map(p => (p.brand || p.Brand || '')).filter(Boolean))].sort()
-  const allStores = [...new Set(prods.map(p => (p.owner_name || p.OwnerName || '').trim()).filter(Boolean))].sort()
   const clearFilters = () => { setMinPrice(''); setMaxPrice(''); setSortBy(''); setSelBrands([]); setSelStores([]) }
   const hasFilters = minPrice || maxPrice || sortBy || selBrands.length > 0 || selStores.length > 0
 
@@ -373,6 +371,22 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
 
     return applyImgVariants(items)
   })()
+
+  const filterScopeProds = useMemo(() => {
+    let f = prods
+    if (searchQ) {
+      const q = searchQ.toLowerCase()
+      f = f.filter(p => norm(p).name.toLowerCase().includes(q) || norm(p).brand.toLowerCase().includes(q) || norm(p).category.toLowerCase().includes(q))
+    }
+    if (selCat) f = f.filter(p => norm(p).category === selCat)
+    return f.map(norm)
+  }, [prods, searchQ, selCat])
+  const allBrands = useMemo(() => [...new Set(filterScopeProds.map(p => p.brand).filter(Boolean))].sort(), [filterScopeProds])
+  const allStores = useMemo(() => [...new Set(filterScopeProds.map(p => (p.ownerName || '').trim()).filter(Boolean))].sort(), [filterScopeProds])
+
+  useEffect(() => {
+    setSelBrands(prev => prev.filter(brand => allBrands.includes(brand)))
+  }, [allBrands])
 
   const markCompactIfOverflowing = (event, productId) => {
     const img = event.currentTarget
