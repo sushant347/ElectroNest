@@ -78,7 +78,7 @@ const SIDE = [
 function getCatEmoji(n) { return { Smartphones: '📱', Laptops: '💻', Monitors: '🖥️', Tablets: '📟', Drones: '🚁', Smartwatches: '⌚', 'PC Builds': '🧩', Speakers: '🔊', Earbuds: '🎧', Headphones: '🎧', Cameras: '📷', 'Gaming Consoles': '🎮' }[n] || '📦' }
 
 function shouldUseContainInCard(categoryName = '', productName = '') {
-  return /smartphones|headphones|earbuds|smartwatches|tablets|pc builds|speakers/i.test(categoryName)
+  return /smartphones|laptops|headphones|earbuds|smartwatches|tablets|pc builds|speakers/i.test(categoryName)
     || /phone|headphone|headset|earbud|earphone|airpod|buds|watch|fenix|amazfit/i.test(productName)
 }
 
@@ -393,7 +393,7 @@ export default function Home({ addToCart, toggleWishlist, wishlistItems = [], to
     if (!img?.naturalWidth || !img?.naturalHeight) return
     const ratio = img.naturalHeight / img.naturalWidth
     const category = img.dataset.category || ''
-    const categoryNeedsCare = /tablets|pc builds|speakers/i.test(category)
+    const categoryNeedsCare = /laptops|tablets|pc builds|speakers/i.test(category)
     const shouldCompact = ratio > (categoryNeedsCare ? 1.08 : 1.28)
     if (shouldCompact) {
       setCompactImages(prev => prev[productId] ? prev : { ...prev, [productId]: true })
@@ -895,5 +895,5 @@ const STYLES = `
 /* RESPONSIVE */
 @media(max-width:1024px){.hm-layout{grid-template-columns:1fr 300px;}.hm-grid{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:768px){.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:row;}.hm-side-lg{flex:2;}.hm-side-row{flex:1;flex-direction:column;gap:.85rem;}.hm-side-sm{min-height:0;flex:1;}.hm-grid{grid-template-columns:repeat(3,1fr);}.hm-prods-sec{padding:1.25rem 1.5rem;}.hm-card-img{height:185px;}}
-@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-controls{display:none;}.hm-banner-cta{bottom:.35rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1rem .85rem;}.hm-grid{grid-template-columns:repeat(2,1fr);gap:.75rem;}.hm-card-img{height:155px;}.hm-card-img.compact{padding:10px;}.hm-on-sale{font-size:.72rem;padding:5px 10px;}.hm-pnm{font-size:.85rem;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}.hm-ticket{padding:9px 11px 10px;}.hm-ticket-price{font-size:1.25rem;}.hm-ticket-icon{font-size:1.1rem;}.hm-ticket-save{font-size:.72rem;}.hm-ticket-ltd{display:none;}.hm-icon-btn{width:32px;height:32px;}}
+@media(max-width:640px){.hm-hero-sec{padding:.85rem;}.hm-controls{display:none;}.hm-banner-cta{bottom:.35rem;left:.75rem;}.hm-shopbtn{padding:.45rem 1rem;font-size:.75rem;}.hm-s-btn{padding:.28rem .6rem;font-size:.68rem;}.hm-s-btn.sm{padding:.22rem .5rem;font-size:.64rem;}.hm-layout{grid-template-columns:1fr;}.hm-side-col{flex-direction:column;}.hm-side-row{grid-template-columns:1fr 1fr;}.hm-s-imgbox.lg{width:112px;height:112px;}.hm-s-imgbox.sm{width:72px;height:72px;}.hm-cats-sec{padding:1rem .85rem .5rem;}.hm-prods-sec{padding:1rem .85rem;}.hm-grid{grid-template-columns:repeat(2,1fr);gap:.75rem;}.hm-card-img{height:155px;}.hm-card-img.compact{padding:10px;}.hm-on-sale{font-size:.72rem;padding:5px 10px;}.hm-pnm{font-size:.85rem;}.hm-cat-circle{width:76px;height:76px;}.hm-cat-nm{max-width:76px;font-size:.71rem;}.hm-ticket{padding:9px 11px 10px;}.hm-ticket-price{font-size:1.25rem;}.hm-ticket-icon{font-size:1.1rem;}.hm-ticket-save{font-size:.72rem;}.hm-ticket-ltd{display:none;}.hm-icon-btn{width:32px;height:32px;}}
 `
