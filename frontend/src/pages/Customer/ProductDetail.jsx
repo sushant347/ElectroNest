@@ -916,6 +916,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
   const [cartModalOpen, setCartModalOpen] = useState(false);
   const alsoRef = useRef(null);
   const descriptionRef = useRef(null);
+  const reviewsRef = useRef(null);
   const [alsoIndex, setAlsoIndex] = useState(0);
 
   const scrollAlso = (dir) => {
@@ -937,6 +938,10 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
     setTimeout(() => {
       descriptionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
+  };
+
+  const scrollToReviews = () => {
+    reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   useEffect(() => {
@@ -1140,14 +1145,14 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
             )}
 
             {/* Rating */}
-            <div style={s.ratingRow}>
+            <button type="button" style={s.ratingRow} onClick={scrollToReviews} title="View customer reviews">
               <StarRow rating={product.rating} size={16} />
               <span style={{ marginLeft: 8, fontSize: 14, color: '#64748b' }}>
                 {product.rating.toFixed(1)} /5
                 {product.ratingCount > 0 ? ` (${product.ratingCount})` : ''}
-                {Number(product.unitsSold || 0) > 0 ? ` ${Number(product.unitsSold).toLocaleString('en-NP')} solds` : ''}
+                {Number(product.unitsSold || 0) > 0 ? ` ${Number(product.unitsSold).toLocaleString('en-NP')} sold` : ''}
               </span>
-            </div>
+            </button>
 
             {/* Price */}
             <div style={s.priceRow}>
@@ -1170,13 +1175,6 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
                 {activeStock > 0 ? '✓ Available' : '✕ Out of Stock'}
               </span>
               {activeSku && <span style={{ fontSize: 12, color: '#9CA3AF' }}>SKU: {activeSku}</span>}
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                <StarRow rating={product.rating} size={14} />
-                <span style={{ fontSize: 12, color: '#64748b', marginLeft: 4 }}>
-                  {product.rating.toFixed(1)} /5
-                  {Number(product.unitsSold || 0) > 0 ? ` ${Number(product.unitsSold).toLocaleString('en-NP')} solds` : ''}
-                </span>
-              </div>
             </div>
 
             {displayDescription && (
@@ -1285,7 +1283,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
           </div>
         )}
 
-        <div style={s.reviewsCard}>
+        <div ref={reviewsRef} style={s.reviewsCard}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <h2 style={{ ...s.specsTitle, margin: 0 }}>Customer Reviews</h2>
             {reviews.length > 3 && (
@@ -1360,12 +1358,12 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
                         <StarRow rating={p.rating} size={12} />
                         <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>{p.rating.toFixed(1)}</span>
                       </div>
-                      <div style={s.alsoPriceRow}>
-                        <span style={s.alsoPrice}>{formatPrice(p.price)}</span>
+                      <div className="also-price-row" style={s.alsoPriceRow}>
+                        <span className="also-price" style={s.alsoPrice}>{formatPrice(p.price)}</span>
                         {p.stock > 0 ? (
-                          <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 600 }}>In Stock</span>
+                          <span className="also-stock" style={{ fontSize: 10, color: '#16a34a', fontWeight: 600 }}>In Stock</span>
                         ) : (
-                          <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>Out of Stock</span>
+                          <span className="also-stock" style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>Out of Stock</span>
                         )}
                       </div>
                     </div>
@@ -1408,7 +1406,7 @@ export default function ProductDetail({ addToCart, toggleWishlist, wishlistItems
                     {product.ratingCount > 0 ? ` (${product.ratingCount})` : ''}
                   </span>
                   {Number(product.unitsSold || 0) > 0 && (
-                    <span>{Number(product.unitsSold || 0).toLocaleString('en-NP')} solds</span>
+                    <span>{Number(product.unitsSold || 0).toLocaleString('en-NP')} sold</span>
                   )}
                 </div>
               </div>
@@ -1657,7 +1655,7 @@ const s = {
   infoCol: { display: 'flex', flexDirection: 'column', gap: 16 },
   category: { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94a3b8' },
   title: { fontSize: 28, fontWeight: 800, color: '#1e293b', lineHeight: 1.2, margin: 0 },
-  ratingRow: { display: 'flex', alignItems: 'center' },
+  ratingRow: { display: 'flex', alignItems: 'center', width: 'fit-content', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' },
   priceRow: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   price: { fontSize: 28, fontWeight: 800, color: '#16a34a' },
   descriptionBtn: { width: 'fit-content', display: 'inline-flex', alignItems: 'center', gap: 7, border: '1.5px solid #fed7aa', background: '#fff7ed', color: '#c2410c', borderRadius: 10, padding: '9px 13px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' },
@@ -1737,7 +1735,7 @@ const s = {
   specsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 },
   specItem: { display: 'flex', gap: 12, alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: 10, border: '1px solid #f1f5f9' },
   specIcon: { width: 40, height: 40, borderRadius: 10, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F97316', flexShrink: 0 },
-  reviewsCard: { marginTop: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  reviewsCard: { scrollMarginTop: 18, marginTop: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 28, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
   qaCard: { marginTop: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 22, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
   qaHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   qaCount: { fontSize: 12, fontWeight: 700, color: '#64748b', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 10px' },
@@ -1788,8 +1786,8 @@ const s = {
   alsoBrand: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#F97316' },
   alsoName: { fontSize: 15, fontWeight: 600, color: '#1e293b', margin: 0, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   alsoRatingRow: { display: 'flex', alignItems: 'center', gap: 2 },
-  alsoPriceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 8 },
-  alsoPrice: { fontSize: 16, fontWeight: 800, color: '#16a34a' },
+  alsoPriceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 'auto', paddingTop: 8, minWidth: 0 },
+  alsoPrice: { fontSize: 16, fontWeight: 800, color: '#16a34a', minWidth: 0 },
   loaderWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' },
   spinner: { width: 40, height: 40, border: '4px solid #e2e8f0', borderTop: '4px solid #F97316', borderRadius: '50%', animation: 'pd-spin 0.8s linear infinite' },
   backBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, color: '#F97316', fontWeight: 600, textDecoration: 'none', fontSize: 14 },
@@ -1903,6 +1901,25 @@ const spinnerCSS = `
   @media (max-width: 640px) {
     .also-grid > a {
       flex: 0 0 calc(50% - 8px) !important;
+      min-width: 0 !important;
+    }
+    .also-price-row {
+      align-items: flex-start !important;
+      flex-direction: column !important;
+      gap: 4px !important;
+      min-width: 0 !important;
+    }
+    .also-price {
+      max-width: 100% !important;
+      font-size: 14px !important;
+      line-height: 1.2 !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+    }
+    .also-stock {
+      align-self: flex-start !important;
+      white-space: nowrap !important;
+      line-height: 1.2 !important;
     }
     .pd-cart-modal {
       padding: 16px !important;
